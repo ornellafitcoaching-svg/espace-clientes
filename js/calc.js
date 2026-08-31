@@ -105,9 +105,17 @@ window.Calc = {
     if (c.cliente && c.cliente.statut === "a_renouveler") {
       out.push({ type: "renouveler", label: "À renouveler", icon: "🔁" });
     }
-    // Programme sportif jamais envoyé alors que le suivi a démarré
+    // Programme à envoyer — UNIQUEMENT pour les clientes qui en reçoivent un :
+    //   • distanciel / hybride  → programme sportif à envoyer
+    //   • nutrition active       → programme nutrition à envoyer
+    // Une cliente présentiel (sans nutrition) est coachée en personne : rien à envoyer.
+    const type = c.cliente && c.cliente.type;
+    const nutritionActive = c.accompagnement && c.accompagnement.nutrition_active;
+    const besoinSport = type === "distanciel" || type === "hybride";
     const sportEnvoye = (c.programmes || []).some((p) => p.kind === "sportif" && p.envoye);
-    if (c.cliente && c.cliente.statut === "active" && !sportEnvoye) {
+    const nutEnvoye = (c.programmes || []).some((p) => p.kind === "nutrition" && p.envoye);
+    const aEnvoyer = (besoinSport && !sportEnvoye) || (nutritionActive && !nutEnvoye);
+    if (c.cliente && c.cliente.statut === "active" && aEnvoyer) {
       out.push({ type: "programme", label: "Programme à envoyer", icon: "📤" });
     }
     return out;

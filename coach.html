@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e3">
+<link rel="stylesheet" href="css/app.css?v=e4">
 </head>
 <body>
 <header class="topbar">
@@ -38,13 +38,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e3"></script>
-<script src="js/supabaseClient.js?v=e3"></script>
-<script src="js/auth.js?v=e3"></script>
-<script src="js/db.js?v=e3"></script>
-<script src="js/calc.js?v=e3"></script>
-<script src="js/ui/modal.js?v=e3"></script>
-<script src="js/ui/progress.js?v=e3"></script>
+<script src="js/config.js?v=e4"></script>
+<script src="js/supabaseClient.js?v=e4"></script>
+<script src="js/auth.js?v=e4"></script>
+<script src="js/db.js?v=e4"></script>
+<script src="js/calc.js?v=e4"></script>
+<script src="js/ui/modal.js?v=e4"></script>
+<script src="js/ui/progress.js?v=e4"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -56,7 +56,14 @@ const FILTERS = [
   { key: "bilan_du",    label: "Bilan à venir",   test: c => { const b = Calc.bilanStats(c.bilans); return b.joursAvant !== null && b.joursAvant >= 0 && b.joursAvant <= 7; } },
   { key: "bilan_retard",label: "Bilan en retard", test: c => { const b = Calc.bilanStats(c.bilans); return b.joursAvant !== null && b.joursAvant < 0; } },
   { key: "echeance",    label: "Suivi bientôt fini", test: c => { const s = Calc.suiviStats(c.accompagnement); return s.joursRestants !== null && s.joursRestants >= 0 && s.joursRestants <= 14; } },
-  { key: "prog_env",    label: "Programme à envoyer", test: c => c.cliente.statut === "active" && !(c.programmes||[]).some(p => p.kind==="sportif" && p.envoye) },
+  { key: "prog_env",    label: "Programme à envoyer", test: c => {
+      if (c.cliente.statut !== "active") return false;
+      const besoinSport = c.cliente.type === "distanciel" || c.cliente.type === "hybride";
+      const nutritionActive = c.accompagnement && c.accompagnement.nutrition_active;
+      const sportEnvoye = (c.programmes||[]).some(p => p.kind==="sportif" && p.envoye);
+      const nutEnvoye   = (c.programmes||[]).some(p => p.kind==="nutrition" && p.envoye);
+      return (besoinSport && !sportEnvoye) || (nutritionActive && !nutEnvoye);
+    } },
   { key: "relancer",    label: "À relancer",  test: c => c.cliente.statut === "a_renouveler" },
 ];
 
