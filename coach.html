@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e9">
+<link rel="stylesheet" href="css/app.css?v=e10">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e9"></script>
-<script src="js/supabaseClient.js?v=e9"></script>
-<script src="js/auth.js?v=e9"></script>
-<script src="js/db.js?v=e9"></script>
-<script src="js/calc.js?v=e9"></script>
-<script src="js/ui/modal.js?v=e9"></script>
-<script src="js/ui/progress.js?v=e9"></script>
+<script src="js/config.js?v=e10"></script>
+<script src="js/supabaseClient.js?v=e10"></script>
+<script src="js/auth.js?v=e10"></script>
+<script src="js/db.js?v=e10"></script>
+<script src="js/calc.js?v=e10"></script>
+<script src="js/ui/modal.js?v=e10"></script>
+<script src="js/ui/progress.js?v=e10"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -79,7 +79,14 @@ function renderAgenda(){
   STATE.clientes.forEach(c => (c.seances||[]).forEach(s => {
     if (s.statut==="prevue" && s.date && s.date>=today) items.push({ date:s.date, type:s.type, cl:c.cliente });
   }));
-  if (!items.length){ box.innerHTML=""; return; }
+  if (!items.length){
+    box.innerHTML = `<details class="section-block" style="margin:14px 0">
+      <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">0</span></summary>
+      <div class="section-body"><p class="empty">Aucune séance programmée. Depuis une fiche cliente, clique
+        « 🏋️ Séance », choisis le statut <strong>Prévue</strong> et une date à venir : elle apparaîtra ici
+        et dans l'espace de ta cliente.</p></div></details>`;
+    return;
+  }
   const byDate = {};
   items.forEach(it => (byDate[it.date] ||= []).push(it));
   const dates = Object.keys(byDate).sort((a,b)=> a<b?-1:1);
