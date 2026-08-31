@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e7">
+<link rel="stylesheet" href="css/app.css?v=e8">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e7"></script>
-<script src="js/supabaseClient.js?v=e7"></script>
-<script src="js/auth.js?v=e7"></script>
-<script src="js/db.js?v=e7"></script>
-<script src="js/calc.js?v=e7"></script>
-<script src="js/ui/modal.js?v=e7"></script>
-<script src="js/ui/progress.js?v=e7"></script>
+<script src="js/config.js?v=e8"></script>
+<script src="js/supabaseClient.js?v=e8"></script>
+<script src="js/auth.js?v=e8"></script>
+<script src="js/db.js?v=e8"></script>
+<script src="js/calc.js?v=e8"></script>
+<script src="js/ui/modal.js?v=e8"></script>
+<script src="js/ui/progress.js?v=e8"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -268,11 +268,20 @@ function sectionMensurations(){
       ${UI.lineChart(ev.points, {unite:ev.unite})}
     </div>`;
   }).join("") + `</div>` : `<p class="empty">Aucune mensuration.</p>`;
-  const listing = (D.mensurations||[]).length ? `<div style="margin-top:14px">`+
-    [...D.mensurations].sort((a,b)=>a.date<b.date?1:-1).slice(0,12).map(m=>`
-    <div class="item"><div class="idate">${Calc.fmtShort(m.date)}</div>
-      <div class="ibody"><div class="ititle">${esc(m.type.replace(/_/g," "))} : ${m.valeur}${esc(m.unite||"")}</div></div>
-      ${delEdit("mensuration",m.id)}</div>`).join("")+`</div>` : "";
+  // Liste regroupée PAR DATE (un relevé = une date), toutes les dates affichées,
+  // de la plus récente à la plus ancienne → aucun relevé n'est caché.
+  const byDate = {};
+  (D.mensurations||[]).forEach(m=>{ (byDate[m.date] ||= []).push(m); });
+  const dates = Object.keys(byDate).sort((a,b)=> a<b?1:-1);
+  const listing = dates.length ? `<div style="margin-top:14px">` + dates.map(d=>`
+    <div class="card" style="margin-top:8px;padding:10px 12px">
+      <div class="idate" style="font-weight:700;margin-bottom:6px">${Calc.fmtShort(d)}</div>
+      ${byDate[d].map(m=>`<div class="cl-line" style="padding:3px 0">
+          <span>${esc(m.type.replace(/_/g," "))}</span>
+          <span style="display:flex;align-items:center;gap:8px"><strong>${m.valeur}${esc(m.unite||"")}</strong>
+            <button class="icon-btn" data-act="del" data-entity="mensuration" data-id="${m.id}">🗑</button>
+          </span></div>`).join("")}
+    </div>`).join("") + `</div>` : "";
   return block("Mensurations & évolution", (D.mensurations||[]).length, body+listing, false);
 }
 
