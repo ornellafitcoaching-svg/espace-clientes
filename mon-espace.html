@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e6">
+<link rel="stylesheet" href="css/app.css?v=e7">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e6"></script>
-<script src="js/supabaseClient.js?v=e6"></script>
-<script src="js/auth.js?v=e6"></script>
-<script src="js/db.js?v=e6"></script>
-<script src="js/calc.js?v=e6"></script>
-<script src="js/ui/modal.js?v=e6"></script>
-<script src="js/ui/progress.js?v=e6"></script>
+<script src="js/config.js?v=e7"></script>
+<script src="js/supabaseClient.js?v=e7"></script>
+<script src="js/auth.js?v=e7"></script>
+<script src="js/db.js?v=e7"></script>
+<script src="js/calc.js?v=e7"></script>
+<script src="js/ui/modal.js?v=e7"></script>
+<script src="js/ui/progress.js?v=e7"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -145,7 +145,7 @@ function viewSeances(){
 // Mesures que la cliente peut renseigner elle-même (mêmes clés que côté coach).
 const MY_MENSU_PRESETS = [
   { name:"poids",         label:"Poids (kg)",            unite:"kg" },
-  { name:"masse_grasse",  label:"Masse grasse (%)",      unite:"%"  },
+  { name:"tour_cou",      label:"Tour de cou (cm)",      unite:"cm" },
   { name:"poitrine",      label:"Poitrine (cm)",         unite:"cm" },
   { name:"sous_poitrine", label:"Sous-poitrine (cm)",    unite:"cm" },
   { name:"tour_dos",      label:"Tour de dos (cm)",      unite:"cm" },
@@ -166,13 +166,17 @@ async function addMyMensu(){
   const entered = MY_MENSU_PRESETS.filter(p => v[p.name] != null && v[p.name] !== "");
   if (!entered.length){ UI.toast("Aucune mesure saisie"); return; }
   const rows = entered.map(p => ({ cliente_id:D.cliente.id, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
+  // Masse grasse calculée automatiquement (US Navy) si taille+hanches+cou + taille (hauteur) dispo.
+  const mg = Calc.masseGrasseNavy(v.tour_taille, v.tour_hanches, v.tour_cou, D.cliente.taille_cm);
+  if (mg != null) rows.push({ cliente_id:D.cliente.id, date:v.date, type:"masse_grasse", valeur:mg, unite:"%" });
   try{
     const { error } = await sb.from("mensurations").insert(rows);
     if (error) throw error;
     D.mensurations = (D.mensurations||[]).concat(rows);
-    UI.toast(rows.length+" mesure(s) enregistrée(s) ✓");
+    UI.toast(rows.length+" mesure(s) enregistrée(s)"+(mg!=null?` · masse grasse ${mg}%`:"")+" ✓");
     render();
-    const lignes = entered.map(p => `• ${p.label.replace(/\s*\(.*\)/,"")} : ${v[p.name]} ${p.unite}`).join("\n");
+    const lignes = entered.map(p => `• ${p.label.replace(/\s*\(.*\)/,"")} : ${v[p.name]} ${p.unite}`).join("\n")
+      + (mg!=null?`\n• Masse grasse (auto) : ${mg} %`:"");
     const wa = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Voici mes mensurations du ${Calc.fmt(v.date)} :\n${lignes}`);
     if (wa) window.open(wa, "_blank");
   }catch(e){ console.error(e); UI.toast("Impossible d'enregistrer : "+(e.message||e), "err"); }

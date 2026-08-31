@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e6">
+<link rel="stylesheet" href="css/app.css?v=e7">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e6"></script>
-<script src="js/supabaseClient.js?v=e6"></script>
-<script src="js/auth.js?v=e6"></script>
-<script src="js/db.js?v=e6"></script>
-<script src="js/calc.js?v=e6"></script>
-<script src="js/ui/modal.js?v=e6"></script>
-<script src="js/ui/progress.js?v=e6"></script>
+<script src="js/config.js?v=e7"></script>
+<script src="js/supabaseClient.js?v=e7"></script>
+<script src="js/auth.js?v=e7"></script>
+<script src="js/db.js?v=e7"></script>
+<script src="js/calc.js?v=e7"></script>
+<script src="js/ui/modal.js?v=e7"></script>
+<script src="js/ui/progress.js?v=e7"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -448,17 +448,18 @@ function findRec(entity,id){
 
 // Saisie COMPLÈTE des mensurations : toutes les mesures d'un coup, une date.
 const MENSU_PRESETS = [
-  { name:"poids",         label:"Poids (kg)",            unite:"kg" },
-  { name:"masse_grasse",  label:"Masse grasse (%)",      unite:"%"  },
-  { name:"poitrine",      label:"Poitrine (cm)",         unite:"cm" },
-  { name:"sous_poitrine", label:"Sous-poitrine (cm)",    unite:"cm" },
-  { name:"tour_dos",      label:"Tour de dos (cm)",      unite:"cm" },
-  { name:"tour_taille",   label:"Tour de taille (cm)",   unite:"cm" },
-  { name:"tour_hanches",  label:"Tour de hanches (cm)",  unite:"cm" },
-  { name:"tour_fessiers", label:"Tour de fessiers (cm)", unite:"cm" },
-  { name:"tour_cuisse",   label:"Tour de cuisse (cm)",   unite:"cm" },
-  { name:"tour_bras",     label:"Tour de bras (cm)",     unite:"cm" },
-  { name:"tour_mollet",   label:"Tour de mollet (cm)",   unite:"cm" },
+  { name:"poids",         label:"Poids (kg)",              unite:"kg" },
+  { name:"masse_grasse",  label:"Masse grasse (% — auto)", unite:"%"  },
+  { name:"tour_cou",      label:"Tour de cou (cm)",        unite:"cm" },
+  { name:"poitrine",      label:"Poitrine (cm)",           unite:"cm" },
+  { name:"sous_poitrine", label:"Sous-poitrine (cm)",      unite:"cm" },
+  { name:"tour_dos",      label:"Tour de dos (cm)",        unite:"cm" },
+  { name:"tour_taille",   label:"Tour de taille (cm)",     unite:"cm" },
+  { name:"tour_hanches",  label:"Tour de hanches (cm)",    unite:"cm" },
+  { name:"tour_fessiers", label:"Tour de fessiers (cm)",   unite:"cm" },
+  { name:"tour_cuisse",   label:"Tour de cuisse (cm)",     unite:"cm" },
+  { name:"tour_bras",     label:"Tour de bras (cm)",       unite:"cm" },
+  { name:"tour_mollet",   label:"Tour de mollet (cm)",     unite:"cm" },
 ];
 async function addMensuSession(){
   const fields = [{ name:"date", label:"Date", type:"date", value:Calc.today() }]
@@ -468,8 +469,16 @@ async function addMensuSession(){
   const rows = MENSU_PRESETS
     .filter(p => v[p.name] != null && v[p.name] !== "")
     .map(p => ({ cliente_id:CID, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
+  // Masse grasse calculée automatiquement (méthode US Navy) si non saisie à la main
+  // et si tour de taille + hanches + cou + taille (hauteur) sont disponibles.
+  if ((v.masse_grasse==null || v.masse_grasse==="") && D && D.cliente){
+    const mg = Calc.masseGrasseNavy(v.tour_taille, v.tour_hanches, v.tour_cou, D.cliente.taille_cm);
+    if (mg != null) rows.push({ cliente_id:CID, date:v.date, type:"masse_grasse", valeur:mg, unite:"%" });
+  }
   if (!rows.length){ UI.toast("Aucune mesure saisie"); return; }
-  try{ await window.sb.from("mensurations").insert(rows); UI.toast(rows.length+" mesure(s) enregistrée(s) ✓"); reload(); }
+  try{ await window.sb.from("mensurations").insert(rows);
+    const mgRow = rows.find(r=>r.type==="masse_grasse");
+    UI.toast(rows.length+" mesure(s) enregistrée(s)"+(mgRow?` · masse grasse ${mgRow.valeur}% calculée ✓`:" ✓")); reload(); }
   catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 
@@ -486,13 +495,17 @@ async function addOrEdit(entity, rec){
 }
 
 async function progEnvoye(kind){
+  // Interrupteur : on pré-remplit l'état ACTUEL (coché/décoché) et on MODIFIE le
+  // programme existant au lieu d'en recréer un → on peut cocher ET décocher.
   const existing = lastProg(kind);
-  const v = await UI.form({ title:(kind==="sportif"?"Programme sportif":"Programme nutrition"), fields:progFields(kind,{}) });
+  const v = await UI.form({ title:(kind==="sportif"?"Programme sportif":"Programme nutrition"), fields:progFields(kind, existing||{}) });
   if (!v) return;
+  const patch = { cliente_id:CID, kind, envoye:!!v.envoye, date_envoi:v.date_envoi,
+    version:v.version, date_debut:v.date_debut, date_fin:v.date_fin, commentaire:v.commentaire };
   try{
-    await DB.insert("programmes", { cliente_id:CID, kind, envoye:!!v.envoye, date_envoi:v.date_envoi,
-      version:v.version, date_debut:v.date_debut, date_fin:v.date_fin, commentaire:v.commentaire });
-    UI.toast("Programme "+kind+" enregistré ✓"); reload();
+    if (existing) await DB.update("programmes", existing.id, patch);
+    else await DB.insert("programmes", patch);
+    UI.toast("Programme "+kind+(patch.envoye?" marqué envoyé ✓":" décoché ✓")); reload();
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 

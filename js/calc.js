@@ -137,6 +137,18 @@ window.Calc = {
     const m = tailleCm / 100;
     return Math.round((poidsKg / (m * m)) * 10) / 10;
   },
+  // Masse grasse estimée — méthode US Navy (femme), au mètre ruban, tout en cm.
+  // Nécessite : tour de taille, tour de hanches, tour de cou et la taille (hauteur).
+  // Renvoie un % arrondi à 0,1, ou null si une mesure manque / résultat aberrant.
+  masseGrasseNavy(tourTaille, tourHanches, tourCou, tailleCm) {
+    const w = Number(tourTaille), h = Number(tourHanches), n = Number(tourCou), ht = Number(tailleCm);
+    if (!w || !h || !n || !ht) return null;
+    const denom = w + h - n;
+    if (denom <= 0) return null;
+    const bf = 495 / (1.29579 - 0.35004 * Math.log10(denom) + 0.22100 * Math.log10(ht)) - 450;
+    if (!isFinite(bf) || bf < 3 || bf > 65) return null;
+    return Math.round(bf * 10) / 10;
+  },
   // Dernier poids connu (dernier bilan avec poids, sinon dernière mensuration 'poids')
   dernierPoids(bilans, mensurations) {
     const b = (bilans || []).filter((x) => x.poids != null).sort((a, b) => (a.date < b.date ? 1 : -1));
