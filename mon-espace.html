@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e5">
+<link rel="stylesheet" href="css/app.css?v=e6">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e5"></script>
-<script src="js/supabaseClient.js?v=e5"></script>
-<script src="js/auth.js?v=e5"></script>
-<script src="js/db.js?v=e5"></script>
-<script src="js/calc.js?v=e5"></script>
-<script src="js/ui/modal.js?v=e5"></script>
-<script src="js/ui/progress.js?v=e5"></script>
+<script src="js/config.js?v=e6"></script>
+<script src="js/supabaseClient.js?v=e6"></script>
+<script src="js/auth.js?v=e6"></script>
+<script src="js/db.js?v=e6"></script>
+<script src="js/calc.js?v=e6"></script>
+<script src="js/ui/modal.js?v=e6"></script>
+<script src="js/ui/progress.js?v=e6"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -142,10 +142,46 @@ function viewSeances(){
   return out;
 }
 
+// Mesures que la cliente peut renseigner elle-même (mêmes clés que côté coach).
+const MY_MENSU_PRESETS = [
+  { name:"poids",         label:"Poids (kg)",            unite:"kg" },
+  { name:"masse_grasse",  label:"Masse grasse (%)",      unite:"%"  },
+  { name:"poitrine",      label:"Poitrine (cm)",         unite:"cm" },
+  { name:"sous_poitrine", label:"Sous-poitrine (cm)",    unite:"cm" },
+  { name:"tour_dos",      label:"Tour de dos (cm)",      unite:"cm" },
+  { name:"tour_taille",   label:"Tour de taille (cm)",   unite:"cm" },
+  { name:"tour_hanches",  label:"Tour de hanches (cm)",  unite:"cm" },
+  { name:"tour_fessiers", label:"Tour de fessiers (cm)", unite:"cm" },
+  { name:"tour_cuisse",   label:"Tour de cuisse (cm)",   unite:"cm" },
+  { name:"tour_bras",     label:"Tour de bras (cm)",     unite:"cm" },
+  { name:"tour_mollet",   label:"Tour de mollet (cm)",   unite:"cm" },
+];
+// La cliente saisit ses mesures -> enregistrées dans SON dossier (RLS: insert limité à
+// my_cliente_id()) -> visibles aussitôt côté coach -> + message WhatsApp récapitulatif à Ornella.
+async function addMyMensu(){
+  const fields = [{ name:"date", label:"Date", type:"date", value:Calc.today() }]
+    .concat(MY_MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
+  const v = await UI.form({ title:"Mes mensurations", submit:"Enregistrer + envoyer à Ornella", fields });
+  if (!v) return;
+  const entered = MY_MENSU_PRESETS.filter(p => v[p.name] != null && v[p.name] !== "");
+  if (!entered.length){ UI.toast("Aucune mesure saisie"); return; }
+  const rows = entered.map(p => ({ cliente_id:D.cliente.id, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
+  try{
+    const { error } = await sb.from("mensurations").insert(rows);
+    if (error) throw error;
+    D.mensurations = (D.mensurations||[]).concat(rows);
+    UI.toast(rows.length+" mesure(s) enregistrée(s) ✓");
+    render();
+    const lignes = entered.map(p => `• ${p.label.replace(/\s*\(.*\)/,"")} : ${v[p.name]} ${p.unite}`).join("\n");
+    const wa = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Voici mes mensurations du ${Calc.fmt(v.date)} :\n${lignes}`);
+    if (wa) window.open(wa, "_blank");
+  }catch(e){ console.error(e); UI.toast("Impossible d'enregistrer : "+(e.message||e), "err"); }
+}
 function viewMensurations(){
+  const addBtn = `<button class="btn-accent btn-sm" id="addMensuBtn" style="margin-bottom:14px"><span>➕</span> Saisir mes mensurations</button>`;
   const types = Calc.mensuTypes(D.mensurations);
-  if (!types.length) return empty("Aucune mensuration pour l'instant.");
-  return `<div class="mensu-grid">` + types.map(t=>{
+  if (!types.length) return addBtn + empty("Aucune mensuration pour l'instant. Ajoute tes mesures avec le bouton ci-dessus 👆");
+  return addBtn + `<div class="mensu-grid">` + types.map(t=>{
     const ev = Calc.mensuEvolution(D.mensurations, t);
     const dir = ev.diff<0?"down":(ev.diff>0?"up":"");
     const sign = ev.diff>0?"+":"";
@@ -346,6 +382,7 @@ async function loadPhotoThumbs(){
 }
 
 document.getElementById("main").addEventListener("click", (e)=>{
+  if (e.target.closest("#addMensuBtn")){ addMyMensu(); return; }
   const b = e.target.closest("[data-view]"); if (!b) return;
   VIEW = b.dataset.view; render();
   window.scrollTo({ top:0, behavior:"smooth" });

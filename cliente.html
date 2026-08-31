@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e5">
+<link rel="stylesheet" href="css/app.css?v=e6">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e5"></script>
-<script src="js/supabaseClient.js?v=e5"></script>
-<script src="js/auth.js?v=e5"></script>
-<script src="js/db.js?v=e5"></script>
-<script src="js/calc.js?v=e5"></script>
-<script src="js/ui/modal.js?v=e5"></script>
-<script src="js/ui/progress.js?v=e5"></script>
+<script src="js/config.js?v=e6"></script>
+<script src="js/supabaseClient.js?v=e6"></script>
+<script src="js/auth.js?v=e6"></script>
+<script src="js/db.js?v=e6"></script>
+<script src="js/calc.js?v=e6"></script>
+<script src="js/ui/modal.js?v=e6"></script>
+<script src="js/ui/progress.js?v=e6"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -448,14 +448,17 @@ function findRec(entity,id){
 
 // Saisie COMPLÈTE des mensurations : toutes les mesures d'un coup, une date.
 const MENSU_PRESETS = [
-  { name:"poids",         label:"Poids (kg)",           unite:"kg" },
-  { name:"masse_grasse",  label:"Masse grasse (%)",     unite:"%"  },
-  { name:"poitrine",      label:"Poitrine (cm)",        unite:"cm" },
-  { name:"tour_taille",   label:"Tour de taille (cm)",  unite:"cm" },
-  { name:"tour_hanches",  label:"Tour de hanches (cm)", unite:"cm" },
-  { name:"tour_cuisse",   label:"Tour de cuisse (cm)",  unite:"cm" },
-  { name:"tour_bras",     label:"Tour de bras (cm)",    unite:"cm" },
-  { name:"tour_mollet",   label:"Tour de mollet (cm)",  unite:"cm" },
+  { name:"poids",         label:"Poids (kg)",            unite:"kg" },
+  { name:"masse_grasse",  label:"Masse grasse (%)",      unite:"%"  },
+  { name:"poitrine",      label:"Poitrine (cm)",         unite:"cm" },
+  { name:"sous_poitrine", label:"Sous-poitrine (cm)",    unite:"cm" },
+  { name:"tour_dos",      label:"Tour de dos (cm)",      unite:"cm" },
+  { name:"tour_taille",   label:"Tour de taille (cm)",   unite:"cm" },
+  { name:"tour_hanches",  label:"Tour de hanches (cm)",  unite:"cm" },
+  { name:"tour_fessiers", label:"Tour de fessiers (cm)", unite:"cm" },
+  { name:"tour_cuisse",   label:"Tour de cuisse (cm)",   unite:"cm" },
+  { name:"tour_bras",     label:"Tour de bras (cm)",     unite:"cm" },
+  { name:"tour_mollet",   label:"Tour de mollet (cm)",   unite:"cm" },
 ];
 async function addMensuSession(){
   const fields = [{ name:"date", label:"Date", type:"date", value:Calc.today() }]
@@ -611,14 +614,35 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="del"){
     const entity = el.dataset.entity;
     if (!(await UI.confirm("Supprimer cet élément ?"))) return;
+    const tbl = {seance:"seances",bilan:"bilans",mensuration:"mensurations",objectif:"objectifs",
+                 note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements"}[entity];
+    // On garde une copie complète AVANT suppression → permet le "retour arrière".
+    const backup = entity!=="photo" ? findRec(entity, id) : null;
     try{
       if (entity==="photo" && el.dataset.path) await sb.storage.from("photos").remove([el.dataset.path]);
-      const tbl = {seance:"seances",bilan:"bilans",mensuration:"mensurations",objectif:"objectifs",
-                   note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements"}[entity];
-      await DB.remove(tbl, id); UI.toast("Supprimé"); reload();
+      await DB.remove(tbl, id);
+      reload();
+      if (backup) showUndo(tbl, backup); else UI.toast("Supprimé");
     }catch(e2){ console.error(e2); UI.toast("Erreur : "+(e2.message||e2),"err"); }
   }
 });
+
+// Toast "Annuler" : restaure l'élément supprimé (fenêtre de 8 s). Réinsère la ligne exacte
+// (même id) → rien n'est vraiment perdu en cas de clic par erreur.
+function showUndo(tbl, rec){
+  document.querySelectorAll(".undo-toast").forEach(n=>n.remove());
+  const t = document.createElement("div");
+  t.className = "toast ok undo-toast";
+  t.innerHTML = `Supprimé <button type="button" style="margin-left:14px;background:#fff;color:var(--accent);border:none;border-radius:999px;padding:4px 12px;font-weight:700;cursor:pointer">↩ Annuler</button>`;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add("show"));
+  t.querySelector("button").onclick = async ()=>{
+    try{ const { error } = await window.sb.from(tbl).insert(rec); if (error) throw error;
+      t.remove(); UI.toast("Restauré ✓"); reload(); }
+    catch(e){ console.error(e); UI.toast("Impossible de restaurer : "+(e.message||e),"err"); }
+  };
+  setTimeout(()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),300); }, 8000);
+}
 
 // ============================ INIT ============================
 (async ()=>{
