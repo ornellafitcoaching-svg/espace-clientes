@@ -90,6 +90,11 @@ window.Calc = {
   // Renvoie la liste d'alertes pour une cliente { dossier léger }.
   alertes(c) {
     const out = [];
+    // Bilan rempli par la cliente récemment (≤ 10 j) → à consulter.
+    const nouveauBilan = (c.bilans || []).some((x) =>
+      x.saisi_par === "cliente" && x.created_at &&
+      this.daysFromToday(String(x.created_at).slice(0, 10)) >= -10);
+    if (nouveauBilan) out.push({ type: "nouveau_bilan", label: "Nouveau bilan rempli", icon: "🆕" });
     const b = this.bilanStats(c.bilans);
     if (b.joursAvant !== null && b.joursAvant <= 3) {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });

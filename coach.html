@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e8">
+<link rel="stylesheet" href="css/app.css?v=e9">
 </head>
 <body>
 <header class="topbar">
@@ -28,6 +28,7 @@
   </div>
 
   <div class="alerts" id="alerts"></div>
+  <div id="agenda"></div>
 
   <div class="toolbar">
     <div class="search"><input id="q" placeholder="Rechercher (prénom, nom, objectif…)"></div>
@@ -38,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e8"></script>
-<script src="js/supabaseClient.js?v=e8"></script>
-<script src="js/auth.js?v=e8"></script>
-<script src="js/db.js?v=e8"></script>
-<script src="js/calc.js?v=e8"></script>
-<script src="js/ui/modal.js?v=e8"></script>
-<script src="js/ui/progress.js?v=e8"></script>
+<script src="js/config.js?v=e9"></script>
+<script src="js/supabaseClient.js?v=e9"></script>
+<script src="js/auth.js?v=e9"></script>
+<script src="js/db.js?v=e9"></script>
+<script src="js/calc.js?v=e9"></script>
+<script src="js/ui/modal.js?v=e9"></script>
+<script src="js/ui/progress.js?v=e9"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -68,14 +69,38 @@ const FILTERS = [
 ];
 
 function initials(c){ return ((c.prenom||"?")[0]||"").toUpperCase(); }
+const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+// ---- Agenda : toutes les séances "prévues" à venir, toutes clientes confondues ----
+function renderAgenda(){
+  const box = document.getElementById("agenda");
+  const today = Calc.today();
+  const items = [];
+  STATE.clientes.forEach(c => (c.seances||[]).forEach(s => {
+    if (s.statut==="prevue" && s.date && s.date>=today) items.push({ date:s.date, type:s.type, cl:c.cliente });
+  }));
+  if (!items.length){ box.innerHTML=""; return; }
+  const byDate = {};
+  items.forEach(it => (byDate[it.date] ||= []).push(it));
+  const dates = Object.keys(byDate).sort((a,b)=> a<b?-1:1);
+  box.innerHTML = `<details class="section-block" open style="margin:14px 0">
+    <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${items.length}</span></summary>
+    <div class="section-body">` + dates.map(d=>`
+      <div class="card" style="margin-top:8px;padding:10px 12px">
+        <div class="idate" style="font-weight:700;margin-bottom:6px">${Calc.fmtShort(d)}</div>
+        ${byDate[d].map(it=>`<a class="cl-line" href="cliente.html?id=${it.cl.id}" style="padding:5px 0;text-decoration:none;color:inherit">
+            <span><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${it.type?` · ${esc(it.type)}`:""}</span>
+            <span class="tag">voir →</span></a>`).join("")}
+      </div>`).join("") + `</div></details>`;
+}
 
 // ---- Chargement groupé (peu de requêtes, quel que soit le nb de clientes) ----
 async function loadAll() {
   const [clientes, accomp, seances, bilans, programmes] = await Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
     sb.from("accompagnements").select("cliente_id,seances_prevues,date_debut,date_fin,nutrition_active,nb_mois"),
-    sb.from("seances").select("cliente_id,statut"),
-    sb.from("bilans").select("cliente_id,date"),
+    sb.from("seances").select("cliente_id,statut,date,type"),
+    sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("programmes").select("cliente_id,kind,envoye"),
   ]);
   const group = (rows, key="cliente_id") => {
@@ -89,7 +114,7 @@ async function loadAll() {
   STATE.clientes = (clientes.data||[]).map(cl => ({
     cliente: cl,
     accompagnement: accMap[cl.id] || null,
-    seances: (seaMap[cl.id]||[]).map(s=>({statut:s.statut})),
+    seances: (seaMap[cl.id]||[]).map(s=>({statut:s.statut, date:s.date, type:s.type})),
     bilans: bilMap[cl.id]||[],
     programmes: proMap[cl.id]||[],
   }));
@@ -101,7 +126,7 @@ function renderAlerts() {
   const all = [];
   STATE.clientes.forEach(c => Calc.alertes(c).forEach(a => all.push({ ...a, c })));
   if (!all.length) { box.innerHTML = ""; return; }
-  const order = { bilan:0, programme:1, fin:2, seances:3, renouveler:4 };
+  const order = { nouveau_bilan:0, bilan:1, programme:2, fin:3, seances:4, renouveler:5 };
   all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
   box.innerHTML = all.slice(0,8).map(a =>
     `<a class="alert" href="cliente.html?id=${a.c.cliente.id}">
@@ -226,7 +251,7 @@ document.getElementById("newCliente").onclick = async () => {
   document.getElementById("q").addEventListener("input", e => { STATE.q = e.target.value.trim(); renderList(); });
   try {
     await loadAll();
-    renderAlerts(); renderFilters(); renderList();
+    renderAlerts(); renderAgenda(); renderFilters(); renderList();
   } catch(e){
     console.error(e);
     document.getElementById("content").innerHTML =

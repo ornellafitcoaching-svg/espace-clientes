@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e8">
+<link rel="stylesheet" href="css/app.css?v=e9">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e8"></script>
-<script src="js/supabaseClient.js?v=e8"></script>
-<script src="js/auth.js?v=e8"></script>
-<script src="js/db.js?v=e8"></script>
-<script src="js/calc.js?v=e8"></script>
-<script src="js/ui/modal.js?v=e8"></script>
-<script src="js/ui/progress.js?v=e8"></script>
+<script src="js/config.js?v=e9"></script>
+<script src="js/supabaseClient.js?v=e9"></script>
+<script src="js/auth.js?v=e9"></script>
+<script src="js/db.js?v=e9"></script>
+<script src="js/calc.js?v=e9"></script>
+<script src="js/ui/modal.js?v=e9"></script>
+<script src="js/ui/progress.js?v=e9"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -227,6 +227,48 @@ function mensuAutour(dateBilan){
     return Math.abs((md - d)/86400000) <= 7;
   });
 }
+// Bilan COMPLET rempli par la cliente : ressenti + mensurations (+ masse grasse auto)
+// → enregistré dans son dossier (visible aussitôt côté coach) → récap WhatsApp à Ornella.
+async function addMyBilan(){
+  const fields = [
+    { name:"date", label:"Date du bilan", type:"date", value:Calc.today() },
+    { name:"ressenti", label:"Comment tu te sens ? 🙂" },
+    { name:"evolution", label:"Ton évolution", type:"textarea" },
+    { name:"points_positifs", label:"Tes points positifs 💪", type:"textarea" },
+    { name:"difficultes", label:"Tes difficultés ⚠️", type:"textarea" },
+    { name:"nouveaux_objectifs", label:"Tes nouveaux objectifs 🎯", type:"textarea" },
+  ].concat(MY_MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
+  const v = await UI.form({ title:"Mon bilan", submit:"Envoyer mon bilan à Ornella", fields });
+  if (!v) return;
+  const entered = MY_MENSU_PRESETS.filter(p => v[p.name] != null && v[p.name] !== "");
+  const mrows = entered.map(p => ({ cliente_id:D.cliente.id, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
+  const mg = Calc.masseGrasseNavy(v.tour_taille, v.tour_hanches, v.tour_cou, D.cliente.taille_cm);
+  if (mg != null) mrows.push({ cliente_id:D.cliente.id, date:v.date, type:"masse_grasse", valeur:mg, unite:"%" });
+  const bilan = { cliente_id:D.cliente.id, date:v.date, saisi_par:"cliente",
+    ressenti:v.ressenti||null, evolution:v.evolution||null, points_positifs:v.points_positifs||null,
+    difficultes:v.difficultes||null, nouveaux_objectifs:v.nouveaux_objectifs||null,
+    poids:(v.poids!=null && v.poids!=="")?Number(v.poids):null };
+  try{
+    const r1 = await sb.from("bilans").insert(bilan); if (r1.error) throw r1.error;
+    if (mrows.length){ const r2 = await sb.from("mensurations").insert(mrows); if (r2.error) throw r2.error; }
+    D.bilans = (D.bilans||[]).concat([bilan]);
+    D.mensurations = (D.mensurations||[]).concat(mrows);
+    UI.toast("Bilan envoyé à Ornella ✓"); render();
+    const parts = [];
+    if (v.ressenti) parts.push(`Ressenti : ${v.ressenti}`);
+    if (v.evolution) parts.push(`Évolution : ${v.evolution}`);
+    if (v.points_positifs) parts.push(`Points positifs : ${v.points_positifs}`);
+    if (v.difficultes) parts.push(`Difficultés : ${v.difficultes}`);
+    if (v.nouveaux_objectifs) parts.push(`Nouveaux objectifs : ${v.nouveaux_objectifs}`);
+    const mLines = entered.map(p => `${p.label.replace(/\s*\(.*\)/,"")} : ${v[p.name]} ${p.unite}`);
+    if (mg != null) mLines.push(`Masse grasse (auto) : ${mg} %`);
+    const msg = `Bonjour Ornella, c'est ${PRENOM} 🙂 Voici mon bilan du ${Calc.fmt(v.date)} :\n`
+      + (parts.length?parts.join("\n"):"(pas de commentaire)")
+      + (mLines.length?`\n\nMensurations :\n• ${mLines.join("\n• ")}`:"");
+    const wa = waHref(msg);
+    if (wa) window.open(wa, "_blank");
+  }catch(e){ console.error(e); UI.toast("Impossible d'envoyer : "+(e.message||e), "err"); }
+}
 function viewBilans(){
   const list = (D.bilans||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
   const b = Calc.bilanStats(D.bilans);
@@ -234,7 +276,7 @@ function viewBilans(){
       <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);font-weight:700">Ton rythme</div>
       <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:700">Un bilan toutes les 4 semaines 📋</div>
       <div class="isub" style="color:rgba(255,255,255,.7);margin-top:2px">On refait le point + les mensurations à chaque bilan.${b.prochain?` Prochain : <strong style="color:#fff">${Calc.fmt(b.prochain)}</strong>${b.joursAvant!=null&&b.joursAvant>=0?` (dans ${b.joursAvant} j)`:""}.`:""}</div>
-      ${(()=>{ const w=waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 J'aimerais programmer mon prochain bilan.`); return w?`<a href="${w}" target="_blank" rel="noopener" class="btn-accent btn-sm" style="margin-top:12px"><span>💬</span> Demander mon bilan sur WhatsApp</a>`:""; })()}
+      <button id="addBilanBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>➕</span> Faire mon bilan</button>
     </div>`;
   if (!list.length) return entete + empty("Ton premier bilan apparaîtra ici.");
   return entete + list.map(x=>{
@@ -387,6 +429,7 @@ async function loadPhotoThumbs(){
 
 document.getElementById("main").addEventListener("click", (e)=>{
   if (e.target.closest("#addMensuBtn")){ addMyMensu(); return; }
+  if (e.target.closest("#addBilanBtn")){ addMyBilan(); return; }
   const b = e.target.closest("[data-view]"); if (!b) return;
   VIEW = b.dataset.view; render();
   window.scrollTo({ top:0, behavior:"smooth" });
