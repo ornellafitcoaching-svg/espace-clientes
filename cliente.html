@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e11">
+<link rel="stylesheet" href="css/app.css?v=e12">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e11"></script>
-<script src="js/supabaseClient.js?v=e11"></script>
-<script src="js/auth.js?v=e11"></script>
-<script src="js/db.js?v=e11"></script>
-<script src="js/calc.js?v=e11"></script>
-<script src="js/ui/modal.js?v=e11"></script>
-<script src="js/ui/progress.js?v=e11"></script>
+<script src="js/config.js?v=e12"></script>
+<script src="js/supabaseClient.js?v=e12"></script>
+<script src="js/auth.js?v=e12"></script>
+<script src="js/db.js?v=e12"></script>
+<script src="js/calc.js?v=e12"></script>
+<script src="js/ui/modal.js?v=e12"></script>
+<script src="js/ui/progress.js?v=e12"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -491,6 +491,34 @@ async function addMensuSession(){
   catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 
+// Bilan COMPLET côté coach : champs bilan + toutes les mensurations (+ masse grasse auto),
+// enregistrés ensemble (un bilan = ressenti + mesures), comme côté cliente.
+async function addBilanCoach(rec){
+  const x = rec || {};
+  const fields = bilanFields(x).concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
+  const v = await UI.form({ title:(rec?"Modifier ":"")+"Bilan", submit:"Enregistrer", fields });
+  if (!v) return;
+  const BILAN_KEYS = ["date","semaine","poids","ressenti","evolution","objectifs_atteints",
+    "difficultes","points_positifs","nouveaux_objectifs","commentaire_coach"];
+  const bilanPayload = { cliente_id:CID };
+  BILAN_KEYS.forEach(k=>{ if (k in v) bilanPayload[k]=v[k]; });
+  const rows = MENSU_PRESETS
+    .filter(p => p.name!=="masse_grasse" && v[p.name]!=null && v[p.name]!=="")
+    .map(p => ({ cliente_id:CID, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
+  if (v.masse_grasse!=null && v.masse_grasse!=="")
+    rows.push({ cliente_id:CID, date:v.date, type:"masse_grasse", valeur:Number(v.masse_grasse), unite:"%" });
+  else {
+    const mg = Calc.masseGrasseNavy(v.tour_taille, v.tour_hanches, v.tour_cou, D.cliente && D.cliente.taille_cm);
+    if (mg!=null) rows.push({ cliente_id:CID, date:v.date, type:"masse_grasse", valeur:mg, unite:"%" });
+  }
+  try{
+    if (rec) await DB.update("bilans", rec.id, bilanPayload);
+    else await DB.insert("bilans", bilanPayload);
+    if (rows.length) await window.sb.from("mensurations").insert(rows);
+    UI.toast("Bilan enregistré ✓"); reload();
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
+
 async function addOrEdit(entity, rec){
   const cfg = ENT[entity];
   const v = await UI.form({ title:(rec?"Modifier ":"")+cfg.title, fields:cfg.fields(rec) });
@@ -550,6 +578,7 @@ async function regenAccess(){
 
 async function editCliente(){
   const cl = D.cliente;
+  const ac = D.accompagnement || {};
   const v = await UI.form({ title:"Modifier la cliente", fields:[
     { name:"prenom", label:"Prénom", half:true, value:cl.prenom, required:true },
     { name:"nom", label:"Nom", half:true, value:cl.nom },
@@ -569,9 +598,28 @@ async function editCliente(){
     { name:"disponibilites", label:"Disponibilités", half:true, value:cl.disponibilites, placeholder:"Lun/Mer 18h…" },
     { name:"sante", label:"Santé / antécédents / blessures / contre-indications", type:"textarea", value:cl.sante },
     { name:"allergies", label:"Allergies", value:cl.allergies },
+    // --- Forfait / accompagnement (modifiable ici aussi) ---
+    { name:"formule", label:"Formule / offre", half:true, value:ac.formule },
+    { name:"prix", label:"Prix du forfait (€)", type:"number", half:true, value:ac.prix },
+    { name:"seances_prevues", label:"Nombre de séances prévues", type:"number", half:true, value:ac.seances_prevues },
+    { name:"freq_prevue", label:"Fréquence", half:true, value:ac.freq_prevue, placeholder:"2/semaine" },
+    { name:"date_debut", label:"Date de début", type:"date", half:true, value:ac.date_debut },
+    { name:"date_fin", label:"Date de fin", type:"date", half:true, value:ac.date_fin },
+    { name:"nb_mois", label:"Durée (mois)", type:"number", half:true, value:ac.nb_mois },
+    { name:"nutrition_active", label:"Suivi nutrition actif", type:"checkbox", half:true, value:ac.nutrition_active },
   ]});
   if (!v) return;
-  await DB.update("clientes", cl.id, v); UI.toast("Enregistré ✓"); reload();
+  const CLIENTE_KEYS = ["prenom","nom","type","statut","objectif_principal","objectifs_secondaires",
+    "telephone","email_perso","date_naissance","taille_cm","niveau","disponibilites","sante","allergies"];
+  const ACCOMP_KEYS = ["date_debut","date_fin","nb_mois","formule","prix","seances_prevues","freq_prevue","nutrition_active"];
+  const cliP = {}, accP = {};
+  CLIENTE_KEYS.forEach(k=>{ if (k in v) cliP[k]=v[k]; });
+  ACCOMP_KEYS.forEach(k=>{ if (k in v) accP[k]=v[k]; });
+  try{
+    await DB.update("clientes", cl.id, cliP);
+    await DB.saveAccompagnement(CID, accP);
+    UI.toast("Enregistré ✓"); reload();
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 async function editAccomp(){
   const ac = D.accompagnement||{};
@@ -601,7 +649,8 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   const el = e.target.closest("[data-act]"); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
   if (act==="add-seance") return addOrEdit("seance");
-  if (act==="add-bilan") return addOrEdit("bilan");
+  if (act==="add-bilan") return addBilanCoach();
+  if (act==="edit-bilan") return addBilanCoach(findRec("bilan", id));
   if (act==="add-mensu") return addMensuSession();
   if (act==="add-objectif") return addOrEdit("objectif");
   if (act==="add-paiement") return addOrEdit("paiement");

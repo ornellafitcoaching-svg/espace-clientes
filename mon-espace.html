@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e11">
+<link rel="stylesheet" href="css/app.css?v=e12">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e11"></script>
-<script src="js/supabaseClient.js?v=e11"></script>
-<script src="js/auth.js?v=e11"></script>
-<script src="js/db.js?v=e11"></script>
-<script src="js/calc.js?v=e11"></script>
-<script src="js/ui/modal.js?v=e11"></script>
-<script src="js/ui/progress.js?v=e11"></script>
+<script src="js/config.js?v=e12"></script>
+<script src="js/supabaseClient.js?v=e12"></script>
+<script src="js/auth.js?v=e12"></script>
+<script src="js/db.js?v=e12"></script>
+<script src="js/calc.js?v=e12"></script>
+<script src="js/ui/modal.js?v=e12"></script>
+<script src="js/ui/progress.js?v=e12"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -399,8 +399,16 @@ const VIEWS = { accueil:viewAccueil, seances:viewSeances, mensurations:viewMensu
   programmes:viewProgrammes, objectifs:viewObjectifs };
 
 // ============================ RENDU ============================
+// La cliente a-t-elle un suivi nutrition ? (sinon on masque l'onglet, cohérent avec le coach)
+function hasNutrition(){
+  const ac = D.accompagnement || {};
+  return !!(ac.nutrition_active || ac.nut_calories!=null || ac.nut_proteines!=null || ac.nut_glucides!=null
+    || ac.nut_lipides!=null || ac.nut_conseils || (D.programmes||[]).some(p=>p.kind==="nutrition"));
+}
 function render(){
-  const nav = `<nav class="cl-nav">` + NAV.map(n=>
+  const menu = NAV.filter(n => n.k!=="nutrition" || hasNutrition());
+  if (!menu.some(n=>n.k===VIEW)) VIEW = "accueil";
+  const nav = `<nav class="cl-nav">` + menu.map(n=>
     `<button class="navbtn ${n.k===VIEW?"on":""}" data-view="${n.k}"><span class="i">${n.i}</span>${n.label}</button>`).join("") + `</nav>`;
   document.getElementById("main").innerHTML = nav + `<div id="viewBox">${VIEWS[VIEW]()}</div>`;
   if (VIEW==="photos") loadPhotoThumbs();
