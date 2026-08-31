@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Mon suivi — Ornella Fit Coaching</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=e3">
+</head>
+<body>
+<header class="topbar">
+  <span class="brand">Ornella <small>Mon&nbsp;suivi</small></span>
+  <span class="spacer"></span>
+  <span class="who" id="who"></span>
+  <button class="btn-ghost btn-sm" id="logout">Déconnexion</button>
+</header>
+
+<main class="wrap wrap-narrow" id="main">
+  <div class="loader"><div class="spin"></div></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=e3"></script>
+<script src="js/supabaseClient.js?v=e3"></script>
+<script src="js/auth.js?v=e3"></script>
+<script src="js/db.js?v=e3"></script>
+<script src="js/calc.js?v=e3"></script>
+<script src="js/ui/modal.js?v=e3"></script>
+<script src="js/ui/progress.js?v=e3"></script>
+<script>
+let D = null;          // dossier de la cliente
+let VIEW = "accueil";  // vue courante
+let PRENOM = "";       // prénom de la cliente (pour les messages WhatsApp)
+const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+// Lien WhatsApp pré-rempli (null si aucun numéro configuré → bouton masqué).
+function waHref(text){
+  const num = ((window.APP_CONFIG && window.APP_CONFIG.WHATSAPP_NUMBER) || "").replace(/\D/g,"");
+  if (!num) return null;
+  return "https://wa.me/" + num + "?text=" + encodeURIComponent(text);
+}
+
+const NAV = [
+  { k:"accueil",      i:"🏠", label:"Accueil" },
+  { k:"seances",      i:"🏋️", label:"Mes séances" },
+  { k:"mensurations", i:"📏", label:"Mensurations" },
+  { k:"evolution",    i:"📈", label:"Mon évolution" },
+  { k:"bilans",       i:"📋", label:"Mes bilans" },
+  { k:"photos",       i:"📸", label:"Mes photos" },
+  { k:"nutrition",    i:"🥗", label:"Ma nutrition" },
+  { k:"programmes",   i:"📄", label:"Mes programmes" },
+  { k:"objectifs",    i:"🎯", label:"Mes objectifs" },
+];
+
+// ============================ HELPERS ============================
+function lastProg(kind){ return (D.programmes||[]).filter(p=>p.kind===kind).sort((a,b)=>a.created_at<b.created_at?1:-1)[0]||null; }
+function weightSeries(){
+  const pts = [];
+  (D.bilans||[]).forEach(b=>{ if(b.poids!=null) pts.push({date:b.date, valeur:Number(b.poids)}); });
+  (D.mensurations||[]).forEach(m=>{ if(m.type==="poids") pts.push({date:m.date, valeur:Number(m.valeur)}); });
+  pts.sort((a,b)=> a.date<b.date?-1:1);
+  return pts;
+}
+function tile(k,v,sub){ return `<div class="stat-tile"><div class="k">${k}</div><div class="v">${v}${sub?`<small>${sub}</small>`:""}</div></div>`; }
+
+// ============================ VUES ============================
+function viewAccueil(){
+  const cl = D.cliente, ac = D.accompagnement;
+  const s = Calc.seancesStats(ac, D.seances);
+  const b = Calc.bilanStats(D.bilans);
+  const w = weightSeries();
+  const sport = lastProg("sportif");
+  let poidsTile = "";
+  if (w.length){
+    const depart = w[0].valeur, actuel = w[w.length-1].valeur;
+    const diff = Math.round((actuel-depart)*10)/10;
+    const sign = diff>0?"+":"";
+    poidsTile = tile("Poids", actuel+" kg", w.length>1?`${sign}${diff} kg depuis le début`:"point de départ");
+  }
+  const bilanSub = b.joursAvant!=null ? (b.joursAvant<0?Math.abs(b.joursAvant)+" j de retard":(b.joursAvant===0?"aujourd'hui":"dans "+b.joursAvant+" j")) : "";
+
+  return `
+    <div style="margin:6px 0 18px">
+      <div class="hero-hello">Bonjour <em>${esc(cl.prenom)}</em> 👋</div>
+      <p class="page-sub" style="margin-bottom:0">Voici ton suivi, mis à jour par Ornella.</p>
+    </div>
+    <div class="stat-grid">
+      ${tile("Ton objectif", esc(cl.objectif_principal||"—"))}
+      ${ac&&ac.seances_prevues ? tile("Séances", s.realisees+" / "+s.prevues, s.restantes+" restantes") : tile("Séances réalisées", s.realisees)}
+      ${poidsTile}
+      ${b.dernier ? tile("Prochain bilan", Calc.fmt(b.prochain), bilanSub) : ""}
+      ${sport&&sport.envoye ? tile("Programme sportif", "Disponible", "envoyé le "+Calc.fmt(sport.date_envoi)) : ""}
+      ${ac&&ac.nutrition_active ? tile("Suivi nutrition", "Actif") : ""}
+    </div>
+    ${ac&&ac.seances_prevues ? `<div class="card" style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>` : ""}
+    <div class="card" style="margin-top:16px">
+      <p class="isub" style="color:var(--text-mid)">Utilise le menu ci-dessus pour parcourir tes séances, mensurations, bilans, photos et programmes. Tout est mis à jour au fil de ton accompagnement 💪</p>
+    </div>`;
+}
+
+function viewSeances(){
+  const list = (D.seances||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  if (!list.length) return empty("Aucune séance enregistrée pour l'instant.");
+  return `<div class="card">` + list.map(x=>`
+    <div class="item">
+      <div class="idate">${Calc.fmtShort(x.date)}</div>
+      <div class="ibody">
+        <div class="ititle">${esc(x.type||"Séance")} ${x.statut!=="realisee"?`<span class="tag">${esc(x.statut)}</span>`:""}</div>
+        <div class="isub">${[x.objectif&&esc(x.objectif), x.intensite&&("Intensité "+esc(x.intensite)), x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+        ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
+        ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}
+      </div>
+    </div>`).join("") + `</div>`;
+}
+
+function viewMensurations(){
+  const types = Calc.mensuTypes(D.mensurations);
+  if (!types.length) return empty("Aucune mensuration pour l'instant.");
+  return `<div class="mensu-grid">` + types.map(t=>{
+    const ev = Calc.mensuEvolution(D.mensurations, t);
+    const dir = ev.diff<0?"down":(ev.diff>0?"up":"");
+    const sign = ev.diff>0?"+":"";
+    return `<div class="mensu-card">
+      <h4>${esc(t.replace(/_/g," "))}</h4>
+      <div class="mensu-delta ${dir}">${sign}${ev.diff} ${esc(ev.unite)} ${ev.pct!=null?`(${sign}${ev.pct}%)`:""}</div>
+      <div class="isub">${ev.depart}${esc(ev.unite)} → ${ev.derniere}${esc(ev.unite)}</div>
+    </div>`;
+  }).join("") + `</div>`;
+}
+
+function viewEvolution(){
+  const w = weightSeries();
+  const types = Calc.mensuTypes(D.mensurations).filter(t=>t!=="poids");
+  let out = "";
+  if (w.length){
+    const depart=w[0].valeur, actuel=w[w.length-1].valeur, diff=Math.round((actuel-depart)*10)/10, sign=diff>0?"+":"";
+    out += `<div class="card"><h4 class="view-title" style="margin-top:0">Poids</h4>
+      <div class="mensu-delta ${diff<0?"down":(diff>0?"up":"")}" style="font-size:1rem">${sign}${diff} kg</div>
+      <div class="isub" style="margin-bottom:8px">${depart} kg → ${actuel} kg</div>
+      ${UI.lineChart(w,{unite:" kg"})}</div>`;
+  }
+  types.forEach(t=>{
+    const ev = Calc.mensuEvolution(D.mensurations, t);
+    const sign = ev.diff>0?"+":"";
+    out += `<div class="card" style="margin-top:16px"><h4 class="view-title" style="margin-top:0">${esc(t.replace(/_/g," "))}</h4>
+      <div class="mensu-delta ${ev.diff<0?"down":(ev.diff>0?"up":"")}" style="font-size:1rem">${sign}${ev.diff} ${esc(ev.unite)}</div>
+      <div class="isub" style="margin-bottom:8px">${ev.depart}${esc(ev.unite)} → ${ev.derniere}${esc(ev.unite)}</div>
+      ${UI.lineChart(ev.points,{unite:ev.unite})}</div>`;
+  });
+  return out || empty("Ton évolution s'affichera ici dès les premières mesures.");
+}
+
+// Mensurations reprises autour de la date d'un bilan (± 7 jours).
+function mensuAutour(dateBilan){
+  const d = Calc.parse(dateBilan); if (!d) return [];
+  return (D.mensurations||[]).filter(m=>{
+    const md = Calc.parse(m.date); if (!md) return false;
+    return Math.abs((md - d)/86400000) <= 7;
+  });
+}
+function viewBilans(){
+  const list = (D.bilans||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  const b = Calc.bilanStats(D.bilans);
+  const entete = `<div class="card" style="background:var(--panel);color:#fff">
+      <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);font-weight:700">Ton rythme</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:700">Un bilan toutes les 4 semaines 📋</div>
+      <div class="isub" style="color:rgba(255,255,255,.7);margin-top:2px">On refait le point + les mensurations à chaque bilan.${b.prochain?` Prochain : <strong style="color:#fff">${Calc.fmt(b.prochain)}</strong>${b.joursAvant!=null&&b.joursAvant>=0?` (dans ${b.joursAvant} j)`:""}.`:""}</div>
+      ${(()=>{ const w=waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 J'aimerais programmer mon prochain bilan.`); return w?`<a href="${w}" target="_blank" rel="noopener" class="btn-accent btn-sm" style="margin-top:12px"><span>💬</span> Demander mon bilan sur WhatsApp</a>`:""; })()}
+    </div>`;
+  if (!list.length) return entete + empty("Ton premier bilan apparaîtra ici.");
+  return entete + list.map(x=>{
+    const mesures = mensuAutour(x.date);
+    const mensuBlock = mesures.length ? `
+      <div class="mensu-card" style="margin-top:10px">
+        <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">📏 Mensurations de ce bilan</div>
+        <div style="margin-top:6px">${mesures.map(m=>`<span class="tag">${esc(m.type.replace(/_/g," "))} : ${m.valeur}${esc(m.unite||"")}</span>`).join(" ")}</div>
+      </div>` : "";
+    return `
+    <div class="card" style="margin-top:14px">
+      <div class="row between" style="margin-bottom:6px">
+        <h4 style="font-size:1.25rem">Bilan ${x.semaine!=null?"semaine "+x.semaine:""}</h4>
+        <span class="tag">${Calc.fmt(x.date)}${x.poids?` · ${x.poids} kg`:""}</span>
+      </div>
+      ${line("Ressenti", x.ressenti)}
+      ${line("Évolution", x.evolution)}
+      ${line("✅ Objectifs atteints", x.objectifs_atteints)}
+      ${line("💪 Points positifs", x.points_positifs)}
+      ${line("⚠️ Difficultés", x.difficultes)}
+      ${line("🎯 Nouveaux objectifs", x.nouveaux_objectifs)}
+      ${mensuBlock}
+      ${x.commentaire_coach?`<div class="mensu-card" style="margin-top:10px;background:var(--cream)"><div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">💬 Mot d'Ornella</div><div class="isub" style="color:var(--text-mid);margin-top:4px">${esc(x.commentaire_coach)}</div></div>`:""}
+    </div>`;
+  }).join("");
+}
+
+function viewPhotos(){
+  const list = (D.photos||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  if (!list.length) return empty("Aucune photo partagée pour l'instant.");
+  return `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
+    <div class="mensu-card photo-card">
+      <div class="cl-line" style="margin-bottom:8px"><strong>${Calc.fmt(p.date)}</strong></div>
+      <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="min-height:140px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem;background:var(--cream);border-radius:12px">chargement…</div>
+      ${p.legende?`<div class="isub" style="margin-top:6px">${esc(p.legende)}</div>`:""}
+    </div>`).join("") + `</div>`;
+}
+
+function viewNutrition(){
+  const ac = D.accompagnement || {};
+  const progs = (D.programmes||[]).filter(p=>p.kind==="nutrition").sort((a,b)=>a.created_at<b.created_at?1:-1);
+  const hasMacros = ac.nut_calories!=null || ac.nut_proteines!=null || ac.nut_glucides!=null || ac.nut_lipides!=null;
+  if (!ac.nutrition_active && !progs.length && !hasMacros && !ac.nut_conseils)
+    return empty("Aucun suivi nutrition pour le moment.");
+
+  let out = `<div class="card">
+    ${line("Suivi nutrition", ac.nutrition_active?"Actif ✓":"—")}
+    ${ac.nut_date_debut?line("Début", Calc.fmt(ac.nut_date_debut)):""}
+    ${ac.nut_date_fin?line("Fin", Calc.fmt(ac.nut_date_fin)):""}
+    ${ac.nut_nb_mois?line("Durée", ac.nut_nb_mois+" mois"):""}
+  </div>`;
+
+  // Objectifs du jour : calories + macros
+  if (hasMacros){
+    const macro = (k,v,u,c) => v!=null
+      ? `<div class="stat-tile"><div class="k">${k}</div><div class="v" style="color:${c}">${v}<small>${u}</small></div></div>` : "";
+    out += `<h4 class="view-title" style="margin-top:18px">Mes objectifs du jour</h4>
+      <div class="stat-grid">
+        ${macro("Calories", ac.nut_calories, "kcal / jour", "var(--accent)")}
+        ${macro("Protéines", ac.nut_proteines, "g / jour", "var(--ok)")}
+        ${macro("Glucides", ac.nut_glucides, "g / jour", "var(--gold-text)")}
+        ${macro("Lipides", ac.nut_lipides, "g / jour", "var(--info)")}
+      </div>`;
+  }
+
+  // Conseils d'Ornella
+  if (ac.nut_conseils){
+    out += `<div class="card" style="margin-top:16px">
+      <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">🥗 Conseils d'Ornella</div>
+      <div class="isub" style="color:var(--text-mid);margin-top:6px;white-space:pre-wrap">${esc(ac.nut_conseils)}</div>
+    </div>`;
+  }
+
+  if (progs.length) out += `<h4 class="view-title" style="margin-top:18px">Mes programmes nutrition</h4>` + progItems(progs);
+  return out;
+}
+
+function viewProgrammes(){
+  const sport = (D.programmes||[]).filter(p=>p.kind==="sportif").sort((a,b)=>a.created_at<b.created_at?1:-1);
+  const nutri = (D.programmes||[]).filter(p=>p.kind==="nutrition").sort((a,b)=>a.created_at<b.created_at?1:-1);
+  if (!sport.length && !nutri.length) return empty("Aucun programme partagé pour l'instant.");
+  let out = "";
+  if (sport.length) out += `<h4 class="view-title">Programme sportif</h4>` + progItems(sport);
+  if (nutri.length) out += `<h4 class="view-title" style="margin-top:20px">Programme nutrition</h4>` + progItems(nutri);
+  return out;
+}
+
+function viewObjectifs(){
+  const list = D.objectifs||[];
+  if (!list.length) return empty("Aucun objectif défini pour l'instant.");
+  const icon = st => ({en_cours:"⏳",atteint:"✅",abandonne:"⛔"}[st]||"");
+  return `<div class="card">` + list.map(o=>`
+    <div class="item">
+      <div class="idate" style="font-size:1.1rem">${icon(o.statut)}</div>
+      <div class="ibody">
+        <div class="ititle">${esc(o.titre)}</div>
+        ${o.description?`<div class="isub">${esc(o.description)}</div>`:""}
+        <div class="isub">${esc(o.statut.replace("_"," "))}${o.date_atteinte?" · atteint le "+Calc.fmt(o.date_atteinte):""}</div>
+      </div>
+    </div>`).join("") + `</div>`;
+}
+
+// petits utilitaires de rendu
+function empty(msg){ return `<div class="card"><p class="empty">${esc(msg)}</p></div>`; }
+function line(k,v){ return v ? `<div class="cl-line" style="padding:4px 0"><span>${k}</span><strong style="text-align:right;max-width:60%">${esc(v)}</strong></div>` : ""; }
+function progItems(list){
+  return `<div class="card">` + list.map(p=>`
+    <div class="item">
+      <div class="idate">${Calc.fmtShort(p.date_envoi||p.date_debut)}</div>
+      <div class="ibody">
+        <div class="ititle">${p.envoye?"Envoyé":"À venir"} ${p.version?`<span class="tag">v${esc(p.version)}</span>`:""}</div>
+        <div class="isub">${[p.date_debut&&("du "+Calc.fmt(p.date_debut)), p.date_fin&&("au "+Calc.fmt(p.date_fin))].filter(Boolean).join(" ")||"&nbsp;"}</div>
+        ${p.commentaire?`<div class="isub">${esc(p.commentaire)}</div>`:""}
+      </div>
+    </div>`).join("") + `</div>`;
+}
+
+const VIEWS = { accueil:viewAccueil, seances:viewSeances, mensurations:viewMensurations,
+  evolution:viewEvolution, bilans:viewBilans, photos:viewPhotos, nutrition:viewNutrition,
+  programmes:viewProgrammes, objectifs:viewObjectifs };
+
+// ============================ RENDU ============================
+function render(){
+  const nav = `<nav class="cl-nav">` + NAV.map(n=>
+    `<button class="navbtn ${n.k===VIEW?"on":""}" data-view="${n.k}"><span class="i">${n.i}</span>${n.label}</button>`).join("") + `</nav>`;
+  document.getElementById("main").innerHTML = nav + `<div id="viewBox">${VIEWS[VIEW]()}</div>`;
+  if (VIEW==="photos") loadPhotoThumbs();
+}
+
+// Bouton WhatsApp flottant (présent sur tout l'espace). Masqué si aucun numéro.
+function mountWhatsApp(){
+  if (document.querySelector(".wa-fab")) return;
+  const href = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 `);
+  if (!href) return;
+  const a = document.createElement("a");
+  a.className = "wa-fab"; a.href = href; a.target = "_blank"; a.rel = "noopener";
+  a.setAttribute("aria-label", "Contacter Ornella sur WhatsApp");
+  a.innerHTML = `<span class="wa-ico">💬</span><span class="wa-txt">Contacter Ornella</span>`;
+  document.body.appendChild(a);
+}
+
+async function loadPhotoThumbs(){
+  document.querySelectorAll(".photo-thumb").forEach(async el=>{
+    const path = el.dataset.path;
+    const { data } = await sb.storage.from("photos").createSignedUrl(path, 3600);
+    if (data && data.signedUrl){ el.innerHTML = `<img src="${data.signedUrl}" alt="">`; }
+    else { el.textContent = "indisponible"; }
+  });
+}
+
+document.getElementById("main").addEventListener("click", (e)=>{
+  const b = e.target.closest("[data-view]"); if (!b) return;
+  VIEW = b.dataset.view; render();
+  window.scrollTo({ top:0, behavior:"smooth" });
+});
+
+// ============================ INIT ============================
+(async ()=>{
+  const p = await Auth.requireCliente(); if (!p) return;
+  document.getElementById("who").textContent = p.prenom || "";
+  document.getElementById("logout").onclick = ()=>Auth.signOutCliente();
+  try{
+    // Vue "ma_fiche" : uniquement SA fiche, SANS champs sensibles (santé, tel,
+    // email, code…). La table clientes n'est plus lisible côté cliente.
+    const { data: rows, error } = await sb.from("ma_fiche").select("*").limit(1);
+    if (error) throw error;
+    const me = rows && rows[0];
+    if (!me){ document.getElementById("main").innerHTML = empty("Aucun dossier n'est encore associé à ce code. Contacte Ornella."); return; }
+    // Accompagnement via la vue "mon_accompagnement" (sans le prix) + les tables
+    // que la cliente peut lire en SELECT (séances, bilans, mensurations…).
+    const [accRes, seances, bilans, mensurations, objectifs, programmes, photos] = await Promise.all([
+      sb.from("mon_accompagnement").select("*").limit(1),
+      DB.list("seances", me.id, { col:"date", asc:false }),
+      DB.list("bilans", me.id, { col:"date", asc:false }),
+      DB.list("mensurations", me.id, { col:"date", asc:true }),
+      DB.list("objectifs", me.id, { col:"date_creation", asc:false }),
+      DB.list("programmes", me.id, { col:"created_at", asc:false }),
+      DB.list("photos", me.id, { col:"date", asc:false }),
+    ]);
+    D = { cliente: me, accompagnement: (accRes.data && accRes.data[0]) || null,
+          seances, bilans, mensurations, objectifs, programmes, photos,
+          notes: [], paiements: [] };
+    PRENOM = me.prenom || "";
+    mountWhatsApp();
+    render();
+  }catch(e){
+    console.error(e);
+    document.getElementById("main").innerHTML = empty("Impossible de charger ton suivi. Réessaie plus tard.");
+  }
+})();
+</script>
+</body>
+</html>

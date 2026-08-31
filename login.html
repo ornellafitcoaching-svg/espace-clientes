@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Connexion — Espace Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=e3">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <h1>Espace <em>Coach</em></h1>
+    <p>Ornella Fit Coaching — dossiers clientes</p>
+    <form id="loginForm">
+      <label class="field">
+        <span class="field-label">Email</span>
+        <input type="email" id="email" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span class="field-label">Mot de passe</span>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="btn-accent btn-block" id="btn">Se connecter</button>
+      <div class="login-err" id="err"></div>
+    </form>
+    <div class="login-foot">Accès réservé. Connexion sécurisée.</div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=e3"></script>
+<script src="js/supabaseClient.js?v=e3"></script>
+<script src="js/auth.js?v=e3"></script>
+<script>
+const err = document.getElementById("err");
+const btn = document.getElementById("btn");
+if (new URLSearchParams(location.search).get("err") === "role")
+  err.textContent = "Ce compte n'est pas un compte coach.";
+
+// Déjà connectée en coach ? → dashboard
+(async () => {
+  const p = await window.Auth.profile();
+  if (p && p.role === "coach") location.replace("coach.html");
+})();
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  err.textContent = ""; btn.disabled = true; btn.textContent = "Connexion…";
+  const { error } = await window.Auth.signInCoach(email.value.trim(), password.value);
+  if (error) {
+    err.textContent = "Email ou mot de passe incorrect.";
+    btn.disabled = false; btn.textContent = "Se connecter";
+    return;
+  }
+  const p = await window.Auth.profile();
+  if (!p || p.role !== "coach") {
+    await window.sb.auth.signOut();
+    err.textContent = "Ce compte n'est pas un compte coach.";
+    btn.disabled = false; btn.textContent = "Se connecter";
+    return;
+  }
+  location.replace("coach.html");
+});
+</script>
+</body>
+</html>

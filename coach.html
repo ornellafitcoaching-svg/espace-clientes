@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Mes clientes — Espace Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=e3">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="coach.html">Ornella <small>Espace&nbsp;Coach</small></a>
+  <span class="spacer"></span>
+  <span class="who" id="who"></span>
+  <button class="btn-ghost btn-sm" id="logout">Déconnexion</button>
+</header>
+
+<main class="wrap">
+  <div class="row between">
+    <div>
+      <h1 class="page-title">Mes <em>clientes</em></h1>
+      <p class="page-sub" id="sub">Chargement…</p>
+    </div>
+    <button class="btn-accent" id="newCliente">＋ Nouvelle cliente</button>
+  </div>
+
+  <div class="alerts" id="alerts"></div>
+
+  <div class="toolbar">
+    <div class="search"><input id="q" placeholder="Rechercher (prénom, nom, objectif…)"></div>
+  </div>
+  <div class="chips" id="filters"></div>
+
+  <div id="content"><div class="loader"><div class="spin"></div></div></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=e3"></script>
+<script src="js/supabaseClient.js?v=e3"></script>
+<script src="js/auth.js?v=e3"></script>
+<script src="js/db.js?v=e3"></script>
+<script src="js/calc.js?v=e3"></script>
+<script src="js/ui/modal.js?v=e3"></script>
+<script src="js/ui/progress.js?v=e3"></script>
+<script>
+let STATE = { clientes: [], byId: {}, filter: null, q: "" };
+
+const FILTERS = [
+  { key: "presentiel",  label: "Présentiel",  test: c => c.cliente.type === "presentiel" },
+  { key: "distanciel",  label: "Distanciel",  test: c => c.cliente.type === "distanciel" },
+  { key: "hybride",     label: "Hybride",     test: c => c.cliente.type === "hybride" },
+  { key: "nutrition",   label: "Suivi nutrition", test: c => c.accompagnement && c.accompagnement.nutrition_active },
+  { key: "bilan_du",    label: "Bilan à venir",   test: c => { const b = Calc.bilanStats(c.bilans); return b.joursAvant !== null && b.joursAvant >= 0 && b.joursAvant <= 7; } },
+  { key: "bilan_retard",label: "Bilan en retard", test: c => { const b = Calc.bilanStats(c.bilans); return b.joursAvant !== null && b.joursAvant < 0; } },
+  { key: "echeance",    label: "Suivi bientôt fini", test: c => { const s = Calc.suiviStats(c.accompagnement); return s.joursRestants !== null && s.joursRestants >= 0 && s.joursRestants <= 14; } },
+  { key: "prog_env",    label: "Programme à envoyer", test: c => c.cliente.statut === "active" && !(c.programmes||[]).some(p => p.kind==="sportif" && p.envoye) },
+  { key: "relancer",    label: "À relancer",  test: c => c.cliente.statut === "a_renouveler" },
+];
+
+function initials(c){ return ((c.prenom||"?")[0]||"").toUpperCase(); }
+
+// ---- Chargement groupé (peu de requêtes, quel que soit le nb de clientes) ----
+async function loadAll() {
+  const [clientes, accomp, seances, bilans, programmes] = await Promise.all([
+    sb.from("clientes").select("*").order("created_at",{ascending:false}),
+    sb.from("accompagnements").select("cliente_id,seances_prevues,date_debut,date_fin,nutrition_active,nb_mois"),
+    sb.from("seances").select("cliente_id,statut"),
+    sb.from("bilans").select("cliente_id,date"),
+    sb.from("programmes").select("cliente_id,kind,envoye"),
+  ]);
+  const group = (rows, key="cliente_id") => {
+    const m = {}; (rows.data||[]).forEach(r => { (m[r[key]] ||= []).push(r); }); return m;
+  };
+  const accMap = {}; (accomp.data||[]).forEach(a => accMap[a.cliente_id] = a);
+  const seaMap = group(seances.data ? seances : {data:[]});
+  const bilMap = group(bilans.data ? bilans : {data:[]});
+  const proMap = group(programmes.data ? programmes : {data:[]});
+
+  STATE.clientes = (clientes.data||[]).map(cl => ({
+    cliente: cl,
+    accompagnement: accMap[cl.id] || null,
+    seances: (seaMap[cl.id]||[]).map(s=>({statut:s.statut})),
+    bilans: bilMap[cl.id]||[],
+    programmes: proMap[cl.id]||[],
+  }));
+}
+
+// ---- Alertes globales ----
+function renderAlerts() {
+  const box = document.getElementById("alerts");
+  const all = [];
+  STATE.clientes.forEach(c => Calc.alertes(c).forEach(a => all.push({ ...a, c })));
+  if (!all.length) { box.innerHTML = ""; return; }
+  const order = { bilan:0, programme:1, fin:2, seances:3, renouveler:4 };
+  all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
+  box.innerHTML = all.slice(0,8).map(a =>
+    `<a class="alert" href="cliente.html?id=${a.c.cliente.id}">
+       <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${a.c.cliente.prenom}</span></span>
+     </a>`).join("");
+}
+
+// ---- Filtres ----
+function renderFilters() {
+  document.getElementById("filters").innerHTML = FILTERS.map(f =>
+    `<button class="chip ${STATE.filter===f.key?'on':''}" data-k="${f.key}">${f.label}</button>`).join("");
+  document.querySelectorAll("#filters .chip").forEach(ch => ch.onclick = () => {
+    STATE.filter = STATE.filter === ch.dataset.k ? null : ch.dataset.k;
+    renderFilters(); renderList();
+  });
+}
+
+// ---- Liste des clientes ----
+function renderList() {
+  const cont = document.getElementById("content");
+  let list = STATE.clientes;
+  if (STATE.q) {
+    const q = STATE.q.toLowerCase();
+    list = list.filter(c => {
+      const cl = c.cliente;
+      return [cl.prenom,cl.nom,cl.objectif_principal,Calc.labelType(cl.type),Calc.labelStatut(cl.statut)]
+        .filter(Boolean).some(v => v.toLowerCase().includes(q));
+    });
+  }
+  if (STATE.filter) {
+    const f = FILTERS.find(x=>x.key===STATE.filter);
+    list = list.filter(f.test);
+  }
+  document.getElementById("sub").textContent =
+    `${STATE.clientes.length} cliente${STATE.clientes.length>1?'s':''}` +
+    (list.length !== STATE.clientes.length ? ` · ${list.length} affichée${list.length>1?'s':''}` : "");
+
+  if (!list.length) {
+    cont.innerHTML = `<div class="card"><p class="empty">Aucune cliente ne correspond.</p></div>`;
+    return;
+  }
+  cont.innerHTML = `<div class="clientes-grid">` + list.map(c => {
+    const cl = c.cliente;
+    const s = Calc.seancesStats(c.accompagnement, c.seances);
+    const b = Calc.bilanStats(c.bilans);
+    const al = Calc.alertes(c);
+    return `<a class="cl-card" href="cliente.html?id=${cl.id}">
+      <div class="cl-top">
+        <div style="display:flex;gap:11px;align-items:center;min-width:0">
+          <div class="cl-avatar">${initials(cl)}</div>
+          <div style="min-width:0">
+            <div class="cl-name">${cl.prenom||''} ${cl.nom||''}</div>
+            <div class="cl-obj">${cl.objectif_principal||'—'}</div>
+          </div>
+        </div>
+      </div>
+      <div class="cl-meta">
+        <span class="badge badge-type">${Calc.labelType(cl.type)}</span>
+        <span class="st st-${cl.statut}">${Calc.labelStatut(cl.statut)}</span>
+      </div>
+      ${s.prevues ? UI.progressBar(s.pct, `${s.realisees} / ${s.prevues} séances`) : ''}
+      <div class="cl-line"><span>Dernier bilan</span><strong>${Calc.fmt(b.dernier)}</strong></div>
+      <div class="cl-line"><span>Prochain bilan</span><strong>${Calc.fmt(b.prochain)}</strong></div>
+      ${al.length ? `<div class="cl-alerts">${al.map(a=>`<span class="dot-alert">${a.icon} ${a.label}</span>`).join('')}</div>` : ''}
+    </a>`;
+  }).join("") + `</div>`;
+}
+
+// ---- Nouvelle cliente ----
+function makeCode(prenom){
+  const base = (prenom||"CLI").normalize("NFD").replace(/[^A-Za-z]/g,"").toUpperCase().slice(0,6) || "CLI";
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sans I,O,0,1
+  let s = ""; for (let i=0;i<5;i++) s += A[Math.floor(Math.random()*A.length)];
+  return base + "-" + s;
+}
+document.getElementById("newCliente").onclick = async () => {
+  const v = await UI.form({
+    title: "Nouvelle cliente",
+    submit: "Créer la fiche",
+    fields: [
+      { name:"prenom", label:"Prénom", required:true, half:true },
+      { name:"nom", label:"Nom", half:true },
+      { name:"type", label:"Accompagnement", type:"select", half:true, value:"presentiel", options:[
+        {value:"presentiel",label:"Présentiel"},{value:"distanciel",label:"Distanciel"},{value:"hybride",label:"Hybride"}]},
+      { name:"statut", label:"Statut", type:"select", half:true, value:"a_demarrer", options:[
+        {value:"a_demarrer",label:"À démarrer"},{value:"active",label:"Active"},{value:"en_pause",label:"En pause"},
+        {value:"termine",label:"Terminé"},{value:"a_renouveler",label:"À renouveler"}]},
+      { name:"objectif_principal", label:"Objectif principal", placeholder:"Perte de poids, prise de masse…" },
+      { name:"date_debut", label:"Date de début", type:"date", half:true, value:Calc.today() },
+      { name:"seances_prevues", label:"Séances prévues", type:"number", half:true, placeholder:"12" },
+      { name:"nb_mois", label:"Durée (mois)", type:"number", half:true, placeholder:"3" },
+      { name:"nutrition_active", label:"Suivi nutrition", type:"checkbox", half:true },
+    ],
+  });
+  if (!v) return;
+  try {
+    const cliente = await DB.createCliente({
+      prenom:v.prenom, nom:v.nom, type:v.type, statut:v.statut,
+      objectif_principal:v.objectif_principal, access_code: makeCode(v.prenom),
+    });
+    // date de fin auto si début + mois
+    let date_fin = null;
+    if (v.date_debut && v.nb_mois) {
+      const d = Calc.parse(v.date_debut); d.setMonth(d.getMonth()+Number(v.nb_mois));
+      date_fin = d.toISOString().slice(0,10);
+    }
+    await DB.saveAccompagnement(cliente.id, {
+      date_debut:v.date_debut, date_fin, nb_mois:v.nb_mois,
+      seances_prevues:v.seances_prevues||0, nutrition_active:!!v.nutrition_active,
+    });
+    UI.toast("Cliente créée ✓");
+    location.href = "cliente.html?id=" + cliente.id;
+  } catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e), "err"); }
+};
+
+// ---- Init ----
+(async () => {
+  const p = await Auth.requireCoach();
+  if (!p) return;
+  document.getElementById("who").textContent = (p.prenom||"Coach");
+  document.getElementById("logout").onclick = () => Auth.signOut();
+  document.getElementById("q").addEventListener("input", e => { STATE.q = e.target.value.trim(); renderList(); });
+  try {
+    await loadAll();
+    renderAlerts(); renderFilters(); renderList();
+  } catch(e){
+    console.error(e);
+    document.getElementById("content").innerHTML =
+      `<div class="card"><p class="empty">Erreur de chargement. Vérifie la config Supabase (js/config.js) et le SQL.</p></div>`;
+  }
+})();
+</script>
+</body>
+</html>

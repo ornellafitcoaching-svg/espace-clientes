@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Fiche cliente — Espace Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=e3">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="coach.html">← Mes clientes</a>
+  <span class="spacer"></span>
+  <span class="who" id="who"></span>
+  <button class="btn-ghost btn-sm" id="logout">Déconnexion</button>
+</header>
+
+<main class="wrap wrap-narrow" id="main">
+  <div class="loader"><div class="spin"></div></div>
+</main>
+
+<input type="file" id="photoInput" accept="image/*" style="display:none">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=e3"></script>
+<script src="js/supabaseClient.js?v=e3"></script>
+<script src="js/auth.js?v=e3"></script>
+<script src="js/db.js?v=e3"></script>
+<script src="js/calc.js?v=e3"></script>
+<script src="js/ui/modal.js?v=e3"></script>
+<script src="js/ui/progress.js?v=e3"></script>
+<script>
+const CID = new URLSearchParams(location.search).get("id");
+let D = null;             // dossier courant
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = Math.random()*16|0; return (c==="x"?r:(r&0x3|0x8)).toString(16); }));
+const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+// Génère un code d'accès lisible : PRÉNOM-XXXXX (sans I,O,0,1 pour éviter les confusions).
+function makeCode(prenom){
+  const base = (prenom||"CLI").normalize("NFD").replace(/[^A-Za-z]/g,"").toUpperCase().slice(0,6) || "CLI";
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = ""; for (let i=0;i<5;i++) s += A[Math.floor(Math.random()*A.length)];
+  return base + "-" + s;
+}
+
+// ============================ CHARGEMENT / RENDU ============================
+async function reload(){ D = await DB.dossier(CID); render(); }
+
+function render(){
+  if (!D || !D.cliente){ document.getElementById("main").innerHTML =
+    `<div class="card"><p class="empty">Cliente introuvable.</p></div>`; return; }
+  const cl = D.cliente, ac = D.accompagnement;
+  const s = Calc.seancesStats(ac, D.seances);
+  const b = Calc.bilanStats(D.bilans);
+  const suivi = Calc.suiviStats(ac);
+  const sport = lastProg("sportif"), nutri = lastProg("nutrition");
+  const pay = Calc.paiementsStats(D.paiements, ac);
+  const age = Calc.age(cl.date_naissance);
+
+  document.getElementById("main").innerHTML = `
+    <div class="row between" style="margin-bottom:14px">
+      <div>
+        <h1 class="page-title">${esc(cl.prenom)} <em>${esc(cl.nom||"")}</em></h1>
+        <div class="cl-meta">
+          <span class="badge badge-type">${Calc.labelType(cl.type)}</span>
+          <span class="st st-${cl.statut}">${Calc.labelStatut(cl.statut)}</span>
+          ${cl.profile_id?`<span class="tag">🔑 ${esc(cl.access_code)}</span>`:''}
+        </div>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="btn-ghost btn-sm" data-act="edit-cliente">Modifier</button>
+        <button class="btn-ghost btn-sm" data-act="del-cliente" style="color:var(--danger);border-color:rgba(192,86,75,.4)">Supprimer</button>
+      </div>
+    </div>
+
+    <!-- RÉSUMÉ -->
+    <div class="card card-dark">
+      <div class="summary">
+        <div class="sum-item"><div class="k">Objectif</div><div class="v">${esc(cl.objectif_principal||"—")}</div></div>
+        <div class="sum-item"><div class="k">Début</div><div class="v">${Calc.fmt(ac&&ac.date_debut)}</div></div>
+        <div class="sum-item"><div class="k">Fin</div><div class="v">${Calc.fmt(ac&&ac.date_fin)}<small>${ac&&ac.nb_mois?ac.nb_mois+" mois":""}</small></div></div>
+        <div class="sum-item"><div class="k">Séances</div><div class="v">${s.realisees} / ${s.prevues}<small>${s.restantes} restantes</small></div></div>
+        <div class="sum-item"><div class="k">Dernier bilan</div><div class="v">${Calc.fmt(b.dernier)}</div></div>
+        <div class="sum-item"><div class="k">Prochain bilan</div><div class="v">${Calc.fmt(b.prochain)}<small>${b.joursAvant!=null?(b.joursAvant<0?Math.abs(b.joursAvant)+" j de retard":"dans "+b.joursAvant+" j"):""}</small></div></div>
+        <div class="sum-item"><div class="k">Programme sportif</div><div class="v">${sport&&sport.envoye?"Envoyé":"—"}<small>${sport&&sport.envoye?Calc.fmt(sport.date_envoi):""}</small></div></div>
+        <div class="sum-item"><div class="k">Nutrition</div><div class="v">${ac&&ac.nutrition_active?"Oui":"Non"}<small>${nutri&&nutri.envoye?"Prog. "+Calc.fmt(nutri.date_envoi):""}</small></div></div>
+        ${age!=null?`<div class="sum-item"><div class="k">Âge</div><div class="v">${age} ans</div></div>`:''}
+        <div class="sum-item"><div class="k">Encaissé</div><div class="v">${Calc.euro(pay.total)}<small>${pay.prix!=null?"forfait "+Calc.euro(pay.prix)+(pay.reste>0?" · reste "+Calc.euro(pay.reste):(pay.reste<0?"":" · soldé")):""}</small></div></div>
+      </div>
+      ${s.prevues?`<div style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>`:''}
+    </div>
+
+    <!-- ACTIONS RAPIDES -->
+    <div class="quick">
+      <button class="qbtn qbtn-accent" data-act="add-seance"><span class="i">🏋️</span> Séance</button>
+      <button class="qbtn" data-act="add-bilan"><span class="i">📋</span> Bilan</button>
+      <button class="qbtn" data-act="add-mensu"><span class="i">📏</span> Mensurations</button>
+      <button class="qbtn" data-act="add-photo"><span class="i">📸</span> Photo</button>
+      <button class="qbtn" data-act="add-objectif"><span class="i">🎯</span> Objectif</button>
+      <button class="qbtn" data-act="add-paiement"><span class="i">💶</span> Paiement</button>
+      <button class="qbtn" data-act="add-note"><span class="i">🔒</span> Note privée</button>
+      <button class="qbtn" data-act="prog-sportif"><span class="i">📤</span> Prog. sportif envoyé</button>
+      <button class="qbtn" data-act="prog-nutrition"><span class="i">🥗</span> Prog. nutrition envoyé</button>
+    </div>
+
+    ${sectionAccesCliente()}
+    ${sectionCoordonnees()}
+    ${sectionAccompagnement(ac, s, suivi)}
+    ${sectionPaiements()}
+    ${sectionSeances()}
+    ${sectionProgrammes()}
+    ${sectionBilans()}
+    ${sectionMensurations()}
+    ${sectionPhotos()}
+    ${sectionObjectifs()}
+    ${sectionTimeline()}
+    ${sectionNotes()}
+  `;
+  loadPhotoThumbs();
+}
+
+function lastProg(kind){ return (D.programmes||[]).filter(p=>p.kind===kind).sort((a,b)=>a.created_at<b.created_at?1:-1)[0]||null; }
+
+// ============================ SECTIONS ============================
+function block(title, count, body, open){
+  return `<details class="section-block" ${open?"open":""}>
+    <summary><span class="chev">▸</span>${title}${count!=null?`<span class="count">${count}</span>`:""}</summary>
+    <div class="section-body">${body}</div></details>`;
+}
+function delEdit(entity,id){
+  return `<div class="iact">
+    <button class="icon-btn" data-act="edit-${entity}" data-id="${id}">✎</button>
+    <button class="icon-btn" data-act="del" data-entity="${entity}" data-id="${id}">🗑</button></div>`;
+}
+
+function sectionAccompagnement(ac,s,suivi){
+  const body = `
+    <div class="cl-line"><span>Formule</span><strong>${esc((ac&&ac.formule)||"—")}</strong></div>
+    <div class="cl-line"><span>Fréquence prévue</span><strong>${esc((ac&&ac.freq_prevue)||"—")}</strong></div>
+    <div class="cl-line"><span>Séances prévues</span><strong>${s.prevues}</strong></div>
+    <div class="cl-line"><span>Réalisées / restantes</span><strong>${s.realisees} / ${s.restantes}</strong></div>
+    ${suivi.pctTemps!=null?`<div style="margin-top:10px">${UI.progressBar(suivi.pctTemps,"Temps de suivi écoulé")}</div>`:""}
+    <div class="cl-line" style="margin-top:8px"><span>Objectifs secondaires</span><strong>${esc((D.cliente.objectifs_secondaires)||"—")}</strong></div>
+    ${ac&&ac.nutrition_active?`<div class="mensu-card" style="margin-top:10px">
+      <h4 style="font-size:.95rem">🥗 Nutrition <span class="tag">visible cliente</span></h4>
+      ${(ac.nut_calories!=null||ac.nut_proteines!=null||ac.nut_glucides!=null||ac.nut_lipides!=null)?`<div class="cl-line" style="margin-top:6px"><span>Objectifs / jour</span><strong>${[ac.nut_calories!=null?ac.nut_calories+" kcal":null,ac.nut_proteines!=null?"P "+ac.nut_proteines+"g":null,ac.nut_glucides!=null?"G "+ac.nut_glucides+"g":null,ac.nut_lipides!=null?"L "+ac.nut_lipides+"g":null].filter(Boolean).join(" · ")}</strong></div>`:`<div class="isub">Aucun objectif calorique/macros saisi.</div>`}
+      ${ac.nut_conseils?`<div class="isub" style="margin-top:6px;white-space:pre-wrap">${esc(ac.nut_conseils)}</div>`:""}
+    </div>`:""}
+    <div style="margin-top:12px"><button class="link" data-act="edit-accomp">Modifier l'accompagnement</button></div>`;
+  return block("Accompagnement", null, body, false);
+}
+
+function sectionAccesCliente(){
+  const cl = D.cliente;
+  const has = !!cl.profile_id;
+  const code = cl.access_code || "";
+  const body = has ? `
+    <p class="isub" style="margin-bottom:10px">La cliente consulte son suivi en <strong>lecture seule</strong> sur la page de connexion cliente. Le code sert d'identifiant <em>et</em> de mot de passe.</p>
+    <div class="code-box">
+      <span class="code-val" id="codeVal">${esc(code)}</span>
+      <button class="btn-ghost btn-sm" data-act="copy-code">Copier</button>
+    </div>
+    <div class="row" style="gap:14px;margin-top:12px">
+      <a class="link" href="espace.html" target="_blank" rel="noopener">Ouvrir l'espace cliente ↗</a>
+      <button class="link" data-act="regen-access" style="color:var(--danger)">Régénérer le code</button>
+    </div>`
+  : `
+    <p class="isub" style="margin-bottom:12px">Aucun accès cliente pour l'instant. Génère un code : ${esc(cl.prenom)} pourra consulter son objectif, ses séances, mensurations, bilans, photos et programmes — sans jamais voir tes notes privées ni les paiements.</p>
+    <button class="btn-accent btn-sm" data-act="create-access">🔑 Créer l'accès cliente</button>`;
+  return block("Accès cliente", null, body, !has);
+}
+
+function sectionCoordonnees(){
+  const cl = D.cliente;
+  const age = Calc.age(cl.date_naissance);
+  const poids = Calc.dernierPoids(D.bilans, D.mensurations);
+  const imc = Calc.imc(poids, cl.taille_cm);
+  const line = (k,v) => v ? `<div class="cl-line"><span>${k}</span><strong>${esc(v)}</strong></div>` : "";
+  const body = `
+    ${line("Téléphone", cl.telephone)}
+    ${line("Email", cl.email_perso)}
+    ${cl.date_naissance?`<div class="cl-line"><span>Naissance</span><strong>${Calc.fmt(cl.date_naissance)}${age!=null?` (${age} ans)`:""}</strong></div>`:""}
+    ${cl.taille_cm?`<div class="cl-line"><span>Taille</span><strong>${esc(cl.taille_cm)} cm${imc!=null?` · IMC ${imc}`:""}</strong></div>`:""}
+    ${line("Niveau", cl.niveau)}
+    ${line("Disponibilités", cl.disponibilites)}
+    ${cl.sante?`<div class="mensu-card" style="margin-top:10px;border-color:rgba(192,86,75,.35)"><h4 style="color:var(--danger)">⚠️ Santé / antécédents</h4><div class="isub">${esc(cl.sante)}</div></div>`:""}
+    ${cl.allergies?`<div class="cl-line" style="margin-top:8px"><span>Allergies</span><strong>${esc(cl.allergies)}</strong></div>`:""}
+    ${(!cl.telephone&&!cl.email_perso&&!cl.date_naissance&&!cl.taille_cm&&!cl.niveau&&!cl.disponibilites&&!cl.sante&&!cl.allergies)?`<p class="empty">Aucune coordonnée renseignée.</p>`:""}
+    <div style="margin-top:12px"><button class="link" data-act="edit-cliente">Modifier les coordonnées & la santé</button></div>`;
+  return block("Coordonnées & santé", null, body, false);
+}
+
+function sectionPaiements(){
+  const list = D.paiements || [];
+  const pay = Calc.paiementsStats(list, D.accompagnement);
+  const head = `<div class="mensu-card" style="margin-bottom:10px">
+      <div class="cl-line"><span>Total encaissé</span><strong style="color:var(--ok)">${Calc.euro(pay.total)}</strong></div>
+      ${pay.prix!=null?`<div class="cl-line"><span>Forfait</span><strong>${Calc.euro(pay.prix)}</strong></div>
+      <div class="cl-line"><span>Reste à régler</span><strong style="color:${pay.reste>0?'var(--danger)':'var(--ok)'}">${pay.reste>0?Calc.euro(pay.reste):"Soldé ✓"}</strong></div>`:""}
+    </div>`;
+  const body = `<p class="isub" style="color:var(--text-light);margin-bottom:8px">🔒 Visible uniquement par toi.</p>` + head +
+    (list.length ? list.map(p=>`
+      <div class="item"><div class="idate">${Calc.fmtShort(p.date)}</div>
+        <div class="ibody"><div class="ititle">${Calc.euro(p.montant)} ${p.mode?`<span class="tag">${esc(p.mode)}</span>`:""}</div>
+          ${p.note?`<div class="isub">${esc(p.note)}</div>`:""}
+        </div>${delEdit("paiement",p.id)}</div>`).join("") : `<p class="empty">Aucun paiement enregistré.</p>`) +
+    `<div style="margin-top:10px"><button class="link" data-act="add-paiement">＋ Ajouter un paiement</button></div>`;
+  return block("Paiements", list.length, body, false);
+}
+
+function sectionSeances(){
+  const list = D.seances||[];
+  const body = list.length ? list.map(x=>`
+    <div class="item">
+      <div class="idate">${Calc.fmtShort(x.date)}</div>
+      <div class="ibody">
+        <div class="ititle">${esc(x.type||"Séance")} ${x.statut!=="realisee"?`<span class="tag">${x.statut}</span>`:""}</div>
+        <div class="isub">${[x.objectif&&esc(x.objectif),x.intensite&&("Intensité "+esc(x.intensite)),x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+        ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
+        ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}
+      </div>${delEdit("seance",x.id)}
+    </div>`).join("") : `<p class="empty">Aucune séance enregistrée.</p>`;
+  return block("Séances", list.length, body, false);
+}
+
+function sectionProgrammes(){
+  const rows = kind => (D.programmes||[]).filter(p=>p.kind===kind).sort((a,b)=>a.created_at<b.created_at?1:-1);
+  const render = (label,kind) => {
+    const list = rows(kind);
+    return `<h4 style="margin:6px 0 4px">${label}</h4>` + (list.length? list.map(p=>`
+      <div class="item"><div class="idate">${Calc.fmtShort(p.date_envoi)}</div>
+        <div class="ibody"><div class="ititle">${p.envoye?"Envoyé":"Non envoyé"} ${p.version?`<span class="tag">v${esc(p.version)}</span>`:""}</div>
+          <div class="isub">${[p.date_debut&&("du "+Calc.fmt(p.date_debut)),p.date_fin&&("au "+Calc.fmt(p.date_fin))].filter(Boolean).join(" ")||"&nbsp;"}</div>
+          ${p.commentaire?`<div class="isub">${esc(p.commentaire)}</div>`:""}
+        </div>${delEdit("programme",p.id)}</div>`).join("") : `<p class="empty">Aucun programme ${kind}.</p>`);
+  };
+  return block("Programmes", null, render("Sportif","sportif")+render("Nutrition","nutrition"), false);
+}
+
+function sectionBilans(){
+  const list = D.bilans||[];
+  const body = list.length ? list.map(x=>`
+    <div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div>
+      <div class="ibody">
+        <div class="ititle">Bilan ${x.semaine!=null?"semaine "+x.semaine:""} ${x.poids?`<span class="tag">${x.poids} kg</span>`:""}</div>
+        <div class="isub">${[x.ressenti&&("Ressenti : "+esc(x.ressenti)),x.evolution&&esc(x.evolution)].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+        ${x.difficultes?`<div class="isub">⚠️ ${esc(x.difficultes)}</div>`:""}
+        ${x.points_positifs?`<div class="isub">✅ ${esc(x.points_positifs)}</div>`:""}
+        ${x.commentaire_coach?`<div class="isub">💬 ${esc(x.commentaire_coach)}</div>`:""}
+      </div>${delEdit("bilan",x.id)}</div>`).join("") : `<p class="empty">Aucun bilan.</p>`;
+  return block("Bilans", list.length, body, false);
+}
+
+function sectionMensurations(){
+  const types = Calc.mensuTypes(D.mensurations);
+  const body = types.length ? `<div class="mensu-grid">` + types.map(t=>{
+    const ev = Calc.mensuEvolution(D.mensurations, t);
+    const dir = ev.diff<0?"down":(ev.diff>0?"up":"");
+    const sign = ev.diff>0?"+":"";
+    return `<div class="mensu-card">
+      <h4>${esc(t.replace(/_/g," "))}</h4>
+      <div class="mensu-delta ${dir}">${sign}${ev.diff} ${esc(ev.unite)} ${ev.pct!=null?`(${sign}${ev.pct}%)`:""}</div>
+      <div class="isub">${ev.depart}${esc(ev.unite)} → ${ev.derniere}${esc(ev.unite)}</div>
+      ${UI.lineChart(ev.points, {unite:ev.unite})}
+    </div>`;
+  }).join("") + `</div>` : `<p class="empty">Aucune mensuration.</p>`;
+  const listing = (D.mensurations||[]).length ? `<div style="margin-top:14px">`+
+    [...D.mensurations].sort((a,b)=>a.date<b.date?1:-1).slice(0,12).map(m=>`
+    <div class="item"><div class="idate">${Calc.fmtShort(m.date)}</div>
+      <div class="ibody"><div class="ititle">${esc(m.type.replace(/_/g," "))} : ${m.valeur}${esc(m.unite||"")}</div></div>
+      ${delEdit("mensuration",m.id)}</div>`).join("")+`</div>` : "";
+  return block("Mensurations & évolution", (D.mensurations||[]).length, body+listing, false);
+}
+
+function sectionPhotos(){
+  const list = D.photos||[];
+  const body = list.length ? `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
+    <div class="mensu-card">
+      <div class="cl-line"><strong>${Calc.fmt(p.date)}</strong>
+        <span class="tag">${p.visibilite==="cliente"?"👁 Visible cliente":"🔒 Privé"}</span></div>
+      <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="margin:8px 0;border-radius:12px;overflow:hidden;background:var(--cream);min-height:120px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem">chargement…</div>
+      ${p.legende?`<div class="isub">${esc(p.legende)}</div>`:""}
+      <div style="margin-top:6px"><button class="link" data-act="toggle-photo" data-id="${p.id}" data-vis="${p.visibilite}">${p.visibilite==="cliente"?"Rendre privé":"Rendre visible"}</button>
+      &nbsp;·&nbsp;<button class="link" data-act="del" data-entity="photo" data-id="${p.id}" data-path="${esc(p.storage_path)}">Supprimer</button></div>
+    </div>`).join("") + `</div>` : `<p class="empty">Aucune photo.</p>`;
+  return block("Photos de progression", list.length, body, false);
+}
+
+function sectionObjectifs(){
+  const list = D.objectifs||[];
+  const icon = st => ({en_cours:"⏳",atteint:"✅",abandonne:"⛔"}[st]||"");
+  const body = list.length ? list.map(o=>`
+    <div class="item"><div class="idate">${icon(o.statut)}</div>
+      <div class="ibody"><div class="ititle">${esc(o.titre)}</div>
+        ${o.description?`<div class="isub">${esc(o.description)}</div>`:""}
+        <div class="isub">${o.statut.replace("_"," ")} · créé le ${Calc.fmt(o.date_creation)}${o.date_atteinte?" · atteint le "+Calc.fmt(o.date_atteinte):""}</div>
+      </div>${delEdit("objectif",o.id)}</div>`).join("") : `<p class="empty">Aucun objectif.</p>`;
+  return block("Objectifs", list.length, body, false);
+}
+
+function sectionTimeline(){
+  const ev = [];
+  (D.bilans||[]).forEach(x=>ev.push({d:x.date,t:"🟠 Bilan "+(x.semaine!=null?"S"+x.semaine:"")}));
+  (D.seances||[]).forEach(x=>ev.push({d:x.date,t:"🏋️ "+(x.type||"Séance")}));
+  (D.mensurations||[]).forEach(x=>ev.push({d:x.date,t:"📏 "+x.type.replace(/_/g," ")}));
+  (D.photos||[]).forEach(x=>ev.push({d:x.date,t:"📸 Photo"}));
+  (D.objectifs||[]).forEach(x=>ev.push({d:x.date_creation,t:"🎯 "+x.titre}));
+  (D.programmes||[]).filter(p=>p.envoye).forEach(x=>ev.push({d:x.date_envoi,t:(x.kind==="sportif"?"📤 Programme sportif":"🥗 Programme nutrition")+" envoyé"}));
+  (D.paiements||[]).forEach(x=>ev.push({d:x.date,t:"💶 Paiement "+Calc.euro(x.montant)+(x.mode?" ("+x.mode+")":"")}));
+  ev.sort((a,b)=>(a.d<b.d?1:-1));
+  const body = ev.length ? `<div class="tl">`+ev.slice(0,40).map(e=>`
+    <div class="tl-item"><div class="tl-date">${Calc.fmt(e.d)}</div><div class="tl-txt">${esc(e.t)}</div></div>`).join("")+`</div>`
+    : `<p class="empty">Rien pour l'instant.</p>`;
+  return block("Timeline", null, body, false);
+}
+
+function sectionNotes(){
+  const list = D.notes||[];
+  const body = `<p class="isub" style="color:var(--text-light);margin-bottom:8px">🔒 Visible uniquement par toi. Jamais côté cliente.</p>` +
+    (list.length ? list.map(n=>`
+    <div class="item"><div class="idate">${Calc.fmtShort(n.date)}</div>
+      <div class="ibody"><div class="isub">${esc(n.contenu)}</div></div>${delEdit("note",n.id)}</div>`).join("")
+    : `<p class="empty">Aucune note.</p>`);
+  return block("Notes privées", list.length, body, false);
+}
+
+// ============================ PHOTOS (Storage privé) ============================
+async function loadPhotoThumbs(){
+  document.querySelectorAll(".photo-thumb").forEach(async el=>{
+    const path = el.dataset.path;
+    const { data } = await sb.storage.from("photos").createSignedUrl(path, 3600);
+    if (data && data.signedUrl){
+      el.innerHTML = `<img src="${data.signedUrl}" style="width:100%;display:block" alt="">`;
+    } else { el.textContent = "indisponible"; }
+  });
+}
+async function addPhoto(){
+  const meta = await UI.form({ title:"Ajouter une photo", submit:"Choisir le fichier", fields:[
+    { name:"date", label:"Date", type:"date", half:true, value:Calc.today() },
+    { name:"visibilite", label:"Visibilité", type:"select", half:true, value:"prive", options:[
+      {value:"prive",label:"🔒 Privé (coach)"},{value:"cliente",label:"👁 Visible cliente"}]},
+    { name:"legende", label:"Légende (facultatif)" },
+  ]});
+  if (!meta) return;
+  const input = document.getElementById("photoInput");
+  input.value = "";
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    try{
+      UI.toast("Envoi de la photo…");
+      const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
+      const path = `${CID}/${meta.visibilite}/${uuid()}.${ext}`;
+      const up = await sb.storage.from("photos").upload(path, file, { upsert:false });
+      if (up.error) throw up.error;
+      await DB.insert("photos", { cliente_id:CID, date:meta.date, storage_path:path, visibilite:meta.visibilite, legende:meta.legende });
+      UI.toast("Photo ajoutée ✓"); reload();
+    }catch(e){ console.error(e); UI.toast("Erreur photo : "+(e.message||e),"err"); }
+  };
+  input.click();
+}
+
+// ============================ FORMULAIRES ENTITÉS ============================
+function seanceFields(x){ x=x||{}; return [
+  { name:"date", label:"Date", type:"date", half:true, value:x.date||Calc.today() },
+  { name:"type", label:"Type de séance", half:true, value:x.type, placeholder:"Jambes, Full body…" },
+  { name:"statut", label:"Statut", type:"select", half:true, value:x.statut||"realisee", options:[
+    {value:"realisee",label:"Réalisée"},{value:"prevue",label:"Prévue"},{value:"annulee",label:"Annulée"}]},
+  { name:"duree", label:"Durée (min)", type:"number", half:true, value:x.duree },
+  { name:"objectif", label:"Objectif (facultatif)", value:x.objectif },
+  { name:"intensite", label:"Intensité (facultatif)", half:true, value:x.intensite, placeholder:"légère / modérée / forte" },
+  { name:"commentaire", label:"Commentaire", type:"textarea", value:x.commentaire },
+  { name:"_exercices", label:"Exercices détaillés (1 par ligne, facultatif)", type:"textarea",
+    value:(Array.isArray(x.exercices)?x.exercices.map(e=>e.nom||e).join("\n"):"") },
+];}
+function seancePayload(v){
+  const ex = (v._exercices||"").split("\n").map(l=>l.trim()).filter(Boolean).map(nom=>({nom}));
+  const niveau = ex.length?"detaille":((v.objectif||v.intensite||v.duree)?"standard":"rapide");
+  return { cliente_id:CID, date:v.date, type:v.type, statut:v.statut, duree:v.duree,
+    objectif:v.objectif, intensite:v.intensite, commentaire:v.commentaire,
+    exercices: ex.length?ex:null, niveau };
+}
+function bilanFields(x){ x=x||{}; return [
+  { name:"date", label:"Date", type:"date", half:true, value:x.date||Calc.today() },
+  { name:"semaine", label:"Semaine (0,4,8…)", type:"number", half:true, value:x.semaine },
+  { name:"poids", label:"Poids (kg)", type:"number", half:true, value:x.poids },
+  { name:"ressenti", label:"Ressenti", half:true, value:x.ressenti },
+  { name:"evolution", label:"Évolution", type:"textarea", value:x.evolution },
+  { name:"objectifs_atteints", label:"Objectifs atteints", type:"textarea", value:x.objectifs_atteints },
+  { name:"difficultes", label:"Difficultés", type:"textarea", value:x.difficultes },
+  { name:"points_positifs", label:"Points positifs", type:"textarea", value:x.points_positifs },
+  { name:"nouveaux_objectifs", label:"Nouveaux objectifs", type:"textarea", value:x.nouveaux_objectifs },
+  { name:"commentaire_coach", label:"Commentaire coach", type:"textarea", value:x.commentaire_coach },
+];}
+function mensuFields(x){ x=x||{}; return [
+  { name:"type", label:"Mesure", half:true, value:x.type, placeholder:"tour_taille, poids…", required:true },
+  { name:"valeur", label:"Valeur", type:"number", half:true, value:x.valeur, required:true },
+  { name:"unite", label:"Unité", type:"select", half:true, value:x.unite||"cm", options:[
+    {value:"cm",label:"cm"},{value:"kg",label:"kg"},{value:"%",label:"%"}]},
+  { name:"date", label:"Date", type:"date", half:true, value:x.date||Calc.today() },
+];}
+function objectifFields(x){ x=x||{}; return [
+  { name:"titre", label:"Titre", value:x.titre, required:true },
+  { name:"description", label:"Description", type:"textarea", value:x.description },
+  { name:"statut", label:"Statut", type:"select", half:true, value:x.statut||"en_cours", options:[
+    {value:"en_cours",label:"En cours"},{value:"atteint",label:"Atteint"},{value:"abandonne",label:"Abandonné"}]},
+  { name:"date_creation", label:"Date de création", type:"date", half:true, value:x.date_creation||Calc.today() },
+  { name:"date_atteinte", label:"Date d'atteinte (si atteint)", type:"date", half:true, value:x.date_atteinte },
+];}
+function noteFields(x){ x=x||{}; return [
+  { name:"date", label:"Date", type:"date", half:true, value:x.date||Calc.today() },
+  { name:"contenu", label:"Note", type:"textarea", value:x.contenu, required:true },
+];}
+function paiementFields(x){ x=x||{}; return [
+  { name:"montant", label:"Montant (€)", type:"number", half:true, value:x.montant, required:true },
+  { name:"date", label:"Date de paiement", type:"date", half:true, value:x.date||Calc.today() },
+  { name:"mode", label:"Moyen de paiement", type:"select", half:true, value:x.mode||"Virement", options:[
+    {value:"Virement",label:"Virement"},{value:"Stripe",label:"Stripe"},{value:"GoCardless",label:"GoCardless"},
+    {value:"Espèces",label:"Espèces"},{value:"Chèque",label:"Chèque"},{value:"Klarna",label:"Klarna"},{value:"Autre",label:"Autre"}]},
+  { name:"note", label:"Note (facultatif)", half:true, value:x.note },
+];}
+function progFields(kind,x){ x=x||{}; return [
+  { name:"envoye", label:"Programme envoyé", type:"checkbox", half:true, value:x.envoye!=null?x.envoye:true },
+  { name:"date_envoi", label:"Date d'envoi", type:"date", half:true, value:x.date_envoi||Calc.today() },
+  { name:"version", label:"Version", half:true, value:x.version, placeholder:"1, 2…" },
+  { name:"date_debut", label:"Début du programme", type:"date", half:true, value:x.date_debut },
+  { name:"date_fin", label:"Fin du programme", type:"date", half:true, value:x.date_fin },
+  { name:"commentaire", label:"Commentaire", type:"textarea", value:x.commentaire },
+];}
+
+// mapping entité → { table, fields, payload }
+const ENT = {
+  seance:      { table:"seances",      fields:seanceFields,  payload:seancePayload, title:"Séance" },
+  bilan:       { table:"bilans",       fields:bilanFields,   payload:v=>({cliente_id:CID,...v}), title:"Bilan" },
+  mensuration: { table:"mensurations", fields:mensuFields,   payload:v=>({cliente_id:CID,...v}), title:"Mensuration" },
+  objectif:    { table:"objectifs",    fields:objectifFields,payload:v=>({cliente_id:CID,...v}), title:"Objectif" },
+  note:        { table:"notes_privees",fields:noteFields,    payload:v=>({cliente_id:CID,...v}), title:"Note privée" },
+  paiement:    { table:"paiements",    fields:paiementFields,payload:v=>({cliente_id:CID,...v}), title:"Paiement" },
+};
+function findRec(entity,id){
+  const map = {seance:"seances",bilan:"bilans",mensuration:"mensurations",objectif:"objectifs",
+               note:"notes",programme:"programmes",paiement:"paiements"};
+  return (D[map[entity]]||[]).find(r=>r.id===id);
+}
+
+// Saisie COMPLÈTE des mensurations : toutes les mesures d'un coup, une date.
+const MENSU_PRESETS = [
+  { name:"poids",         label:"Poids (kg)",           unite:"kg" },
+  { name:"masse_grasse",  label:"Masse grasse (%)",     unite:"%"  },
+  { name:"poitrine",      label:"Poitrine (cm)",        unite:"cm" },
+  { name:"tour_taille",   label:"Tour de taille (cm)",  unite:"cm" },
+  { name:"tour_hanches",  label:"Tour de hanches (cm)", unite:"cm" },
+  { name:"tour_cuisse",   label:"Tour de cuisse (cm)",  unite:"cm" },
+  { name:"tour_bras",     label:"Tour de bras (cm)",    unite:"cm" },
+  { name:"tour_mollet",   label:"Tour de mollet (cm)",  unite:"cm" },
+];
+async function addMensuSession(){
+  const fields = [{ name:"date", label:"Date", type:"date", value:Calc.today() }]
+    .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
+  const v = await UI.form({ title:"Mensurations", submit:"Enregistrer", fields });
+  if (!v) return;
+  const rows = MENSU_PRESETS
+    .filter(p => v[p.name] != null && v[p.name] !== "")
+    .map(p => ({ cliente_id:CID, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
+  if (!rows.length){ UI.toast("Aucune mesure saisie"); return; }
+  try{ await window.sb.from("mensurations").insert(rows); UI.toast(rows.length+" mesure(s) enregistrée(s) ✓"); reload(); }
+  catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
+
+async function addOrEdit(entity, rec){
+  const cfg = ENT[entity];
+  const v = await UI.form({ title:(rec?"Modifier ":"")+cfg.title, fields:cfg.fields(rec) });
+  if (!v) return;
+  try{
+    const payload = cfg.payload(v);
+    if (rec) await DB.update(cfg.table, rec.id, payload);
+    else await DB.insert(cfg.table, payload);
+    UI.toast("Enregistré ✓"); reload();
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
+
+async function progEnvoye(kind){
+  const existing = lastProg(kind);
+  const v = await UI.form({ title:(kind==="sportif"?"Programme sportif":"Programme nutrition"), fields:progFields(kind,{}) });
+  if (!v) return;
+  try{
+    await DB.insert("programmes", { cliente_id:CID, kind, envoye:!!v.envoye, date_envoi:v.date_envoi,
+      version:v.version, date_debut:v.date_debut, date_fin:v.date_fin, commentaire:v.commentaire });
+    UI.toast("Programme "+kind+" enregistré ✓"); reload();
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
+
+// ============================ ACCÈS CLIENTE ============================
+async function createAccess(){
+  const cl = D.cliente;
+  const code = cl.access_code || makeCode(cl.prenom);
+  try{
+    UI.toast("Création du compte cliente…");
+    const uid = await Auth.provisionCliente(code, cl.prenom, cl.nom);
+    await DB.update("clientes", cl.id, { profile_id: uid, access_code: code });
+    UI.toast("Accès cliente créé ✓"); reload();
+  }catch(e){
+    console.error(e);
+    const m = (e.message||String(e));
+    const msg = /rate limit|confirm/i.test(m)
+      ? "Désactive d'abord « Confirm email » dans Supabase → Authentication → Sign In / Providers → Email."
+      : m;
+    UI.toast("Erreur : "+msg, "err");
+  }
+}
+async function regenAccess(){
+  if (!(await UI.confirm("Régénérer le code ? L'ancien code ne fonctionnera plus."))) return;
+  const cl = D.cliente;
+  const code = makeCode(cl.prenom);
+  try{
+    UI.toast("Régénération…");
+    const uid = await Auth.provisionCliente(code, cl.prenom, cl.nom);
+    await DB.update("clientes", cl.id, { profile_id: uid, access_code: code });
+    UI.toast("Nouveau code généré ✓"); reload();
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e), "err"); }
+}
+
+async function editCliente(){
+  const cl = D.cliente;
+  const v = await UI.form({ title:"Modifier la cliente", fields:[
+    { name:"prenom", label:"Prénom", half:true, value:cl.prenom, required:true },
+    { name:"nom", label:"Nom", half:true, value:cl.nom },
+    { name:"type", label:"Accompagnement", type:"select", half:true, value:cl.type, options:[
+      {value:"presentiel",label:"Présentiel"},{value:"distanciel",label:"Distanciel"},{value:"hybride",label:"Hybride"}]},
+    { name:"statut", label:"Statut", type:"select", half:true, value:cl.statut, options:[
+      {value:"a_demarrer",label:"À démarrer"},{value:"active",label:"Active"},{value:"en_pause",label:"En pause"},
+      {value:"termine",label:"Terminé"},{value:"a_renouveler",label:"À renouveler"}]},
+    { name:"objectif_principal", label:"Objectif principal", value:cl.objectif_principal },
+    { name:"objectifs_secondaires", label:"Objectifs secondaires", type:"textarea", value:cl.objectifs_secondaires },
+    { name:"telephone", label:"Téléphone", half:true, value:cl.telephone },
+    { name:"email_perso", label:"Email perso", half:true, value:cl.email_perso },
+    { name:"date_naissance", label:"Date de naissance", type:"date", half:true, value:cl.date_naissance },
+    { name:"taille_cm", label:"Taille (cm)", type:"number", half:true, value:cl.taille_cm },
+    { name:"niveau", label:"Niveau", type:"select", half:true, value:cl.niveau||"", options:[
+      {value:"",label:"—"},{value:"Débutant",label:"Débutant"},{value:"Intermédiaire",label:"Intermédiaire"},{value:"Avancé",label:"Avancé"}]},
+    { name:"disponibilites", label:"Disponibilités", half:true, value:cl.disponibilites, placeholder:"Lun/Mer 18h…" },
+    { name:"sante", label:"Santé / antécédents / blessures / contre-indications", type:"textarea", value:cl.sante },
+    { name:"allergies", label:"Allergies", value:cl.allergies },
+  ]});
+  if (!v) return;
+  await DB.update("clientes", cl.id, v); UI.toast("Enregistré ✓"); reload();
+}
+async function editAccomp(){
+  const ac = D.accompagnement||{};
+  const v = await UI.form({ title:"Accompagnement", fields:[
+    { name:"date_debut", label:"Date de début", type:"date", half:true, value:ac.date_debut },
+    { name:"date_fin", label:"Date de fin", type:"date", half:true, value:ac.date_fin },
+    { name:"nb_mois", label:"Durée (mois)", type:"number", half:true, value:ac.nb_mois },
+    { name:"formule", label:"Formule", half:true, value:ac.formule },
+    { name:"seances_prevues", label:"Séances prévues", type:"number", half:true, value:ac.seances_prevues },
+    { name:"freq_prevue", label:"Fréquence prévue", half:true, value:ac.freq_prevue, placeholder:"2/semaine" },
+    { name:"nutrition_active", label:"Suivi nutrition actif", type:"checkbox", half:true, value:ac.nutrition_active },
+    { name:"nut_nb_mois", label:"Durée nutrition (mois)", type:"number", half:true, value:ac.nut_nb_mois },
+    { name:"nut_date_debut", label:"Début nutrition", type:"date", half:true, value:ac.nut_date_debut },
+    { name:"nut_date_fin", label:"Fin nutrition", type:"date", half:true, value:ac.nut_date_fin },
+    { name:"nut_calories", label:"Calories cible (kcal/j)", type:"number", half:true, value:ac.nut_calories },
+    { name:"nut_proteines", label:"Protéines (g/j)", type:"number", half:true, value:ac.nut_proteines },
+    { name:"nut_glucides", label:"Glucides (g/j)", type:"number", half:true, value:ac.nut_glucides },
+    { name:"nut_lipides", label:"Lipides (g/j)", type:"number", half:true, value:ac.nut_lipides },
+    { name:"nut_conseils", label:"Conseils nutrition (visibles par la cliente)", type:"textarea", value:ac.nut_conseils },
+  ]});
+  if (!v) return;
+  await DB.saveAccompagnement(CID, v); UI.toast("Enregistré ✓"); reload();
+}
+
+// ============================ ÉVÉNEMENTS ============================
+document.getElementById("main").addEventListener("click", async (e)=>{
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  if (act==="add-seance") return addOrEdit("seance");
+  if (act==="add-bilan") return addOrEdit("bilan");
+  if (act==="add-mensu") return addMensuSession();
+  if (act==="add-objectif") return addOrEdit("objectif");
+  if (act==="add-paiement") return addOrEdit("paiement");
+  if (act==="add-note") return addOrEdit("note");
+  if (act==="add-photo") return addPhoto();
+  if (act==="prog-sportif") return progEnvoye("sportif");
+  if (act==="prog-nutrition") return progEnvoye("nutrition");
+  if (act==="edit-cliente") return editCliente();
+  if (act==="edit-accomp") return editAccomp();
+  if (act==="create-access") return createAccess();
+  if (act==="regen-access") return regenAccess();
+  if (act==="copy-code"){
+    const code = D.cliente.access_code||"";
+    try{ await navigator.clipboard.writeText(code); UI.toast("Code copié ✓"); }
+    catch(_){ UI.toast(code); }
+    return;
+  }
+  if (act==="del-cliente"){
+    if (!(await UI.confirm("Supprimer définitivement cette cliente et TOUT son dossier ?"))) return;
+    try{ await DB.deleteCliente(CID); UI.toast("Cliente supprimée"); location.href="coach.html"; }
+    catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    return;
+  }
+  if (act.startsWith("edit-")){
+    const entity = act.slice(5);
+    if (ENT[entity]) return addOrEdit(entity, findRec(entity,id));
+  }
+  if (act==="toggle-photo"){
+    const nv = el.dataset.vis==="cliente"?"prive":"cliente";
+    await DB.update("photos", id, { visibilite:nv }); UI.toast("Visibilité mise à jour"); return reload();
+  }
+  if (act==="del"){
+    const entity = el.dataset.entity;
+    if (!(await UI.confirm("Supprimer cet élément ?"))) return;
+    try{
+      if (entity==="photo" && el.dataset.path) await sb.storage.from("photos").remove([el.dataset.path]);
+      const tbl = {seance:"seances",bilan:"bilans",mensuration:"mensurations",objectif:"objectifs",
+                   note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements"}[entity];
+      await DB.remove(tbl, id); UI.toast("Supprimé"); reload();
+    }catch(e2){ console.error(e2); UI.toast("Erreur : "+(e2.message||e2),"err"); }
+  }
+});
+
+// ============================ INIT ============================
+(async ()=>{
+  const p = await Auth.requireCoach(); if (!p) return;
+  document.getElementById("who").textContent = p.prenom||"Coach";
+  document.getElementById("logout").onclick = ()=>Auth.signOut();
+  if (!CID){ location.href="coach.html"; return; }
+  try{ await reload(); }
+  catch(e){ console.error(e); document.getElementById("main").innerHTML =
+    `<div class="card"><p class="empty">Erreur de chargement. Vérifie la config Supabase et le SQL.</p></div>`; }
+})();
+</script>
+</body>
+</html>

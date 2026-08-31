@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Mon espace — Ornella Fit Coaching</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=e3">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <h1>Mon <em>espace</em></h1>
+    <p>Ornella Fit Coaching — ton suivi personnalisé</p>
+    <form id="loginForm">
+      <label class="field">
+        <span class="field-label">Code d'accès</span>
+        <input type="text" id="code" autocomplete="one-time-code" autocapitalize="characters"
+               spellcheck="false" placeholder="Ex : PRENOM-AB4CD" required>
+      </label>
+      <button type="submit" class="btn-accent btn-block" id="btn">Accéder à mon suivi</button>
+      <div class="login-err" id="err"></div>
+    </form>
+    <div class="login-foot">Ton code t'est remis par Ornella. Il est personnel.<br>
+      <a class="link" href="login.html">Espace coach</a>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=e3"></script>
+<script src="js/supabaseClient.js?v=e3"></script>
+<script src="js/auth.js?v=e3"></script>
+<script>
+const err = document.getElementById("err");
+const btn = document.getElementById("btn");
+const codeInput = document.getElementById("code");
+if (new URLSearchParams(location.search).get("err") === "role")
+  err.textContent = "Ce code n'est pas un accès cliente.";
+
+// Déjà connectée en cliente ? → son espace
+(async () => {
+  const p = await window.Auth.profile();
+  if (p && p.role === "cliente") location.replace("mon-espace.html");
+  if (p && p.role === "coach") location.replace("coach.html");
+})();
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  err.textContent = ""; btn.disabled = true; btn.textContent = "Connexion…";
+  const code = codeInput.value.trim();
+  const { error } = await window.Auth.signInCliente(code);
+  if (error) {
+    err.textContent = "Code incorrect ou inconnu.";
+    btn.disabled = false; btn.textContent = "Accéder à mon suivi";
+    return;
+  }
+  const p = await window.Auth.profile();
+  if (!p || p.role !== "cliente") {
+    await window.sb.auth.signOut();
+    err.textContent = "Ce code n'est pas un accès cliente.";
+    btn.disabled = false; btn.textContent = "Accéder à mon suivi";
+    return;
+  }
+  location.replace("mon-espace.html");
+});
+</script>
+</body>
+</html>

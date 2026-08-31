@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Espace — Ornella Fit Coaching</title>
+<link rel="stylesheet" href="css/app.css?v=e3">
+</head>
+<body>
+<div class="loader"><div class="spin"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=e3"></script>
+<script src="js/supabaseClient.js?v=e3"></script>
+<script>
+// Redirige selon l'état de connexion / le rôle.
+(async () => {
+  const { data } = await window.sb.auth.getSession();
+  if (!data.session) { location.replace("espace.html"); return; }
+  const { data: p } = await window.sb.from("profiles")
+    .select("role").eq("id", data.session.user.id).maybeSingle();
+  if (p && p.role === "coach") location.replace("coach.html");
+  else if (p && p.role === "cliente") location.replace("mon-espace.html");
+  else location.replace("espace.html");
+})();
+</script>
+</body>
+</html>
