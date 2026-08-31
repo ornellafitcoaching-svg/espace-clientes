@@ -17,5 +17,5 @@ window.APP_CONFIG = {
 
   // Numéro WhatsApp d'Ornella au format international SANS le "+" ni espaces.
   // Ex. pour +33 6 12 34 56 78 → "33612345678". Laisser vide masque le bouton.
-  WHATSAPP_NUMBER: "",
+  WHATSAPP_NUMBER: "33756834626",
 };

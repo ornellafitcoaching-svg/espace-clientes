@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e4">
+<link rel="stylesheet" href="css/app.css?v=e5">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e4"></script>
-<script src="js/supabaseClient.js?v=e4"></script>
-<script src="js/auth.js?v=e4"></script>
-<script src="js/db.js?v=e4"></script>
-<script src="js/calc.js?v=e4"></script>
-<script src="js/ui/modal.js?v=e4"></script>
-<script src="js/ui/progress.js?v=e4"></script>
+<script src="js/config.js?v=e5"></script>
+<script src="js/supabaseClient.js?v=e5"></script>
+<script src="js/auth.js?v=e5"></script>
+<script src="js/db.js?v=e5"></script>
+<script src="js/calc.js?v=e5"></script>
+<script src="js/ui/modal.js?v=e5"></script>
+<script src="js/ui/progress.js?v=e5"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -73,6 +73,7 @@ function viewAccueil(){
   const b = Calc.bilanStats(D.bilans);
   const w = weightSeries();
   const sport = lastProg("sportif");
+  const nextSeance = (D.seances||[]).filter(x=>x.statut==="prevue" && x.date>=Calc.today()).sort((a,b)=>a.date<b.date?-1:1)[0];
   let poidsTile = "";
   if (w.length){
     const depart = w[0].valeur, actuel = w[w.length-1].valeur;
@@ -91,6 +92,7 @@ function viewAccueil(){
       ${tile("Ton objectif", esc(cl.objectif_principal||"—"))}
       ${ac&&ac.seances_prevues ? tile("Séances", s.realisees+" / "+s.prevues, s.restantes+" restantes") : tile("Séances réalisées", s.realisees)}
       ${poidsTile}
+      ${nextSeance ? tile("Prochaine séance", Calc.fmt(nextSeance.date), esc(nextSeance.type||"")) : ""}
       ${b.dernier ? tile("Prochain bilan", Calc.fmt(b.prochain), bilanSub) : ""}
       ${sport&&sport.envoye ? tile("Programme sportif", "Disponible", "envoyé le "+Calc.fmt(sport.date_envoi)) : ""}
       ${ac&&ac.nutrition_active ? tile("Suivi nutrition", "Actif") : ""}
@@ -101,19 +103,43 @@ function viewAccueil(){
     </div>`;
 }
 
+// Rendu du corps commun d'une séance (objectif/intensité/durée/commentaire/exos).
+function seanceBody(x){
+  return `<div class="isub">${[x.objectif&&esc(x.objectif), x.intensite&&("Intensité "+esc(x.intensite)), x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+        ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
+        ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}`;
+}
 function viewSeances(){
-  const list = (D.seances||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
-  if (!list.length) return empty("Aucune séance enregistrée pour l'instant.");
-  return `<div class="card">` + list.map(x=>`
+  const all = (D.seances||[]).slice();
+  const today = Calc.today();
+  // À venir = séances "prévues" datées d'aujourd'hui ou plus tard, du plus proche au plus lointain.
+  const upcoming = all.filter(x=>x.statut==="prevue" && x.date>=today).sort((a,b)=>a.date<b.date?-1:1);
+  const rest = all.filter(x=>!(x.statut==="prevue" && x.date>=today)).sort((a,b)=>a.date<b.date?1:-1);
+  if (!all.length) return empty("Aucune séance enregistrée pour l'instant.");
+  let out = "";
+  if (upcoming.length){
+    out += `<h4 class="view-title" style="margin-top:0">📅 Mes prochaines séances</h4><div class="card">` + upcoming.map(x=>{
+      const wa = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Je souhaiterais modifier ma séance prévue le ${Calc.fmt(x.date)}${x.type?` (${x.type})`:""}.`);
+      return `<div class="item">
+      <div class="idate">${Calc.fmtShort(x.date)}</div>
+      <div class="ibody">
+        <div class="ititle">${esc(x.type||"Séance")} <span class="tag">à venir</span></div>
+        ${seanceBody(x)}
+        ${wa?`<a href="${wa}" target="_blank" rel="noopener" class="btn-ghost btn-sm" style="margin-top:8px"><span>💬</span> Demander une modification</a>`:""}
+      </div>
+    </div>`;}).join("") + `</div>`;
+  }
+  if (rest.length){
+    out += `${upcoming.length?`<h4 class="view-title" style="margin-top:18px">Séances passées</h4>`:""}<div class="card">` + rest.map(x=>`
     <div class="item">
       <div class="idate">${Calc.fmtShort(x.date)}</div>
       <div class="ibody">
         <div class="ititle">${esc(x.type||"Séance")} ${x.statut!=="realisee"?`<span class="tag">${esc(x.statut)}</span>`:""}</div>
-        <div class="isub">${[x.objectif&&esc(x.objectif), x.intensite&&("Intensité "+esc(x.intensite)), x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
-        ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
-        ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}
+        ${seanceBody(x)}
       </div>
     </div>`).join("") + `</div>`;
+  }
+  return out;
 }
 
 function viewMensurations(){
