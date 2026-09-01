@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e16">
+<link rel="stylesheet" href="css/app.css?v=e17">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e16"></script>
-<script src="js/supabaseClient.js?v=e16"></script>
-<script src="js/auth.js?v=e16"></script>
-<script src="js/db.js?v=e16"></script>
-<script src="js/calc.js?v=e16"></script>
-<script src="js/ui/modal.js?v=e16"></script>
-<script src="js/ui/progress.js?v=e16"></script>
+<script src="js/config.js?v=e17"></script>
+<script src="js/supabaseClient.js?v=e17"></script>
+<script src="js/auth.js?v=e17"></script>
+<script src="js/db.js?v=e17"></script>
+<script src="js/calc.js?v=e17"></script>
+<script src="js/ui/modal.js?v=e17"></script>
+<script src="js/ui/progress.js?v=e17"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -66,6 +66,35 @@ function weightSeries(){
 }
 function tile(k,v,sub){ return `<div class="stat-tile"><div class="k">${k}</div><div class="v">${v}${sub?`<small>${sub}</small>`:""}</div></div>`; }
 
+// Carte « Mot d'Ornella » (message de motivation du moment, rempli par la coach).
+function motOrnella(){
+  const msg = D.accompagnement && D.accompagnement.message_coach;
+  if (!msg) return "";
+  return `<div class="card mot-ornella" style="margin-bottom:16px">
+    <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">💬 Le mot d'Ornella</div>
+    <div class="isub" style="color:var(--text-mid);margin-top:6px;white-space:pre-wrap;font-size:.95rem">${esc(msg)}</div>
+  </div>`;
+}
+// Carte « nudge » quand c'est le moment du bilan (ou premier bilan à faire).
+function bilanNudge(){
+  const b = Calc.bilanStats(D.bilans);
+  const ac = D.accompagnement;
+  const has = (D.bilans||[]).length;
+  let titre = "", sub = "";
+  if (b.joursAvant !== null && b.joursAvant <= 3){
+    if (b.joursAvant < 0){ titre = "C'est le moment de ton bilan 📊"; sub = `Il était prévu le ${Calc.fmt(b.prochain)} — pas de souci, fais-le dès que tu peux !`; }
+    else if (b.joursAvant === 0){ titre = "C'est le jour de ton bilan ! 📊"; sub = "On refait le point + tes mensurations, ça prend 2 minutes."; }
+    else { titre = "Ton bilan approche 📊"; sub = `Prévu dans ${b.joursAvant} j (le ${Calc.fmt(b.prochain)}). Tu peux déjà le faire.`; }
+  } else if (!has && ac && ac.date_debut){
+    titre = "Fais ton premier bilan 📊"; sub = "Un point de départ pour suivre tous tes progrès ✨";
+  } else return "";
+  return `<div class="card nudge-bilan" style="margin-bottom:16px">
+    <div class="nudge-title">${titre}</div>
+    <div class="isub nudge-sub">${sub}</div>
+    <button id="nudgeBilanBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>➕</span> Faire mon bilan</button>
+  </div>`;
+}
+
 // ============================ VUES ============================
 function viewAccueil(){
   const cl = D.cliente, ac = D.accompagnement;
@@ -88,6 +117,8 @@ function viewAccueil(){
       <div class="hero-hello">Bonjour <em>${esc(cl.prenom)}</em> 👋</div>
       <p class="page-sub" style="margin-bottom:0">Voici ton suivi, mis à jour par Ornella.</p>
     </div>
+    ${bilanNudge()}
+    ${motOrnella()}
     <div class="stat-grid">
       ${tile("Ton objectif", esc(cl.objectif_principal||"—"))}
       ${ac&&ac.seances_prevues ? tile("Séances", s.realisees+" / "+s.prevues, s.restantes+" restantes") : tile("Séances réalisées", s.realisees)}
@@ -438,6 +469,7 @@ async function loadPhotoThumbs(){
 document.getElementById("main").addEventListener("click", (e)=>{
   if (e.target.closest("#addMensuBtn")){ addMyMensu(); return; }
   if (e.target.closest("#addBilanBtn")){ addMyBilan(); return; }
+  if (e.target.closest("#nudgeBilanBtn")){ VIEW="bilans"; render(); addMyBilan(); return; }
   const b = e.target.closest("[data-view]"); if (!b) return;
   VIEW = b.dataset.view; render();
   window.scrollTo({ top:0, behavior:"smooth" });

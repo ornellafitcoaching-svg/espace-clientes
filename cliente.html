@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e16">
+<link rel="stylesheet" href="css/app.css?v=e17">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e16"></script>
-<script src="js/supabaseClient.js?v=e16"></script>
-<script src="js/auth.js?v=e16"></script>
-<script src="js/db.js?v=e16"></script>
-<script src="js/calc.js?v=e16"></script>
-<script src="js/ui/modal.js?v=e16"></script>
-<script src="js/ui/progress.js?v=e16"></script>
+<script src="js/config.js?v=e17"></script>
+<script src="js/supabaseClient.js?v=e17"></script>
+<script src="js/auth.js?v=e17"></script>
+<script src="js/db.js?v=e17"></script>
+<script src="js/calc.js?v=e17"></script>
+<script src="js/ui/modal.js?v=e17"></script>
+<script src="js/ui/progress.js?v=e17"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -151,6 +151,9 @@ function sectionAccompagnement(ac,s,suivi){
     <div class="cl-line"><span>Réalisées / restantes</span><strong>${s.realisees} / ${s.restantes}</strong></div>
     ${suivi.pctTemps!=null?`<div style="margin-top:10px">${UI.progressBar(suivi.pctTemps,"Temps de suivi écoulé")}</div>`:""}
     <div class="cl-line" style="margin-top:8px"><span>Objectifs secondaires</span><strong>${esc((D.cliente.objectifs_secondaires)||"—")}</strong></div>
+    ${ac&&ac.message_coach?`<div class="mensu-card" style="margin-top:10px;background:var(--cream)">
+      <h4 style="font-size:.9rem">💬 Mot pour la cliente <span class="tag">visible cliente</span></h4>
+      <div class="isub" style="margin-top:4px;white-space:pre-wrap">${esc(ac.message_coach)}</div></div>`:""}
     ${ac&&ac.nutrition_active?`<div class="mensu-card" style="margin-top:10px">
       <h4 style="font-size:.95rem">🥗 Nutrition <span class="tag">visible cliente</span></h4>
       ${(ac.nut_calories!=null||ac.nut_proteines!=null||ac.nut_glucides!=null||ac.nut_lipides!=null)?`<div class="cl-line" style="margin-top:6px"><span>Objectifs / jour</span><strong>${[ac.nut_calories!=null?ac.nut_calories+" kcal":null,ac.nut_proteines!=null?"P "+ac.nut_proteines+"g":null,ac.nut_glucides!=null?"G "+ac.nut_glucides+"g":null,ac.nut_lipides!=null?"L "+ac.nut_lipides+"g":null].filter(Boolean).join(" · ")}</strong></div>`:`<div class="isub">Aucun objectif calorique/macros saisi.</div>`}
@@ -652,6 +655,7 @@ async function editAccomp(){
     { name:"formule", label:"Formule", half:true, value:ac.formule },
     { name:"seances_prevues", label:"Séances prévues", type:"number", half:true, value:ac.seances_prevues },
     { name:"freq_prevue", label:"Fréquence prévue", half:true, value:ac.freq_prevue, placeholder:"2/semaine" },
+    { name:"message_coach", label:"💬 Mot pour la cliente (visible en haut de son espace)", type:"textarea", value:ac.message_coach, placeholder:"Ex : Bravo pour ta semaine, on lâche rien 💪" },
     { name:"nutrition_active", label:"Suivi nutrition actif", type:"checkbox", half:true, value:ac.nutrition_active },
     { name:"nut_nb_mois", label:"Durée nutrition (mois)", type:"number", half:true, value:ac.nut_nb_mois },
     { name:"nut_date_debut", label:"Début nutrition", type:"date", half:true, value:ac.nut_date_debut },
@@ -663,7 +667,20 @@ async function editAccomp(){
     { name:"nut_conseils", label:"Conseils nutrition (visibles par la cliente)", type:"textarea", value:ac.nut_conseils },
   ]});
   if (!v) return;
-  await DB.saveAccompagnement(CID, v); UI.toast("Enregistré ✓"); reload();
+  try{
+    await DB.saveAccompagnement(CID, v);
+    UI.toast("Enregistré ✓"); reload();
+  }catch(e){
+    // Filet : si la colonne message_coach n'existe pas encore (migration_06 non exécutée),
+    // on réenregistre sans ce champ pour ne rien bloquer.
+    if (/message_coach/.test(e.message||"") && ("message_coach" in v)){
+      const { message_coach, ...rest } = v;
+      try{ await DB.saveAccompagnement(CID, rest);
+        UI.toast("Enregistré (le « mot » nécessite la migration SQL)","err"); return reload();
+      }catch(e2){ console.error(e2); UI.toast("Erreur : "+(e2.message||e2),"err"); return; }
+    }
+    console.error(e); UI.toast("Erreur : "+(e.message||e),"err");
+  }
 }
 
 // ============================ ÉVÉNEMENTS ============================

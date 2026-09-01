@@ -136,6 +136,12 @@ button{font-family:inherit;cursor:pointer}
 .dot-wa:hover{background:rgba(37,211,102,.24)}
 .tag-wa{background:#25D366;color:#fff;text-decoration:none}
 
+/* ---- Espace cliente : nudge bilan + mot d'Ornella ------------------------ */
+.nudge-bilan{border-left:4px solid var(--accent);background:linear-gradient(135deg,rgba(201,99,88,.08),rgba(201,99,88,.02))}
+.nudge-title{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:700;color:var(--accent-deep)}
+.nudge-sub{color:var(--text-mid);margin-top:2px}
+.mot-ornella{border-left:4px solid var(--gold)}
+
 /* ---- Fiche cliente : résumé ---------------------------------------------- */
 .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px 22px}
 .sum-item .k{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);font-weight:700}
