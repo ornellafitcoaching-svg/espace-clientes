@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e13">
+<link rel="stylesheet" href="css/app.css?v=e14">
 </head>
 <body>
 <div class="login-wrap">
@@ -30,9 +30,9 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e13"></script>
-<script src="js/supabaseClient.js?v=e13"></script>
-<script src="js/auth.js?v=e13"></script>
+<script src="js/config.js?v=e14"></script>
+<script src="js/supabaseClient.js?v=e14"></script>
+<script src="js/auth.js?v=e14"></script>
 <script>
 const err = document.getElementById("err");
 const btn = document.getElementById("btn");
@@ -40,11 +40,19 @@ const codeInput = document.getElementById("code");
 if (new URLSearchParams(location.search).get("err") === "role")
   err.textContent = "Ce code n'est pas un accès cliente.";
 
-// Déjà connectée en cliente ? → son espace
+// Déjà connectée en cliente ? → son espace. Sinon, si un code est passé dans l'URL
+// (lien envoyé par Ornella, ex. demande de bilan), on pré-remplit et on connecte en 1 clic.
 (async () => {
   const p = await window.Auth.profile();
-  if (p && p.role === "cliente") location.replace("mon-espace.html");
-  if (p && p.role === "coach") location.replace("coach.html");
+  if (p && p.role === "cliente") return location.replace("mon-espace.html");
+  if (p && p.role === "coach") return location.replace("coach.html");
+  const preCode = new URLSearchParams(location.search).get("code");
+  if (preCode) {
+    codeInput.value = preCode.trim();
+    const form = document.getElementById("loginForm");
+    if (form.requestSubmit) form.requestSubmit();
+    else form.dispatchEvent(new Event("submit", { cancelable: true }));
+  }
 })();
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {

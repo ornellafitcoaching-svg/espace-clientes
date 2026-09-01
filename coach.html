@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e13">
+<link rel="stylesheet" href="css/app.css?v=e14">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e13"></script>
-<script src="js/supabaseClient.js?v=e13"></script>
-<script src="js/auth.js?v=e13"></script>
-<script src="js/db.js?v=e13"></script>
-<script src="js/calc.js?v=e13"></script>
-<script src="js/ui/modal.js?v=e13"></script>
-<script src="js/ui/progress.js?v=e13"></script>
+<script src="js/config.js?v=e14"></script>
+<script src="js/supabaseClient.js?v=e14"></script>
+<script src="js/auth.js?v=e14"></script>
+<script src="js/db.js?v=e14"></script>
+<script src="js/calc.js?v=e14"></script>
+<script src="js/ui/modal.js?v=e14"></script>
+<script src="js/ui/progress.js?v=e14"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -155,9 +155,13 @@ function renderAlerts() {
     if (a.type === "bilan") {
       const b = Calc.bilanStats(a.c.bilans);
       const retard = b.joursAvant !== null && b.joursAvant < 0;
+      // Lien direct : avec le code de la cliente, elle est connectée en 1 clic sur son espace.
+      const lien = cl.access_code
+        ? `https://espace.ornellafitcoaching.com/espace.html?code=${encodeURIComponent(cl.access_code)}`
+        : `https://espace.ornellafitcoaching.com`;
       const msg = `Coucou ${cl.prenom} 🌸 C'est le moment de faire ton bilan `
         + (retard ? `(il est un peu en retard, pas de souci !)` : `(on en fait un toutes les 4 semaines)`)
-        + ` 📊\n\nTu peux le remplir en 2 min directement dans ton espace : https://espace.ornellafitcoaching.com\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪`;
+        + ` 📊\n\nTu peux le remplir en 2 min directement dans ton espace (connexion en 1 clic) : ${lien}\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪`;
       const wa = waCliente(cl.telephone, msg);
       if (wa) {
         return `<a class="alert alert-action" href="${wa}" target="_blank" rel="noopener">

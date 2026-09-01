@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e13">
+<link rel="stylesheet" href="css/app.css?v=e14">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e13"></script>
-<script src="js/supabaseClient.js?v=e13"></script>
-<script src="js/auth.js?v=e13"></script>
-<script src="js/db.js?v=e13"></script>
-<script src="js/calc.js?v=e13"></script>
-<script src="js/ui/modal.js?v=e13"></script>
-<script src="js/ui/progress.js?v=e13"></script>
+<script src="js/config.js?v=e14"></script>
+<script src="js/supabaseClient.js?v=e14"></script>
+<script src="js/auth.js?v=e14"></script>
+<script src="js/db.js?v=e14"></script>
+<script src="js/calc.js?v=e14"></script>
+<script src="js/ui/modal.js?v=e14"></script>
+<script src="js/ui/progress.js?v=e14"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -72,6 +72,7 @@ function render(){
         </div>
       </div>
       <div class="row" style="gap:8px">
+        <button class="btn-ghost btn-sm" data-act="toggle-select">☑️ Sélection</button>
         <button class="btn-ghost btn-sm" data-act="edit-cliente">Modifier</button>
         <button class="btn-ghost btn-sm" data-act="del-cliente" style="color:var(--danger);border-color:rgba(192,86,75,.4)">Supprimer</button>
       </div>
@@ -131,8 +132,13 @@ function block(title, count, body, open){
     <summary><span class="chev">▸</span>${title}${count!=null?`<span class="count">${count}</span>`:""}</summary>
     <div class="section-body">${body}</div></details>`;
 }
+// Case à cocher de sélection multiple (masquée hors mode « Sélection »).
+function selBox(entity,id,path){
+  return `<input type="checkbox" class="selchk" data-entity="${entity}" data-id="${id}"${path?` data-path="${esc(path)}"`:""} title="Sélectionner" onclick="event.stopPropagation()">`;
+}
 function delEdit(entity,id){
   return `<div class="iact">
+    ${selBox(entity,id)}
     <button class="icon-btn" data-act="edit-${entity}" data-id="${id}">✎</button>
     <button class="icon-btn" data-act="del" data-entity="${entity}" data-id="${id}">🗑</button></div>`;
 }
@@ -279,6 +285,7 @@ function sectionMensurations(){
       ${byDate[d].map(m=>`<div class="cl-line" style="padding:3px 0">
           <span>${esc(m.type.replace(/_/g," "))}</span>
           <span style="display:flex;align-items:center;gap:8px"><strong>${m.valeur}${esc(m.unite||"")}</strong>
+            ${selBox("mensuration",m.id)}
             <button class="icon-btn" data-act="del" data-entity="mensuration" data-id="${m.id}">🗑</button>
           </span></div>`).join("")}
     </div>`).join("") + `</div>` : "";
@@ -293,7 +300,7 @@ function sectionPhotos(){
         <span class="tag">${p.visibilite==="cliente"?"👁 Visible cliente":"🔒 Privé"}</span></div>
       <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="margin:8px 0;border-radius:12px;overflow:hidden;background:var(--cream);min-height:120px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem">chargement…</div>
       ${p.legende?`<div class="isub">${esc(p.legende)}</div>`:""}
-      <div style="margin-top:6px"><button class="link" data-act="toggle-photo" data-id="${p.id}" data-vis="${p.visibilite}">${p.visibilite==="cliente"?"Rendre privé":"Rendre visible"}</button>
+      <div style="margin-top:6px">${selBox("photo",p.id,p.storage_path)} <button class="link" data-act="toggle-photo" data-id="${p.id}" data-vis="${p.visibilite}">${p.visibilite==="cliente"?"Rendre privé":"Rendre visible"}</button>
       &nbsp;·&nbsp;<button class="link" data-act="del" data-entity="photo" data-id="${p.id}" data-path="${esc(p.storage_path)}">Supprimer</button></div>
     </div>`).join("") + `</div>` : `<p class="empty">Aucune photo.</p>`;
   return block("Photos de progression", list.length, body, false);
@@ -454,6 +461,9 @@ function findRec(entity,id){
                note:"notes",programme:"programmes",paiement:"paiements"};
   return (D[map[entity]]||[]).find(r=>r.id===id);
 }
+// entity → nom de la table Supabase (partagé suppression simple + en lot).
+const TBL = {seance:"seances",bilan:"bilans",mensuration:"mensurations",objectif:"objectifs",
+             note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements"};
 
 // Saisie COMPLÈTE des mensurations : toutes les mesures d'un coup, une date.
 const MENSU_PRESETS = [
@@ -658,6 +668,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="add-photo") return addPhoto();
   if (act==="prog-sportif") return progEnvoye("sportif");
   if (act==="prog-nutrition") return progEnvoye("nutrition");
+  if (act==="toggle-select") return setSelMode(!SELMODE);
   if (act==="edit-cliente") return editCliente();
   if (act==="edit-accomp") return editAccomp();
   if (act==="create-access") return createAccess();
@@ -698,6 +709,65 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   }
 });
 
+// ============================ SUPPRESSION EN LOT ============================
+// Mode « Sélection » : affiche une case à cocher sur chaque élément supprimable, plus une
+// barre flottante pour tout supprimer d'un coup (avec retour arrière groupé).
+let SELMODE = false;
+function setSelMode(on){
+  SELMODE = on;
+  const main = document.getElementById("main");
+  main.classList.toggle("sel-mode", on);
+  if (!on) main.querySelectorAll(".selchk:checked").forEach(c => c.checked = false);
+  const tgl = document.querySelector('[data-act="toggle-select"]');
+  if (tgl) tgl.textContent = on ? "✕ Terminer" : "☑️ Sélection";
+  updateSelCount();
+}
+function updateSelCount(){
+  const bar = document.getElementById("selBar"); if (!bar) return;
+  const n = document.querySelectorAll("#main .selchk:checked").length;
+  bar.querySelector(".cnt").textContent = n;
+  bar.querySelector(".del").disabled = (n === 0);
+  bar.classList.toggle("show", SELMODE);
+}
+async function deleteSelection(){
+  const checks = [...document.querySelectorAll("#main .selchk:checked")];
+  if (!checks.length) return;
+  if (!(await UI.confirm(`Supprimer les ${checks.length} élément(s) sélectionné(s) ?`))) return;
+  // Sauvegardes pour le retour arrière (les photos n'en ont pas, comme en suppression simple).
+  const backups = [];
+  checks.forEach(c => {
+    const entity = c.dataset.entity;
+    if (entity !== "photo"){ const rec = findRec(entity, c.dataset.id); if (rec) backups.push({ tbl:TBL[entity], rec }); }
+  });
+  try{
+    for (const c of checks){
+      const entity = c.dataset.entity, id = c.dataset.id;
+      if (entity === "photo" && c.dataset.path){ try{ await sb.storage.from("photos").remove([c.dataset.path]); }catch(_){} }
+      await DB.remove(TBL[entity], id);
+    }
+    setSelMode(false);
+    await reload();
+    if (backups.length) showUndoBatch(backups, checks.length); else UI.toast(`${checks.length} supprimé(s)`);
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
+// Retour arrière groupé : réinsère toutes les lignes sauvegardées (regroupées par table).
+function showUndoBatch(items, total){
+  document.querySelectorAll(".undo-toast").forEach(n=>n.remove());
+  const t = document.createElement("div");
+  t.className = "toast ok undo-toast";
+  t.innerHTML = `${total} supprimé(s) <button type="button" style="margin-left:14px;background:#fff;color:var(--accent);border:none;border-radius:999px;padding:4px 12px;font-weight:700;cursor:pointer">↩ Annuler</button>`;
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add("show"));
+  t.querySelector("button").onclick = async ()=>{
+    try{
+      const byTbl = {}; items.forEach(it => (byTbl[it.tbl] ||= []).push(it.rec));
+      for (const tbl in byTbl){ const { error } = await window.sb.from(tbl).insert(byTbl[tbl]); if (error) throw error; }
+      t.remove(); UI.toast("Restauré ✓"); reload();
+    }catch(e){ console.error(e); UI.toast("Impossible de restaurer : "+(e.message||e),"err"); }
+  };
+  setTimeout(()=>{ t.classList.remove("show"); setTimeout(()=>t.remove(),300); }, 10000);
+}
+
 // Toast "Annuler" : restaure l'élément supprimé (fenêtre de 8 s). Réinsère la ligne exacte
 // (même id) → rien n'est vraiment perdu en cas de clic par erreur.
 function showUndo(tbl, rec){
@@ -721,6 +791,18 @@ function showUndo(tbl, rec){
   document.getElementById("who").textContent = p.prenom||"Coach";
   document.getElementById("logout").onclick = ()=>Auth.signOut();
   if (!CID){ location.href="coach.html"; return; }
+  // Barre flottante « suppression en lot » (hors #main pour survivre aux re-rendus).
+  const bar = document.createElement("div");
+  bar.id = "selBar"; bar.className = "sel-bar";
+  bar.innerHTML = `<b><span class="cnt">0</span> sélectionné(s)</b>
+    <button type="button" class="del" disabled>🗑 Supprimer</button>
+    <button type="button" class="cancel">Annuler</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector(".del").onclick = deleteSelection;
+  bar.querySelector(".cancel").onclick = () => setSelMode(false);
+  document.getElementById("main").addEventListener("change", (e)=>{
+    if (e.target.classList && e.target.classList.contains("selchk")) updateSelCount();
+  });
   try{ await reload(); }
   catch(e){ console.error(e); document.getElementById("main").innerHTML =
     `<div class="card"><p class="empty">Erreur de chargement. Vérifie la config Supabase et le SQL.</p></div>`; }

@@ -102,6 +102,19 @@ button{font-family:inherit;cursor:pointer}
   padding:4px 10px;border-radius:999px;white-space:nowrap}
 .alert-cta.muted{background:var(--line);color:var(--text-mid)}
 
+/* ---- Suppression en lot -------------------------------------------------- */
+.selchk{display:none;width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex:none;vertical-align:middle}
+#main.sel-mode .selchk{display:inline-block}
+.sel-bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;
+  background:var(--dark);color:#fff;border-radius:999px;padding:10px 12px 10px 20px;
+  display:none;align-items:center;gap:16px;box-shadow:0 10px 34px rgba(0,0,0,.28);font-size:.9rem;max-width:92vw}
+.sel-bar.show{display:flex}
+.sel-bar b{font-weight:700;white-space:nowrap}
+.sel-bar button{border:none;border-radius:999px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:.85rem}
+.sel-bar .del{background:var(--danger);color:#fff}
+.sel-bar .del:disabled{opacity:.5;cursor:not-allowed}
+.sel-bar .cancel{background:rgba(255,255,255,.16);color:#fff}
+
 /* ---- Grille clientes ------------------------------------------------------ */
 .clientes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
 .cl-card{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
