@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e14">
+<link rel="stylesheet" href="css/app.css?v=e15">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e14"></script>
-<script src="js/supabaseClient.js?v=e14"></script>
-<script src="js/auth.js?v=e14"></script>
-<script src="js/db.js?v=e14"></script>
-<script src="js/calc.js?v=e14"></script>
-<script src="js/ui/modal.js?v=e14"></script>
-<script src="js/ui/progress.js?v=e14"></script>
+<script src="js/config.js?v=e15"></script>
+<script src="js/supabaseClient.js?v=e15"></script>
+<script src="js/auth.js?v=e15"></script>
+<script src="js/db.js?v=e15"></script>
+<script src="js/calc.js?v=e15"></script>
+<script src="js/ui/modal.js?v=e15"></script>
+<script src="js/ui/progress.js?v=e15"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -105,7 +105,7 @@ function render(){
       <button class="qbtn" data-act="add-paiement"><span class="i">💶</span> Paiement</button>
       <button class="qbtn" data-act="add-note"><span class="i">🔒</span> Note privée</button>
       <button class="qbtn" data-act="prog-sportif"><span class="i">📤</span> Prog. sportif envoyé</button>
-      <button class="qbtn" data-act="prog-nutrition"><span class="i">🥗</span> Prog. nutrition envoyé</button>
+      ${(ac&&ac.nutrition_active)?`<button class="qbtn" data-act="prog-nutrition"><span class="i">🥗</span> Prog. nutrition envoyé</button>`:''}
     </div>
 
     ${sectionAccesCliente()}
@@ -234,6 +234,7 @@ function sectionSeances(){
 }
 
 function sectionProgrammes(){
+  const ac = D.accompagnement;
   const rows = kind => (D.programmes||[]).filter(p=>p.kind===kind).sort((a,b)=>a.created_at<b.created_at?1:-1);
   const render = (label,kind) => {
     const list = rows(kind);
@@ -244,7 +245,10 @@ function sectionProgrammes(){
           ${p.commentaire?`<div class="isub">${esc(p.commentaire)}</div>`:""}
         </div>${delEdit("programme",p.id)}</div>`).join("") : `<p class="empty">Aucun programme ${kind}.</p>`);
   };
-  return block("Programmes", null, render("Sportif","sportif")+render("Nutrition","nutrition"), false);
+  // Nutrition affichée seulement si suivi nutrition actif (ou si un programme nutrition existe déjà,
+  // pour ne jamais cacher de données réelles).
+  const showNut = (ac && ac.nutrition_active) || rows("nutrition").length > 0;
+  return block("Programmes", null, render("Sportif","sportif") + (showNut ? render("Nutrition","nutrition") : ""), false);
 }
 
 function sectionBilans(){
