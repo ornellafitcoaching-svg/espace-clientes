@@ -97,6 +97,10 @@ button{font-family:inherit;cursor:pointer}
 .alert:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
 .alert strong{color:var(--dark);font-weight:700}
 .alert .who{color:var(--accent);font-weight:600}
+.alert-action{border-left-color:#25D366}
+.alert-cta{margin-left:auto;background:#25D366;color:#fff;font-weight:700;font-size:.76rem;
+  padding:4px 10px;border-radius:999px;white-space:nowrap}
+.alert-cta.muted{background:var(--line);color:var(--text-mid)}
 
 /* ---- Grille clientes ------------------------------------------------------ */
 .clientes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}

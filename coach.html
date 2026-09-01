@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e12">
+<link rel="stylesheet" href="css/app.css?v=e13">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e12"></script>
-<script src="js/supabaseClient.js?v=e12"></script>
-<script src="js/auth.js?v=e12"></script>
-<script src="js/db.js?v=e12"></script>
-<script src="js/calc.js?v=e12"></script>
-<script src="js/ui/modal.js?v=e12"></script>
-<script src="js/ui/progress.js?v=e12"></script>
+<script src="js/config.js?v=e13"></script>
+<script src="js/supabaseClient.js?v=e13"></script>
+<script src="js/auth.js?v=e13"></script>
+<script src="js/db.js?v=e13"></script>
+<script src="js/calc.js?v=e13"></script>
+<script src="js/ui/modal.js?v=e13"></script>
+<script src="js/ui/progress.js?v=e13"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -70,6 +70,20 @@ const FILTERS = [
 
 function initials(c){ return ((c.prenom||"?")[0]||"").toUpperCase(); }
 const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+
+// ---- WhatsApp vers UNE cliente (numéro français normalisé en international) ----
+function normalizeFrPhone(tel){
+  let d = String(tel||"").replace(/\D/g,"");
+  if (!d) return "";
+  if (d.startsWith("00")) d = d.slice(2);       // indicatif international 00…
+  else if (d.startsWith("0")) d = "33" + d.slice(1); // 06… → 336…
+  return d;
+}
+function waCliente(tel, text){
+  const num = normalizeFrPhone(tel);
+  if (!num) return null;
+  return "https://wa.me/" + num + "?text=" + encodeURIComponent(text);
+}
 
 // ---- Agenda : toutes les séances "prévues" à venir, toutes clientes confondues ----
 function renderAgenda(){
@@ -135,10 +149,30 @@ function renderAlerts() {
   if (!all.length) { box.innerHTML = ""; return; }
   const order = { nouveau_bilan:0, bilan:1, programme:2, fin:3, seances:4, renouveler:5 };
   all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
-  box.innerHTML = all.slice(0,8).map(a =>
-    `<a class="alert" href="cliente.html?id=${a.c.cliente.id}">
-       <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${a.c.cliente.prenom}</span></span>
-     </a>`).join("");
+  box.innerHTML = all.slice(0,8).map(a => {
+    const cl = a.c.cliente;
+    // Rappel de bilan → cliquer envoie la demande à la cliente sur WhatsApp.
+    if (a.type === "bilan") {
+      const b = Calc.bilanStats(a.c.bilans);
+      const retard = b.joursAvant !== null && b.joursAvant < 0;
+      const msg = `Coucou ${cl.prenom} 🌸 C'est le moment de faire ton bilan `
+        + (retard ? `(il est un peu en retard, pas de souci !)` : `(on en fait un toutes les 4 semaines)`)
+        + ` 📊\n\nTu peux le remplir en 2 min directement dans ton espace : https://espace.ornellafitcoaching.com\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪`;
+      const wa = waCliente(cl.telephone, msg);
+      if (wa) {
+        return `<a class="alert alert-action" href="${wa}" target="_blank" rel="noopener">
+           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           <span class="alert-cta">Demander le bilan 📲</span></a>`;
+      }
+      // Pas de numéro enregistré → renvoie vers la fiche pour l'ajouter.
+      return `<a class="alert" href="cliente.html?id=${cl.id}" title="Ajoute son numéro de téléphone dans sa fiche pour demander le bilan en un clic">
+           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           <span class="alert-cta muted">☎️ n° manquant</span></a>`;
+    }
+    return `<a class="alert" href="cliente.html?id=${cl.id}">
+       <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+     </a>`;
+  }).join("");
 }
 
 // ---- Filtres ----
