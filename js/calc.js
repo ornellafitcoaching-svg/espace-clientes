@@ -126,6 +126,42 @@ window.Calc = {
     return out;
   },
 
+  // ---- WhatsApp / liens espace (partagés coach + fiche) -------------------
+  // Normalise un numéro FR en international sans "+" (06…→336…, gère +33/0033/espaces).
+  normalizeFrPhone(tel) {
+    let d = String(tel || "").replace(/\D/g, "");
+    if (!d) return "";
+    if (d.startsWith("00")) d = d.slice(2);
+    else if (d.startsWith("0")) d = "33" + d.slice(1);
+    return d;
+  },
+  // Lien WhatsApp pré-rempli vers un numéro (null si pas de numéro).
+  waHref(tel, text) {
+    const num = this.normalizeFrPhone(tel);
+    if (!num) return null;
+    return "https://wa.me/" + num + "?text=" + encodeURIComponent(text);
+  },
+  // Lien de connexion 1 clic à l'espace cliente (avec son code si fourni).
+  espaceLink(code) {
+    return code
+      ? "https://espace.ornellafitcoaching.com/espace.html?code=" + encodeURIComponent(code)
+      : "https://espace.ornellafitcoaching.com";
+  },
+  // Message « demande de bilan » pré-rempli (retard = ton adapté).
+  bilanMsg(cl, retard) {
+    return "Coucou " + cl.prenom + " 🌸 C'est le moment de faire ton bilan "
+      + (retard ? "(il est un peu en retard, pas de souci !)" : "(on en fait un toutes les 4 semaines)")
+      + " 📊\n\nTu peux le remplir en 2 min directement dans ton espace (connexion en 1 clic) : "
+      + this.espaceLink(cl.access_code)
+      + "\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪";
+  },
+  // Message « rappel de séance » pré-rempli.
+  seanceRappelMsg(cl, date, type) {
+    return "Coucou " + cl.prenom + " 🌸 Petit rappel : on a séance prévue le "
+      + this.fmt(date) + (type ? " (" + type + ")" : "")
+      + " 💪 Hâte de te voir ! Si tu as besoin de décaler, dis-le-moi 🙂";
+  },
+
   // ---- Âge / IMC ----------------------------------------------------------
   age(dateNaissance) {
     if (!dateNaissance) return null;

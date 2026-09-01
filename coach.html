@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e15">
+<link rel="stylesheet" href="css/app.css?v=e16">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e15"></script>
-<script src="js/supabaseClient.js?v=e15"></script>
-<script src="js/auth.js?v=e15"></script>
-<script src="js/db.js?v=e15"></script>
-<script src="js/calc.js?v=e15"></script>
-<script src="js/ui/modal.js?v=e15"></script>
-<script src="js/ui/progress.js?v=e15"></script>
+<script src="js/config.js?v=e16"></script>
+<script src="js/supabaseClient.js?v=e16"></script>
+<script src="js/auth.js?v=e16"></script>
+<script src="js/db.js?v=e16"></script>
+<script src="js/calc.js?v=e16"></script>
+<script src="js/ui/modal.js?v=e16"></script>
+<script src="js/ui/progress.js?v=e16"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -71,19 +71,7 @@ const FILTERS = [
 function initials(c){ return ((c.prenom||"?")[0]||"").toUpperCase(); }
 const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 
-// ---- WhatsApp vers UNE cliente (numéro français normalisé en international) ----
-function normalizeFrPhone(tel){
-  let d = String(tel||"").replace(/\D/g,"");
-  if (!d) return "";
-  if (d.startsWith("00")) d = d.slice(2);       // indicatif international 00…
-  else if (d.startsWith("0")) d = "33" + d.slice(1); // 06… → 336…
-  return d;
-}
-function waCliente(tel, text){
-  const num = normalizeFrPhone(tel);
-  if (!num) return null;
-  return "https://wa.me/" + num + "?text=" + encodeURIComponent(text);
-}
+// WhatsApp vers une cliente : helpers centralisés dans Calc (waHref / bilanMsg / seanceRappelMsg).
 
 // ---- Agenda : toutes les séances "prévues" à venir, toutes clientes confondues ----
 function renderAgenda(){
@@ -109,9 +97,15 @@ function renderAgenda(){
     <div class="section-body">` + dates.map(d=>`
       <div class="card" style="margin-top:8px;padding:10px 12px">
         <div class="idate" style="font-weight:700;margin-bottom:6px">${Calc.fmtShort(d)}</div>
-        ${byDate[d].map(it=>`<a class="cl-line" href="cliente.html?id=${it.cl.id}" style="padding:5px 0;text-decoration:none;color:inherit">
-            <span><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${it.type?` · ${esc(it.type)}`:""}</span>
-            <span class="tag">voir →</span></a>`).join("")}
+        ${byDate[d].map(it=>{
+          const wa = Calc.waHref(it.cl.telephone, Calc.seanceRappelMsg(it.cl, it.date, it.type));
+          return `<div class="cl-line" style="padding:5px 0">
+            <a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${it.type?` · ${esc(it.type)}`:""}</a>
+            <span style="display:flex;gap:8px;align-items:center;flex:none">
+              ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
+              <a class="tag" href="cliente.html?id=${it.cl.id}">voir →</a>
+            </span></div>`;
+        }).join("")}
       </div>`).join("") + `</div></details>`;
 }
 
@@ -155,14 +149,7 @@ function renderAlerts() {
     if (a.type === "bilan") {
       const b = Calc.bilanStats(a.c.bilans);
       const retard = b.joursAvant !== null && b.joursAvant < 0;
-      // Lien direct : avec le code de la cliente, elle est connectée en 1 clic sur son espace.
-      const lien = cl.access_code
-        ? `https://espace.ornellafitcoaching.com/espace.html?code=${encodeURIComponent(cl.access_code)}`
-        : `https://espace.ornellafitcoaching.com`;
-      const msg = `Coucou ${cl.prenom} 🌸 C'est le moment de faire ton bilan `
-        + (retard ? `(il est un peu en retard, pas de souci !)` : `(on en fait un toutes les 4 semaines)`)
-        + ` 📊\n\nTu peux le remplir en 2 min directement dans ton espace (connexion en 1 clic) : ${lien}\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪`;
-      const wa = waCliente(cl.telephone, msg);
+      const wa = Calc.waHref(cl.telephone, Calc.bilanMsg(cl, retard));
       if (wa) {
         return `<a class="alert alert-action" href="${wa}" target="_blank" rel="noopener">
            <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
@@ -239,7 +226,14 @@ function renderList() {
       <div class="cl-line"><span>📅 Séances à venir</span><strong>${upcoming.length ? `${upcoming.length} · le ${Calc.fmtShort(upcoming[0].date)}` : '—'}</strong></div>
       <div class="cl-line"><span>Dernier bilan</span><strong>${Calc.fmt(b.dernier)}</strong></div>
       <div class="cl-line"><span>Prochain bilan</span><strong>${Calc.fmt(b.prochain)}</strong></div>
-      ${al.length ? `<div class="cl-alerts">${al.map(a=>`<span class="dot-alert">${a.icon} ${a.label}</span>`).join('')}</div>` : ''}
+      ${al.length ? `<div class="cl-alerts">${al.map(a=>{
+        // Pastille « bilan » cliquable → WhatsApp (data-wa géré par délégation, cf. init).
+        if (a.type === "bilan") {
+          const wa = Calc.waHref(cl.telephone, Calc.bilanMsg(cl, b.joursAvant !== null && b.joursAvant < 0));
+          if (wa) return `<span class="dot-alert dot-wa" data-wa="${wa}" title="Demander le bilan sur WhatsApp">${a.icon} ${a.label} 📲</span>`;
+        }
+        return `<span class="dot-alert">${a.icon} ${a.label}</span>`;
+      }).join('')}</div>` : ''}
     </a>`;
   }).join("") + `</div>`;
 }
@@ -298,6 +292,11 @@ document.getElementById("newCliente").onclick = async () => {
   document.getElementById("who").textContent = (p.prenom||"Coach");
   document.getElementById("logout").onclick = () => Auth.signOut();
   document.getElementById("q").addEventListener("input", e => { STATE.q = e.target.value.trim(); renderList(); });
+  // Clic sur une pastille de bilan dans une carte → WhatsApp (sans naviguer vers la fiche).
+  document.getElementById("content").addEventListener("click", (e) => {
+    const w = e.target.closest(".dot-wa");
+    if (w && w.dataset.wa) { e.preventDefault(); e.stopPropagation(); window.open(w.dataset.wa, "_blank"); }
+  });
   try {
     await loadAll();
     renderAlerts(); renderAgenda(); renderFilters(); renderList();

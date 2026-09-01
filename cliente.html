@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e15">
+<link rel="stylesheet" href="css/app.css?v=e16">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e15"></script>
-<script src="js/supabaseClient.js?v=e15"></script>
-<script src="js/auth.js?v=e15"></script>
-<script src="js/db.js?v=e15"></script>
-<script src="js/calc.js?v=e15"></script>
-<script src="js/ui/modal.js?v=e15"></script>
-<script src="js/ui/progress.js?v=e15"></script>
+<script src="js/config.js?v=e16"></script>
+<script src="js/supabaseClient.js?v=e16"></script>
+<script src="js/auth.js?v=e16"></script>
+<script src="js/db.js?v=e16"></script>
+<script src="js/calc.js?v=e16"></script>
+<script src="js/ui/modal.js?v=e16"></script>
+<script src="js/ui/progress.js?v=e16"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -253,7 +253,15 @@ function sectionProgrammes(){
 
 function sectionBilans(){
   const list = D.bilans||[];
-  const body = list.length ? list.map(x=>`
+  const cl = D.cliente;
+  const b = Calc.bilanStats(list);
+  const retard = b.joursAvant !== null && b.joursAvant < 0;
+  const wa = Calc.waHref(cl.telephone, Calc.bilanMsg(cl, retard));
+  // Bouton « Demander son bilan » (WhatsApp, connexion 1 clic à son espace).
+  const askBtn = wa
+    ? `<div style="margin-bottom:12px"><a class="btn-accent btn-sm" href="${wa}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px">📲 Demander son bilan</a></div>`
+    : `<p class="isub" style="margin-bottom:12px">Ajoute son numéro de téléphone (bouton « Modifier ») pour lui demander son bilan en un clic sur WhatsApp.</p>`;
+  const body = askBtn + (list.length ? list.map(x=>`
     <div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div>
       <div class="ibody">
         <div class="ititle">Bilan ${x.semaine!=null?"semaine "+x.semaine:""} ${x.poids?`<span class="tag">${x.poids} kg</span>`:""}</div>
@@ -261,7 +269,7 @@ function sectionBilans(){
         ${x.difficultes?`<div class="isub">⚠️ ${esc(x.difficultes)}</div>`:""}
         ${x.points_positifs?`<div class="isub">✅ ${esc(x.points_positifs)}</div>`:""}
         ${x.commentaire_coach?`<div class="isub">💬 ${esc(x.commentaire_coach)}</div>`:""}
-      </div>${delEdit("bilan",x.id)}</div>`).join("") : `<p class="empty">Aucun bilan.</p>`;
+      </div>${delEdit("bilan",x.id)}</div>`).join("") : `<p class="empty">Aucun bilan.</p>`);
   return block("Bilans", list.length, body, false);
 }
 
