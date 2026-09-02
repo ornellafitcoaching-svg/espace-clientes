@@ -317,4 +317,8 @@ button{font-family:inherit;cursor:pointer}
   .quick{position:sticky;bottom:0;background:var(--cream);padding:10px 0;margin:14px -14px 0;
     padding-left:14px;padding-right:14px;overflow-x:auto;flex-wrap:nowrap;border-top:1px solid var(--line-soft)}
   .qbtn{flex-shrink:0}
+  /* Rappels : passer la pastille d'action à la ligne plutôt que déborder */
+  .alert{flex-wrap:wrap}
+  .alert-cta{margin-left:0}
+  .sel-bar{width:auto}
 }
