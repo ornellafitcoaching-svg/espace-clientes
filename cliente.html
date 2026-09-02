@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e20">
+<link rel="stylesheet" href="css/app.css?v=e21">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e20"></script>
-<script src="js/supabaseClient.js?v=e20"></script>
-<script src="js/auth.js?v=e20"></script>
-<script src="js/db.js?v=e20"></script>
-<script src="js/calc.js?v=e20"></script>
-<script src="js/ui/modal.js?v=e20"></script>
-<script src="js/ui/progress.js?v=e20"></script>
+<script src="js/config.js?v=e21"></script>
+<script src="js/supabaseClient.js?v=e21"></script>
+<script src="js/auth.js?v=e21"></script>
+<script src="js/db.js?v=e21"></script>
+<script src="js/calc.js?v=e21"></script>
+<script src="js/ui/modal.js?v=e21"></script>
+<script src="js/ui/progress.js?v=e21"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -223,17 +223,24 @@ function sectionPaiements(){
 
 function sectionSeances(){
   const list = D.seances||[];
-  const body = list.length ? list.map(x=>`
+  const st = Calc.seancesStats(D.accompagnement, list);
+  const aVenir = list.filter(x=>x.statut==="prevue" && x.date>=Calc.today()).length;
+  const decompte = `<div class="mensu-card" style="margin-bottom:10px">
+    <div class="cl-line"><span>✅ Réalisées</span><strong style="color:var(--ok)">${st.realisees}${st.prevues?` / ${st.prevues}`:""}</strong></div>
+    ${st.prevues?`<div class="cl-line"><span>⏳ Restantes (forfait)</span><strong>${st.restantes}</strong></div>`:""}
+    <div class="cl-line"><span>📅 Programmées à venir</span><strong>${aVenir}</strong></div>
+  </div>`;
+  const body = decompte + (list.length ? list.map(x=>`
     <div class="item">
       <div class="idate">${Calc.fmtShort(x.date)}${x.heure?`<small style="display:block;font-weight:600;color:var(--text-light)">${Calc.fmtHeure(x.heure)}</small>`:""}</div>
       <div class="ibody">
-        <div class="ititle">${esc(x.type||"Séance")} ${x.statut!=="realisee"?`<span class="tag">${x.statut}</span>`:""}</div>
+        <div class="ititle">${esc(x.type||"Séance")} ${x.statut==="realisee"?`<span class="tag tag-done">✅ Fait</span>`:`<span class="tag">${x.statut}</span>`}</div>
         <div class="isub">${[x.objectif&&esc(x.objectif),x.intensite&&("Intensité "+esc(x.intensite)),x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
         ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
         ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}
         ${x.statut==="prevue"?`<button class="btn-accent btn-sm" data-act="seance-done" data-id="${x.id}" style="margin-top:8px">✅ Marquer faite</button>`:""}
       </div>${delEdit("seance",x.id)}
-    </div>`).join("") : `<p class="empty">Aucune séance enregistrée.</p>`;
+    </div>`).join("") : `<p class="empty">Aucune séance enregistrée.</p>`);
   return block("Séances", list.length, body, false);
 }
 

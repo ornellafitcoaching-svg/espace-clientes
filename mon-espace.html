@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e20">
+<link rel="stylesheet" href="css/app.css?v=e21">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e20"></script>
-<script src="js/supabaseClient.js?v=e20"></script>
-<script src="js/auth.js?v=e20"></script>
-<script src="js/db.js?v=e20"></script>
-<script src="js/calc.js?v=e20"></script>
-<script src="js/ui/modal.js?v=e20"></script>
-<script src="js/ui/progress.js?v=e20"></script>
+<script src="js/config.js?v=e21"></script>
+<script src="js/supabaseClient.js?v=e21"></script>
+<script src="js/auth.js?v=e21"></script>
+<script src="js/db.js?v=e21"></script>
+<script src="js/calc.js?v=e21"></script>
+<script src="js/ui/modal.js?v=e21"></script>
+<script src="js/ui/progress.js?v=e21"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -147,7 +147,13 @@ function viewSeances(){
   const upcoming = all.filter(x=>x.statut==="prevue" && x.date>=today).sort((a,b)=>a.date<b.date?-1:1);
   const rest = all.filter(x=>!(x.statut==="prevue" && x.date>=today)).sort((a,b)=>a.date<b.date?1:-1);
   if (!all.length) return empty("Aucune séance enregistrée pour l'instant.");
-  let out = "";
+  // Décompte : réalisées / forfait + restantes + à venir.
+  const st = Calc.seancesStats(D.accompagnement, all);
+  let out = `<div class="stat-grid" style="margin-bottom:16px">
+    ${tile("✅ Réalisées", st.realisees + (st.prevues?` / ${st.prevues}`:""))}
+    ${st.prevues?tile("⏳ Restantes", st.restantes):""}
+    ${tile("📅 À venir", upcoming.length)}
+  </div>`;
   if (upcoming.length){
     out += `<h4 class="view-title" style="margin-top:0">📅 Mes prochaines séances</h4><div class="card">` + upcoming.map(x=>{
       const hh = Calc.fmtHeure(x.heure);
@@ -166,7 +172,7 @@ function viewSeances(){
     <div class="item">
       <div class="idate">${Calc.fmtShort(x.date)}</div>
       <div class="ibody">
-        <div class="ititle">${esc(x.type||"Séance")} ${x.statut!=="realisee"?`<span class="tag">${esc(x.statut)}</span>`:""}</div>
+        <div class="ititle">${esc(x.type||"Séance")} ${x.statut==="realisee"?`<span class="tag tag-done">✅ Fait</span>`:`<span class="tag">${esc(x.statut)}</span>`}</div>
         ${seanceBody(x)}
       </div>
     </div>`).join("") + `</div>`;

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e20">
+<link rel="stylesheet" href="css/app.css?v=e21">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e20"></script>
-<script src="js/supabaseClient.js?v=e20"></script>
-<script src="js/auth.js?v=e20"></script>
-<script src="js/db.js?v=e20"></script>
-<script src="js/calc.js?v=e20"></script>
-<script src="js/ui/modal.js?v=e20"></script>
-<script src="js/ui/progress.js?v=e20"></script>
+<script src="js/config.js?v=e21"></script>
+<script src="js/supabaseClient.js?v=e21"></script>
+<script src="js/auth.js?v=e21"></script>
+<script src="js/db.js?v=e21"></script>
+<script src="js/calc.js?v=e21"></script>
+<script src="js/ui/modal.js?v=e21"></script>
+<script src="js/ui/progress.js?v=e21"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -79,7 +79,10 @@ function renderAgenda(){
   const today = Calc.today();
   const items = [];
   STATE.clientes.forEach(c => (c.seances||[]).forEach(s => {
-    if (s.statut==="prevue" && s.date && s.date>=today) items.push({ id:s.id, date:s.date, type:s.type, heure:s.heure, cl:c.cliente });
+    // On garde aussi les séances déjà "réalisées" (à partir d'aujourd'hui) pour qu'une séance
+    // cochée « faite » NE disparaisse PAS : elle reste visible, marquée ✅.
+    if ((s.statut==="prevue"||s.statut==="realisee") && s.date && s.date>=today)
+      items.push({ id:s.id, date:s.date, type:s.type, heure:s.heure, statut:s.statut, cl:c.cliente });
   }));
   if (!items.length){
     box.innerHTML = `<details class="section-block" style="margin:14px 0">
@@ -89,19 +92,26 @@ function renderAgenda(){
         et dans l'espace de ta cliente.</p></div></details>`;
     return;
   }
+  const nAvenir = items.filter(i=>i.statut==="prevue").length;
+  const nFaites = items.filter(i=>i.statut==="realisee").length;
   const byDate = {};
   items.forEach(it => (byDate[it.date] ||= []).push(it));
   const dates = Object.keys(byDate).sort((a,b)=> a<b?-1:1);
   box.innerHTML = `<details class="section-block" open style="margin:14px 0">
-    <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${items.length}</span></summary>
+    <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${nAvenir}</span>${nFaites?`<span class="count" style="background:var(--ok);color:#fff">✅ ${nFaites}</span>`:""}</summary>
     <div class="section-body">` + dates.map(d=>`
       <div class="card" style="margin-top:8px;padding:10px 12px">
         <div class="idate" style="font-weight:700;margin-bottom:6px">${Calc.fmtShort(d)}</div>
         ${byDate[d].map(it=>{
-          const wa = Calc.waHref(it.cl.telephone, Calc.seanceRappelMsg(it.cl, it.date, it.type, it.heure));
           const hh = Calc.fmtHeure(it.heure);
-          return `<div class="cl-line" style="padding:5px 0">
-            <a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>
+          const nom = `<a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>`;
+          if (it.statut==="realisee"){
+            // Séance faite : reste visible, grisée, marquée ✅ (ne disparaît pas).
+            return `<div class="cl-line" style="padding:5px 0;opacity:.6">${nom}
+              <span class="tag tag-done" style="cursor:default">✅ Fait</span></div>`;
+          }
+          const wa = Calc.waHref(it.cl.telephone, Calc.seanceRappelMsg(it.cl, it.date, it.type, it.heure));
+          return `<div class="cl-line" style="padding:5px 0">${nom}
             <span style="display:flex;gap:8px;align-items:center;flex:none">
               <button class="tag tag-done" data-done="${it.id}" title="Marquer cette séance comme faite">✅ Fait</button>
               ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
