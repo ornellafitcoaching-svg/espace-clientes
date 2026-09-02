@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e18">
+<link rel="stylesheet" href="css/app.css?v=e19">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e18"></script>
-<script src="js/supabaseClient.js?v=e18"></script>
-<script src="js/auth.js?v=e18"></script>
-<script src="js/db.js?v=e18"></script>
-<script src="js/calc.js?v=e18"></script>
-<script src="js/ui/modal.js?v=e18"></script>
-<script src="js/ui/progress.js?v=e18"></script>
+<script src="js/config.js?v=e19"></script>
+<script src="js/supabaseClient.js?v=e19"></script>
+<script src="js/auth.js?v=e19"></script>
+<script src="js/db.js?v=e19"></script>
+<script src="js/calc.js?v=e19"></script>
+<script src="js/ui/modal.js?v=e19"></script>
+<script src="js/ui/progress.js?v=e19"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -123,7 +123,7 @@ function viewAccueil(){
       ${tile("Ton objectif", esc(cl.objectif_principal||"—"))}
       ${ac&&ac.seances_prevues ? tile("Séances", s.realisees+" / "+s.prevues, s.restantes+" restantes") : tile("Séances réalisées", s.realisees)}
       ${poidsTile}
-      ${nextSeance ? tile("Prochaine séance", Calc.fmt(nextSeance.date), esc(nextSeance.type||"")) : ""}
+      ${nextSeance ? tile("Prochaine séance", Calc.fmt(nextSeance.date), [Calc.fmtHeure(nextSeance.heure), esc(nextSeance.type||"")].filter(Boolean).join(" · ")) : ""}
       ${b.dernier ? tile("Prochain bilan", Calc.fmt(b.prochain), bilanSub) : ""}
       ${sport&&sport.envoye ? tile("Programme sportif", "Disponible", "envoyé le "+Calc.fmt(sport.date_envoi)) : ""}
       ${ac&&ac.nutrition_active ? tile("Suivi nutrition", "Actif") : ""}
@@ -150,9 +150,10 @@ function viewSeances(){
   let out = "";
   if (upcoming.length){
     out += `<h4 class="view-title" style="margin-top:0">📅 Mes prochaines séances</h4><div class="card">` + upcoming.map(x=>{
-      const wa = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Je souhaiterais modifier ma séance prévue le ${Calc.fmt(x.date)}${x.type?` (${x.type})`:""}.`);
+      const hh = Calc.fmtHeure(x.heure);
+      const wa = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Je souhaiterais modifier ma séance prévue le ${Calc.fmt(x.date)}${hh?` à ${hh}`:""}${x.type?` (${x.type})`:""}.`);
       return `<div class="item">
-      <div class="idate">${Calc.fmtShort(x.date)}</div>
+      <div class="idate">${Calc.fmtShort(x.date)}${hh?`<small style="display:block;font-weight:600;color:var(--text-light)">${hh}</small>`:""}</div>
       <div class="ibody">
         <div class="ititle">${esc(x.type||"Séance")} <span class="tag">à venir</span></div>
         ${seanceBody(x)}

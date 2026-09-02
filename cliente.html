@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e18">
+<link rel="stylesheet" href="css/app.css?v=e19">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e18"></script>
-<script src="js/supabaseClient.js?v=e18"></script>
-<script src="js/auth.js?v=e18"></script>
-<script src="js/db.js?v=e18"></script>
-<script src="js/calc.js?v=e18"></script>
-<script src="js/ui/modal.js?v=e18"></script>
-<script src="js/ui/progress.js?v=e18"></script>
+<script src="js/config.js?v=e19"></script>
+<script src="js/supabaseClient.js?v=e19"></script>
+<script src="js/auth.js?v=e19"></script>
+<script src="js/db.js?v=e19"></script>
+<script src="js/calc.js?v=e19"></script>
+<script src="js/ui/modal.js?v=e19"></script>
+<script src="js/ui/progress.js?v=e19"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -225,7 +225,7 @@ function sectionSeances(){
   const list = D.seances||[];
   const body = list.length ? list.map(x=>`
     <div class="item">
-      <div class="idate">${Calc.fmtShort(x.date)}</div>
+      <div class="idate">${Calc.fmtShort(x.date)}${x.heure?`<small style="display:block;font-weight:600;color:var(--text-light)">${Calc.fmtHeure(x.heure)}</small>`:""}</div>
       <div class="ibody">
         <div class="ititle">${esc(x.type||"Séance")} ${x.statut!=="realisee"?`<span class="tag">${x.statut}</span>`:""}</div>
         <div class="isub">${[x.objectif&&esc(x.objectif),x.intensite&&("Intensité "+esc(x.intensite)),x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
@@ -397,6 +397,7 @@ async function addPhoto(){
 // ============================ FORMULAIRES ENTITÉS ============================
 function seanceFields(x){ x=x||{}; return [
   { name:"date", label:"Date", type:"date", half:true, value:x.date||Calc.today() },
+  { name:"heure", label:"Heure (facultatif)", type:"time", half:true, value:x.heure },
   { name:"type", label:"Type de séance", half:true, value:x.type, placeholder:"Jambes, Full body…" },
   { name:"statut", label:"Statut", type:"select", half:true, value:x.statut||"realisee", options:[
     {value:"realisee",label:"Réalisée"},{value:"prevue",label:"Prévue"},{value:"annulee",label:"Annulée"}]},
@@ -410,7 +411,7 @@ function seanceFields(x){ x=x||{}; return [
 function seancePayload(v){
   const ex = (v._exercices||"").split("\n").map(l=>l.trim()).filter(Boolean).map(nom=>({nom}));
   const niveau = ex.length?"detaille":((v.objectif||v.intensite||v.duree)?"standard":"rapide");
-  return { cliente_id:CID, date:v.date, type:v.type, statut:v.statut, duree:v.duree,
+  return { cliente_id:CID, date:v.date, heure:v.heure||null, type:v.type, statut:v.statut, duree:v.duree,
     objectif:v.objectif, intensite:v.intensite, commentaire:v.commentaire,
     exercices: ex.length?ex:null, niveau };
 }

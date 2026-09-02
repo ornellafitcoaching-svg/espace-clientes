@@ -19,6 +19,14 @@ window.Calc = {
     const dt = this.parse(d);
     return dt ? dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
   },
+  // Heure "09:30" ou "09:30:00" → "9h30" (et "09:00" → "9h"). Vide si absente.
+  fmtHeure(h) {
+    if (!h) return "";
+    const m = String(h).match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return "";
+    const hh = parseInt(m[1], 10);
+    return m[2] === "00" ? hh + "h" : hh + "h" + m[2];
+  },
   daysBetween(a, b) {
     const da = this.parse(a), db = this.parse(b);
     if (!da || !db) return null;
@@ -156,9 +164,10 @@ window.Calc = {
       + "\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪";
   },
   // Message « rappel de séance » pré-rempli.
-  seanceRappelMsg(cl, date, type) {
+  seanceRappelMsg(cl, date, type, heure) {
+    const h = this.fmtHeure(heure);
     return "Coucou " + cl.prenom + " 🌸 Petit rappel : on a séance prévue le "
-      + this.fmt(date) + (type ? " (" + type + ")" : "")
+      + this.fmt(date) + (h ? " à " + h : "") + (type ? " (" + type + ")" : "")
       + " 💪 Hâte de te voir ! Si tu as besoin de décaler, dis-le-moi 🙂";
   },
 
