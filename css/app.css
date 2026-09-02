@@ -135,6 +135,8 @@ button{font-family:inherit;cursor:pointer}
 .dot-wa{cursor:pointer;background:rgba(37,211,102,.14);color:#128C4B}
 .dot-wa:hover{background:rgba(37,211,102,.24)}
 .tag-wa{background:#25D366;color:#fff;text-decoration:none}
+.tag-done{background:var(--ok);color:#fff;border:none;cursor:pointer;font-family:inherit}
+.tag-done:disabled{opacity:.5;cursor:default}
 
 /* ---- Espace cliente : nudge bilan + mot d'Ornella ------------------------ */
 .nudge-bilan{border-left:4px solid var(--accent);background:linear-gradient(135deg,rgba(201,99,88,.08),rgba(201,99,88,.02))}

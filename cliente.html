@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e19">
+<link rel="stylesheet" href="css/app.css?v=e20">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e19"></script>
-<script src="js/supabaseClient.js?v=e19"></script>
-<script src="js/auth.js?v=e19"></script>
-<script src="js/db.js?v=e19"></script>
-<script src="js/calc.js?v=e19"></script>
-<script src="js/ui/modal.js?v=e19"></script>
-<script src="js/ui/progress.js?v=e19"></script>
+<script src="js/config.js?v=e20"></script>
+<script src="js/supabaseClient.js?v=e20"></script>
+<script src="js/auth.js?v=e20"></script>
+<script src="js/db.js?v=e20"></script>
+<script src="js/calc.js?v=e20"></script>
+<script src="js/ui/modal.js?v=e20"></script>
+<script src="js/ui/progress.js?v=e20"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -231,6 +231,7 @@ function sectionSeances(){
         <div class="isub">${[x.objectif&&esc(x.objectif),x.intensite&&("Intensité "+esc(x.intensite)),x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
         ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
         ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}
+        ${x.statut==="prevue"?`<button class="btn-accent btn-sm" data-act="seance-done" data-id="${x.id}" style="margin-top:8px">✅ Marquer faite</button>`:""}
       </div>${delEdit("seance",x.id)}
     </div>`).join("") : `<p class="empty">Aucune séance enregistrée.</p>`;
   return block("Séances", list.length, body, false);
@@ -698,6 +699,11 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="add-photo") return addPhoto();
   if (act==="prog-sportif") return progEnvoye("sportif");
   if (act==="prog-nutrition") return progEnvoye("nutrition");
+  if (act==="seance-done"){
+    try{ await DB.update("seances", id, { statut:"realisee" }); UI.toast("Séance marquée faite ✓"); reload(); }
+    catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    return;
+  }
   if (act==="toggle-select") return setSelMode(!SELMODE);
   if (act==="edit-cliente") return editCliente();
   if (act==="edit-accomp") return editAccomp();

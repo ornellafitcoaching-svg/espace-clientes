@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e19">
+<link rel="stylesheet" href="css/app.css?v=e20">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e19"></script>
-<script src="js/supabaseClient.js?v=e19"></script>
-<script src="js/auth.js?v=e19"></script>
-<script src="js/db.js?v=e19"></script>
-<script src="js/calc.js?v=e19"></script>
-<script src="js/ui/modal.js?v=e19"></script>
-<script src="js/ui/progress.js?v=e19"></script>
+<script src="js/config.js?v=e20"></script>
+<script src="js/supabaseClient.js?v=e20"></script>
+<script src="js/auth.js?v=e20"></script>
+<script src="js/db.js?v=e20"></script>
+<script src="js/calc.js?v=e20"></script>
+<script src="js/ui/modal.js?v=e20"></script>
+<script src="js/ui/progress.js?v=e20"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -79,7 +79,7 @@ function renderAgenda(){
   const today = Calc.today();
   const items = [];
   STATE.clientes.forEach(c => (c.seances||[]).forEach(s => {
-    if (s.statut==="prevue" && s.date && s.date>=today) items.push({ date:s.date, type:s.type, heure:s.heure, cl:c.cliente });
+    if (s.statut==="prevue" && s.date && s.date>=today) items.push({ id:s.id, date:s.date, type:s.type, heure:s.heure, cl:c.cliente });
   }));
   if (!items.length){
     box.innerHTML = `<details class="section-block" style="margin:14px 0">
@@ -103,6 +103,7 @@ function renderAgenda(){
           return `<div class="cl-line" style="padding:5px 0">
             <a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>
             <span style="display:flex;gap:8px;align-items:center;flex:none">
+              <button class="tag tag-done" data-done="${it.id}" title="Marquer cette séance comme faite">✅ Fait</button>
               ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
               <a class="tag" href="cliente.html?id=${it.cl.id}">voir →</a>
             </span></div>`;
@@ -115,7 +116,7 @@ async function loadAll() {
   const [clientes, accomp, seances, bilans, programmes] = await Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
     sb.from("accompagnements").select("cliente_id,seances_prevues,date_debut,date_fin,nutrition_active,nb_mois"),
-    sb.from("seances").select("cliente_id,statut,date,type,heure"),
+    sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("programmes").select("cliente_id,kind,envoye"),
   ]);
@@ -130,7 +131,7 @@ async function loadAll() {
   STATE.clientes = (clientes.data||[]).map(cl => ({
     cliente: cl,
     accompagnement: accMap[cl.id] || null,
-    seances: (seaMap[cl.id]||[]).map(s=>({statut:s.statut, date:s.date, type:s.type, heure:s.heure})),
+    seances: (seaMap[cl.id]||[]).map(s=>({id:s.id, statut:s.statut, date:s.date, type:s.type, heure:s.heure})),
     bilans: bilMap[cl.id]||[],
     programmes: proMap[cl.id]||[],
   }));
@@ -297,6 +298,17 @@ document.getElementById("newCliente").onclick = async () => {
   document.getElementById("content").addEventListener("click", (e) => {
     const w = e.target.closest(".dot-wa");
     if (w && w.dataset.wa) { e.preventDefault(); e.stopPropagation(); window.open(w.dataset.wa, "_blank"); }
+  });
+  // Bouton « ✅ Fait » dans l'agenda → passe la séance en réalisée + rafraîchit.
+  document.getElementById("agenda").addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-done]"); if (!btn) return;
+    e.preventDefault(); btn.disabled = true;
+    try {
+      const { error } = await sb.from("seances").update({ statut:"realisee" }).eq("id", btn.dataset.done);
+      if (error) throw error;
+      UI.toast("Séance marquée faite ✓");
+      await loadAll(); renderAlerts(); renderAgenda(); renderList();
+    } catch(err){ console.error(err); UI.toast("Erreur : "+(err.message||err),"err"); btn.disabled = false; }
   });
   try {
     await loadAll();
