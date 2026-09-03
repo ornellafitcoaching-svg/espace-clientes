@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e30">
+<link rel="stylesheet" href="css/app.css?v=e31">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e30"></script>
-<script src="js/supabaseClient.js?v=e30"></script>
-<script src="js/auth.js?v=e30"></script>
-<script src="js/db.js?v=e30"></script>
-<script src="js/calc.js?v=e30"></script>
-<script src="js/ui/modal.js?v=e30"></script>
-<script src="js/ui/progress.js?v=e30"></script>
+<script src="js/config.js?v=e31"></script>
+<script src="js/supabaseClient.js?v=e31"></script>
+<script src="js/auth.js?v=e31"></script>
+<script src="js/db.js?v=e31"></script>
+<script src="js/calc.js?v=e31"></script>
+<script src="js/ui/modal.js?v=e31"></script>
+<script src="js/ui/progress.js?v=e31"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -87,7 +87,7 @@ function render(focusTitle){
       <div class="summary">
         <div class="sum-item"><div class="k">Objectif</div><div class="v">${esc(cl.objectif_principal||"—")}</div></div>
         <div class="sum-item"><div class="k">Début</div><div class="v">${Calc.fmt(ac&&ac.date_debut)}</div></div>
-        <div class="sum-item"><div class="k">Fin</div><div class="v">${Calc.fmt(ac&&ac.date_fin)}<small>${ac&&ac.nb_mois?ac.nb_mois+" mois":""}</small></div></div>
+        <div class="sum-item"><div class="k">Fin (prév.)</div><div class="v">${Calc.fmt(ac&&ac.date_fin)}<small>${ac&&ac.nb_mois?ac.nb_mois+" mois":""}</small></div></div>
         <div class="sum-item"><div class="k">Séances</div><div class="v">${s.realisees} / ${s.prevues}<small>${s.restantes} restantes</small></div></div>
         <div class="sum-item"><div class="k">Dernier bilan</div><div class="v">${Calc.fmt(b.dernier)}</div></div>
         <div class="sum-item"><div class="k">Prochain bilan</div><div class="v">${Calc.fmt(b.prochain)}<small>${b.joursAvant!=null?(b.joursAvant<0?Math.abs(b.joursAvant)+" j de retard":"dans "+b.joursAvant+" j"):""}</small></div></div>
@@ -674,6 +674,8 @@ async function editCliente(){
     { name:"nutrition_active", label:"Suivi nutrition actif", type:"checkbox", half:true, value:ac.nutrition_active },
   ]});
   if (!v) return;
+  // Date de fin prévisionnelle auto (début + durée) si non renseignée — n'écrase jamais une date saisie.
+  if (v.date_debut && v.nb_mois && !v.date_fin) v.date_fin = Calc.dateFin(v.date_debut, v.nb_mois);
   const CLIENTE_KEYS = ["prenom","nom","type","statut","objectif_principal","objectifs_secondaires",
     "telephone","email_perso","date_naissance","taille_cm","niveau","disponibilites","tutoiement","sante","allergies"];
   const ACCOMP_KEYS = ["date_debut","date_fin","nb_mois","formule","prix","seances_prevues","seances_faites_init","freq_prevue","nutrition_active"];
@@ -708,6 +710,8 @@ async function editAccomp(){
     { name:"nut_conseils", label:"Conseils nutrition (visibles par la cliente)", type:"textarea", value:ac.nut_conseils },
   ]});
   if (!v) return;
+  // Date de fin prévisionnelle auto (début + durée) si non renseignée.
+  if (v.date_debut && v.nb_mois && !v.date_fin) v.date_fin = Calc.dateFin(v.date_debut, v.nb_mois);
   try{
     await DB.saveAccompagnement(CID, v);
     UI.toast("Enregistré ✓"); reload();

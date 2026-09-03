@@ -76,6 +76,15 @@ window.Calc = {
     return { dernier, prochain, joursAvant: this.daysFromToday(prochain) };
   },
 
+  // Date de fin prévisionnelle = date de début + nb de mois (null si incomplet).
+  dateFin(dateDebut, nbMois) {
+    if (!dateDebut || !nbMois) return null;
+    const d = this.parse(dateDebut);
+    if (!d) return null;
+    d.setMonth(d.getMonth() + Number(nbMois));
+    return this.ymd(d);
+  },
+
   // ---- Suivi (durée / fin) ------------------------------------------------
   suiviStats(accompagnement) {
     if (!accompagnement) return { joursRestants: null, pctTemps: null };
