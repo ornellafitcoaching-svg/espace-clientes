@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e29">
+<link rel="stylesheet" href="css/app.css?v=e30">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e29"></script>
-<script src="js/supabaseClient.js?v=e29"></script>
-<script src="js/auth.js?v=e29"></script>
-<script src="js/db.js?v=e29"></script>
-<script src="js/calc.js?v=e29"></script>
-<script src="js/ui/modal.js?v=e29"></script>
-<script src="js/ui/progress.js?v=e29"></script>
+<script src="js/config.js?v=e30"></script>
+<script src="js/supabaseClient.js?v=e30"></script>
+<script src="js/auth.js?v=e30"></script>
+<script src="js/db.js?v=e30"></script>
+<script src="js/calc.js?v=e30"></script>
+<script src="js/ui/modal.js?v=e30"></script>
+<script src="js/ui/progress.js?v=e30"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -77,8 +77,8 @@ function motOrnella(){
 }
 // Carte « nudge » quand c'est le moment du bilan (ou premier bilan à faire).
 function bilanNudge(){
-  const b = Calc.bilanStats(D.bilans);
   const ac = D.accompagnement;
+  const b = Calc.bilanStats(D.bilans, ac && ac.date_debut);
   const has = (D.bilans||[]).length;
   let titre = "", sub = "";
   if (b.joursAvant !== null && b.joursAvant <= 3){
@@ -99,7 +99,7 @@ function bilanNudge(){
 function viewAccueil(){
   const cl = D.cliente, ac = D.accompagnement;
   const s = Calc.seancesStats(ac, D.seances);
-  const b = Calc.bilanStats(D.bilans);
+  const b = Calc.bilanStats(D.bilans, ac && ac.date_debut);
   const w = weightSeries();
   const sport = lastProg("sportif");
   const nextSeance = (D.seances||[]).filter(x=>x.statut==="prevue" && x.date>=Calc.today()).sort((a,b)=>a.date<b.date?-1:1)[0];
@@ -315,7 +315,7 @@ async function addMyBilan(){
 }
 function viewBilans(){
   const list = (D.bilans||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
-  const b = Calc.bilanStats(D.bilans);
+  const b = Calc.bilanStats(D.bilans, D.accompagnement && D.accompagnement.date_debut);
   const entete = `<div class="card" style="background:var(--panel);color:#fff">
       <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);font-weight:700">Ton rythme</div>
       <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:700">Un bilan toutes les 4 semaines 📋</div>

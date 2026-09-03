@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e29">
+<link rel="stylesheet" href="css/app.css?v=e30">
 </head>
 <body>
 <div class="login-wrap">
@@ -30,9 +30,9 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e29"></script>
-<script src="js/supabaseClient.js?v=e29"></script>
-<script src="js/auth.js?v=e29"></script>
+<script src="js/config.js?v=e30"></script>
+<script src="js/supabaseClient.js?v=e30"></script>
+<script src="js/auth.js?v=e30"></script>
 <script>
 const err = document.getElementById("err");
 const btn = document.getElementById("btn");
@@ -40,19 +40,23 @@ const codeInput = document.getElementById("code");
 if (new URLSearchParams(location.search).get("err") === "role")
   err.textContent = "Ce code n'est pas un accès cliente.";
 
-// Déjà connectée en cliente ? → son espace. Sinon, si un code est passé dans l'URL
-// (lien envoyé par Ornella, ex. demande de bilan), on pré-remplit et on connecte en 1 clic.
+// Un code dans l'URL (lien envoyé par Ornella) IMPOSE ce compte : on déconnecte toute
+// session en cours (coach ou autre cliente) puis on connecte avec ce code → le lien marche
+// toujours, quelle que soit la session ouverte dans le navigateur.
+// Sans code : comportement normal (session existante → espace cliente / coach).
 (async () => {
-  const p = await window.Auth.profile();
-  if (p && p.role === "cliente") return location.replace("mon-espace.html");
-  if (p && p.role === "coach") return location.replace("coach.html");
   const preCode = new URLSearchParams(location.search).get("code");
   if (preCode) {
+    try { await window.sb.auth.signOut(); } catch (_) {}
     codeInput.value = preCode.trim();
     const form = document.getElementById("loginForm");
     if (form.requestSubmit) form.requestSubmit();
     else form.dispatchEvent(new Event("submit", { cancelable: true }));
+    return;
   }
+  const p = await window.Auth.profile();
+  if (p && p.role === "cliente") return location.replace("mon-espace.html");
+  if (p && p.role === "coach") return location.replace("coach.html");
 })();
 
 document.getElementById("loginForm").addEventListener("submit", async (e) => {

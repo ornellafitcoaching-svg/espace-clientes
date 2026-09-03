@@ -3,8 +3,15 @@
 // ============================================================================
 window.Calc = {
   // ---- Dates --------------------------------------------------------------
+  // 'YYYY-MM-DD' en heure LOCALE (jamais UTC, pour éviter les décalages d'un jour).
+  ymd(dt) {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, "0");
+    const d = String(dt.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  },
   today() {
-    return new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+    return this.ymd(new Date()); // date locale, pas UTC
   },
   parse(d) {
     return d ? new Date(d + (d.length === 10 ? "T00:00:00" : "")) : null;
@@ -55,13 +62,17 @@ window.Calc = {
 
   // ---- Bilans -------------------------------------------------------------
   // dernier bilan = date la plus récente ; prochain = dernier + 28 jours.
-  bilanStats(bilans) {
-    if (!bilans || !bilans.length) return { dernier: null, prochain: null, joursAvant: null };
-    const trie = [...bilans].sort((a, b) => (a.date < b.date ? 1 : -1));
-    const dernier = trie[0].date;
-    const dt = this.parse(dernier);
+  // dernier bilan = date la plus récente ; prochain = dernier + 28 j.
+  // Si aucun bilan encore : le prochain se base sur la date de début (+28 j),
+  // pour qu'une cliente qui démarre ait quand même une date de prochain bilan.
+  bilanStats(bilans, dateDebut) {
+    const has = bilans && bilans.length;
+    const dernier = has ? [...bilans].sort((a, b) => (a.date < b.date ? 1 : -1))[0].date : null;
+    const ancre = dernier || dateDebut || null;
+    if (!ancre) return { dernier, prochain: null, joursAvant: null };
+    const dt = this.parse(ancre);
     dt.setDate(dt.getDate() + 28);
-    const prochain = dt.toISOString().slice(0, 10);
+    const prochain = this.ymd(dt); // heure locale (pas d'UTC → pas de décalage)
     return { dernier, prochain, joursAvant: this.daysFromToday(prochain) };
   },
 
