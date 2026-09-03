@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e21">
+<link rel="stylesheet" href="css/app.css?v=e22">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e21"></script>
-<script src="js/supabaseClient.js?v=e21"></script>
-<script src="js/auth.js?v=e21"></script>
-<script src="js/db.js?v=e21"></script>
-<script src="js/calc.js?v=e21"></script>
-<script src="js/ui/modal.js?v=e21"></script>
-<script src="js/ui/progress.js?v=e21"></script>
+<script src="js/config.js?v=e22"></script>
+<script src="js/supabaseClient.js?v=e22"></script>
+<script src="js/auth.js?v=e22"></script>
+<script src="js/db.js?v=e22"></script>
+<script src="js/calc.js?v=e22"></script>
+<script src="js/ui/modal.js?v=e22"></script>
+<script src="js/ui/progress.js?v=e22"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -173,6 +173,10 @@ function sectionAccesCliente(){
       <span class="code-val" id="codeVal">${esc(code)}</span>
       <button class="btn-ghost btn-sm" data-act="copy-code">Copier</button>
     </div>
+    ${(()=>{ const wa = Calc.waHref(cl.telephone, Calc.accessInviteMsg(cl));
+      return wa
+        ? `<div style="margin-top:12px"><a class="btn-accent btn-sm" href="${wa}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px">📲 Envoyer l'accès (${cl.tutoiement?"tu":"vous"})</a></div>`
+        : `<p class="isub" style="margin-top:10px">Ajoute son numéro de téléphone (Modifier) pour envoyer l'accès en un clic sur WhatsApp.</p>`; })()}
     <div class="row" style="gap:14px;margin-top:12px">
       <a class="link" href="espace.html" target="_blank" rel="noopener">Ouvrir l'espace cliente ↗</a>
       <button class="link" data-act="regen-access" style="color:var(--danger)">Régénérer le code</button>
@@ -630,6 +634,7 @@ async function editCliente(){
     { name:"niveau", label:"Niveau", type:"select", half:true, value:cl.niveau||"", options:[
       {value:"",label:"—"},{value:"Débutant",label:"Débutant"},{value:"Intermédiaire",label:"Intermédiaire"},{value:"Avancé",label:"Avancé"}]},
     { name:"disponibilites", label:"Disponibilités", half:true, value:cl.disponibilites, placeholder:"Lun/Mer 18h…" },
+    { name:"tutoiement", label:"La tutoyer dans les messages (sinon vouvoiement)", type:"checkbox", half:true, value:cl.tutoiement },
     { name:"sante", label:"Santé / antécédents / blessures / contre-indications", type:"textarea", value:cl.sante },
     { name:"allergies", label:"Allergies", value:cl.allergies },
     // --- Forfait / accompagnement (modifiable ici aussi) ---
@@ -644,7 +649,7 @@ async function editCliente(){
   ]});
   if (!v) return;
   const CLIENTE_KEYS = ["prenom","nom","type","statut","objectif_principal","objectifs_secondaires",
-    "telephone","email_perso","date_naissance","taille_cm","niveau","disponibilites","sante","allergies"];
+    "telephone","email_perso","date_naissance","taille_cm","niveau","disponibilites","tutoiement","sante","allergies"];
   const ACCOMP_KEYS = ["date_debut","date_fin","nb_mois","formule","prix","seances_prevues","freq_prevue","nutrition_active"];
   const cliP = {}, accP = {};
   CLIENTE_KEYS.forEach(k=>{ if (k in v) cliP[k]=v[k]; });

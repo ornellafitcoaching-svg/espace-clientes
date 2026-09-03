@@ -155,20 +155,43 @@ window.Calc = {
       ? "https://espace.ornellafitcoaching.com/espace.html?code=" + encodeURIComponent(code)
       : "https://espace.ornellafitcoaching.com";
   },
-  // Message « demande de bilan » pré-rempli (retard = ton adapté).
+  // Message « demande de bilan » pré-rempli (tutoiement selon cl.tutoiement).
   bilanMsg(cl, retard) {
-    return "Coucou " + cl.prenom + " 🌸 C'est le moment de faire ton bilan "
-      + (retard ? "(il est un peu en retard, pas de souci !)" : "(on en fait un toutes les 4 semaines)")
-      + " 📊\n\nTu peux le remplir en 2 min directement dans ton espace (connexion en 1 clic) : "
-      + this.espaceLink(cl.access_code)
-      + "\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪";
+    const lien = this.espaceLink(cl.access_code);
+    const quand = retard ? "(il est un peu en retard, pas de souci !)" : "(on en fait un toutes les 4 semaines)";
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 C'est le moment de faire ton bilan " + quand
+        + " 📊\n\nTu peux le remplir en 2 min directement dans ton espace (connexion en 1 clic) : " + lien
+        + "\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪";
+    }
+    return "Bonjour " + cl.prenom + " 😊 C'est le moment de faire votre bilan " + quand
+      + " 📊\n\nVous pouvez le remplir en 2 min directement dans votre espace (connexion en 1 clic) : " + lien
+      + "\n\nCela me permet de suivre votre progression et d'ajuster votre programme 💪";
   },
-  // Message « rappel de séance » pré-rempli.
+  // Message « rappel de séance » pré-rempli (tutoiement selon cl.tutoiement).
   seanceRappelMsg(cl, date, type, heure) {
     const h = this.fmtHeure(heure);
-    return "Coucou " + cl.prenom + " 🌸 Petit rappel : on a séance prévue le "
-      + this.fmt(date) + (h ? " à " + h : "") + (type ? " (" + type + ")" : "")
-      + " 💪 Hâte de te voir ! Si tu as besoin de décaler, dis-le-moi 🙂";
+    const quand = this.fmt(date) + (h ? " à " + h : "") + (type ? " (" + type + ")" : "");
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 Petit rappel : on a séance prévue le " + quand
+        + " 💪 Hâte de te voir ! Si tu as besoin de décaler, dis-le-moi 🙂";
+    }
+    return "Bonjour " + cl.prenom + " 😊 Petit rappel : nous avons séance prévue le " + quand
+      + " 💪 Au plaisir de vous voir ! Si vous avez besoin de décaler, dites-le-moi 🙂";
+  },
+  // Message « invitation à l'espace » pré-rempli (tutoiement selon cl.tutoiement).
+  accessInviteMsg(cl) {
+    const lien = this.espaceLink(cl.access_code);
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 Voici ton espace personnel de suivi ✨ Tu y retrouves tes séances "
+        + "à venir (avec les horaires), tes bilans, tes mensurations, ton évolution et tes programmes.\n\n"
+        + "👉 Ton accès en 1 clic : " + lien
+        + "\n\nN'hésite pas si tu as la moindre question. Belle journée ! 💪";
+    }
+    return "Bonjour " + cl.prenom + " 😊 J'ai le plaisir de vous présenter votre espace personnel de suivi ✨ "
+      + "Vous y retrouvez vos séances à venir (avec les horaires), vos bilans, vos mensurations, votre évolution "
+      + "et vos programmes.\n\n👉 Votre accès en 1 clic : " + lien
+      + "\n\nN'hésitez pas si vous avez la moindre question. Belle journée ! 💪";
   },
 
   // ---- Âge / IMC ----------------------------------------------------------
