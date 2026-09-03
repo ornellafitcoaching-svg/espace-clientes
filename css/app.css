@@ -325,4 +325,9 @@ button{font-family:inherit;cursor:pointer}
   .sel-bar{width:auto}
   /* Lignes (agenda, listes) : autoriser le retour à la ligne plutôt que déborder */
   .cl-line{flex-wrap:wrap;gap:4px}
+  /* Espace cliente : menu en grille d'icônes (tout visible, plus joli que le scroll) */
+  .cl-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;overflow:visible;padding:2px 0 14px}
+  .cl-nav .navbtn{flex-direction:column;gap:4px;justify-content:center;text-align:center;
+    padding:12px 6px;font-size:.72rem;line-height:1.15;border-radius:14px}
+  .cl-nav .navbtn .i{font-size:1.4rem}
 }
