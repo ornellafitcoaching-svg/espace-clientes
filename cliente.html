@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e22">
+<link rel="stylesheet" href="css/app.css?v=e23">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e22"></script>
-<script src="js/supabaseClient.js?v=e22"></script>
-<script src="js/auth.js?v=e22"></script>
-<script src="js/db.js?v=e22"></script>
-<script src="js/calc.js?v=e22"></script>
-<script src="js/ui/modal.js?v=e22"></script>
-<script src="js/ui/progress.js?v=e22"></script>
+<script src="js/config.js?v=e23"></script>
+<script src="js/supabaseClient.js?v=e23"></script>
+<script src="js/auth.js?v=e23"></script>
+<script src="js/db.js?v=e23"></script>
+<script src="js/calc.js?v=e23"></script>
+<script src="js/ui/modal.js?v=e23"></script>
+<script src="js/ui/progress.js?v=e23"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -53,6 +53,10 @@ async function reload(){ D = await DB.dossier(CID); render(); }
 function render(){
   if (!D || !D.cliente){ document.getElementById("main").innerHTML =
     `<div class="card"><p class="empty">Cliente introuvable.</p></div>`; return; }
+  // Mémoriser l'état déplié des sections + la position de défilement AVANT de tout redessiner,
+  // pour que la page ne "saute" pas et ne se referme pas à chaque suppression / ajout.
+  const prevOpen = [...document.querySelectorAll('#main .section-block')].map(d => d.open);
+  const prevY = window.scrollY;
   const cl = D.cliente, ac = D.accompagnement;
   const s = Calc.seancesStats(ac, D.seances);
   const b = Calc.bilanStats(D.bilans);
@@ -121,6 +125,10 @@ function render(){
     ${sectionTimeline()}
     ${sectionNotes()}
   `;
+  // Restaurer les sections ouvertes + la position (même nombre de sections → même ordre).
+  const secs = document.querySelectorAll('#main .section-block');
+  if (prevOpen.length === secs.length) secs.forEach((d, i) => { d.open = prevOpen[i]; });
+  if (prevY) window.scrollTo(0, prevY);
   loadPhotoThumbs();
 }
 
