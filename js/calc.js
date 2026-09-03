@@ -39,7 +39,9 @@ window.Calc = {
   // ---- Séances ------------------------------------------------------------
   seancesStats(accompagnement, seances) {
     const prevues = (accompagnement && accompagnement.seances_prevues) || 0;
-    const realisees = (seances || []).filter((s) => s.statut === "realisee").length;
+    // Report initial (séances déjà faites au CRM, dates inconnues) + séances réelles cochées.
+    const init = (accompagnement && accompagnement.seances_faites_init) || 0;
+    const realisees = init + (seances || []).filter((s) => s.statut === "realisee").length;
     const restantes = Math.max(0, prevues - realisees);
     const pct = prevues > 0 ? Math.round((realisees / prevues) * 100) : 0;
     return { prevues, realisees, restantes, pct };

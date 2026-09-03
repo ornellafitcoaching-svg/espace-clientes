@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e24">
+<link rel="stylesheet" href="css/app.css?v=e25">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e24"></script>
-<script src="js/supabaseClient.js?v=e24"></script>
-<script src="js/auth.js?v=e24"></script>
-<script src="js/db.js?v=e24"></script>
-<script src="js/calc.js?v=e24"></script>
-<script src="js/ui/modal.js?v=e24"></script>
-<script src="js/ui/progress.js?v=e24"></script>
+<script src="js/config.js?v=e25"></script>
+<script src="js/supabaseClient.js?v=e25"></script>
+<script src="js/auth.js?v=e25"></script>
+<script src="js/db.js?v=e25"></script>
+<script src="js/calc.js?v=e25"></script>
+<script src="js/ui/modal.js?v=e25"></script>
+<script src="js/ui/progress.js?v=e25"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -125,7 +125,7 @@ function renderAgenda(){
 async function loadAll() {
   const [clientes, accomp, seances, bilans, programmes] = await Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
-    sb.from("accompagnements").select("cliente_id,seances_prevues,date_debut,date_fin,nutrition_active,nb_mois"),
+    sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois"),
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("programmes").select("cliente_id,kind,envoye"),

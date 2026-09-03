@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e24">
+<link rel="stylesheet" href="css/app.css?v=e25">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e24"></script>
-<script src="js/supabaseClient.js?v=e24"></script>
-<script src="js/auth.js?v=e24"></script>
-<script src="js/db.js?v=e24"></script>
-<script src="js/calc.js?v=e24"></script>
-<script src="js/ui/modal.js?v=e24"></script>
-<script src="js/ui/progress.js?v=e24"></script>
+<script src="js/config.js?v=e25"></script>
+<script src="js/supabaseClient.js?v=e25"></script>
+<script src="js/auth.js?v=e25"></script>
+<script src="js/db.js?v=e25"></script>
+<script src="js/calc.js?v=e25"></script>
+<script src="js/ui/modal.js?v=e25"></script>
+<script src="js/ui/progress.js?v=e25"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -653,7 +653,8 @@ async function editCliente(){
     // --- Forfait / accompagnement (modifiable ici aussi) ---
     { name:"formule", label:"Formule / offre", half:true, value:ac.formule },
     { name:"prix", label:"Prix du forfait (€)", type:"number", half:true, value:ac.prix },
-    { name:"seances_prevues", label:"Nombre de séances prévues", type:"number", half:true, value:ac.seances_prevues },
+    { name:"seances_prevues", label:"Séances du forfait (total)", type:"number", half:true, value:ac.seances_prevues },
+    { name:"seances_faites_init", label:"Séances déjà faites (report CRM, dates inconnues)", type:"number", half:true, value:ac.seances_faites_init },
     { name:"freq_prevue", label:"Fréquence", half:true, value:ac.freq_prevue, placeholder:"2/semaine" },
     { name:"date_debut", label:"Date de début", type:"date", half:true, value:ac.date_debut },
     { name:"date_fin", label:"Date de fin", type:"date", half:true, value:ac.date_fin },
@@ -663,7 +664,7 @@ async function editCliente(){
   if (!v) return;
   const CLIENTE_KEYS = ["prenom","nom","type","statut","objectif_principal","objectifs_secondaires",
     "telephone","email_perso","date_naissance","taille_cm","niveau","disponibilites","tutoiement","sante","allergies"];
-  const ACCOMP_KEYS = ["date_debut","date_fin","nb_mois","formule","prix","seances_prevues","freq_prevue","nutrition_active"];
+  const ACCOMP_KEYS = ["date_debut","date_fin","nb_mois","formule","prix","seances_prevues","seances_faites_init","freq_prevue","nutrition_active"];
   const cliP = {}, accP = {};
   CLIENTE_KEYS.forEach(k=>{ if (k in v) cliP[k]=v[k]; });
   ACCOMP_KEYS.forEach(k=>{ if (k in v) accP[k]=v[k]; });
@@ -680,7 +681,8 @@ async function editAccomp(){
     { name:"date_fin", label:"Date de fin", type:"date", half:true, value:ac.date_fin },
     { name:"nb_mois", label:"Durée (mois)", type:"number", half:true, value:ac.nb_mois },
     { name:"formule", label:"Formule", half:true, value:ac.formule },
-    { name:"seances_prevues", label:"Séances prévues", type:"number", half:true, value:ac.seances_prevues },
+    { name:"seances_prevues", label:"Séances du forfait (total)", type:"number", half:true, value:ac.seances_prevues },
+    { name:"seances_faites_init", label:"Séances déjà faites (report CRM)", type:"number", half:true, value:ac.seances_faites_init },
     { name:"freq_prevue", label:"Fréquence prévue", half:true, value:ac.freq_prevue, placeholder:"2/semaine" },
     { name:"message_coach", label:"💬 Mot pour la cliente (visible en haut de son espace)", type:"textarea", value:ac.message_coach, placeholder:"Ex : Bravo pour ta semaine, on lâche rien 💪" },
     { name:"nutrition_active", label:"Suivi nutrition actif", type:"checkbox", half:true, value:ac.nutrition_active },
