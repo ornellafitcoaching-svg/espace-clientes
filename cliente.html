@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e23">
+<link rel="stylesheet" href="css/app.css?v=e24">
 </head>
 <body>
 <header class="topbar">
@@ -22,16 +22,16 @@
   <div class="loader"><div class="spin"></div></div>
 </main>
 
-<input type="file" id="photoInput" accept="image/*" style="display:none">
+<input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e23"></script>
-<script src="js/supabaseClient.js?v=e23"></script>
-<script src="js/auth.js?v=e23"></script>
-<script src="js/db.js?v=e23"></script>
-<script src="js/calc.js?v=e23"></script>
-<script src="js/ui/modal.js?v=e23"></script>
-<script src="js/ui/progress.js?v=e23"></script>
+<script src="js/config.js?v=e24"></script>
+<script src="js/supabaseClient.js?v=e24"></script>
+<script src="js/auth.js?v=e24"></script>
+<script src="js/db.js?v=e24"></script>
+<script src="js/calc.js?v=e24"></script>
+<script src="js/ui/modal.js?v=e24"></script>
+<script src="js/ui/progress.js?v=e24"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -390,25 +390,30 @@ async function loadPhotoThumbs(){
   });
 }
 async function addPhoto(){
-  const meta = await UI.form({ title:"Ajouter une photo", submit:"Choisir le fichier", fields:[
+  const meta = await UI.form({ title:"Ajouter des photos", submit:"Choisir les fichiers", fields:[
     { name:"date", label:"Date", type:"date", half:true, value:Calc.today() },
     { name:"visibilite", label:"Visibilité", type:"select", half:true, value:"prive", options:[
       {value:"prive",label:"🔒 Privé (coach)"},{value:"cliente",label:"👁 Visible cliente"}]},
-    { name:"legende", label:"Légende (facultatif)" },
+    { name:"legende", label:"Légende (facultatif, commune aux photos choisies)" },
   ]});
   if (!meta) return;
   const input = document.getElementById("photoInput");
   input.value = "";
   input.onchange = async () => {
-    const file = input.files[0]; if (!file) return;
+    const files = [...input.files]; if (!files.length) return;
     try{
-      UI.toast("Envoi de la photo…");
-      const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
-      const path = `${CID}/${meta.visibilite}/${uuid()}.${ext}`;
-      const up = await sb.storage.from("photos").upload(path, file, { upsert:false });
-      if (up.error) throw up.error;
-      await DB.insert("photos", { cliente_id:CID, date:meta.date, storage_path:path, visibilite:meta.visibilite, legende:meta.legende });
-      UI.toast("Photo ajoutée ✓"); reload();
+      UI.toast(`Envoi de ${files.length} photo${files.length>1?"s":""}…`);
+      let ok = 0;
+      for (const file of files){
+        const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
+        const path = `${CID}/${meta.visibilite}/${uuid()}.${ext}`;
+        const up = await sb.storage.from("photos").upload(path, file, { upsert:false });
+        if (up.error) throw up.error;
+        await DB.insert("photos", { cliente_id:CID, date:meta.date, storage_path:path, visibilite:meta.visibilite, legende:meta.legende });
+        ok++;
+        if (files.length > 1) UI.toast(`Envoi… ${ok}/${files.length}`);
+      }
+      UI.toast(`${ok} photo${ok>1?"s":""} ajoutée${ok>1?"s":""} ✓`); reload();
     }catch(e){ console.error(e); UI.toast("Erreur photo : "+(e.message||e),"err"); }
   };
   input.click();
