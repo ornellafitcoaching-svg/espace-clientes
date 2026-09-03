@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e25">
+<link rel="stylesheet" href="css/app.css?v=e26">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e25"></script>
-<script src="js/supabaseClient.js?v=e25"></script>
-<script src="js/auth.js?v=e25"></script>
-<script src="js/db.js?v=e25"></script>
-<script src="js/calc.js?v=e25"></script>
-<script src="js/ui/modal.js?v=e25"></script>
-<script src="js/ui/progress.js?v=e25"></script>
+<script src="js/config.js?v=e26"></script>
+<script src="js/supabaseClient.js?v=e26"></script>
+<script src="js/auth.js?v=e26"></script>
+<script src="js/db.js?v=e26"></script>
+<script src="js/calc.js?v=e26"></script>
+<script src="js/ui/modal.js?v=e26"></script>
+<script src="js/ui/progress.js?v=e26"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -96,6 +96,8 @@ function renderAgenda(){
   const nFaites = items.filter(i=>i.statut==="realisee").length;
   const byDate = {};
   items.forEach(it => (byDate[it.date] ||= []).push(it));
+  // Trier les séances d'une même date par HEURE (sans heure → à la fin).
+  Object.values(byDate).forEach(arr => arr.sort((a,b)=> (a.heure||"99")<(b.heure||"99")?-1:((a.heure||"99")>(b.heure||"99")?1:0)));
   const dates = Object.keys(byDate).sort((a,b)=> a<b?-1:1);
   box.innerHTML = `<details class="section-block" open style="margin:14px 0">
     <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${nAvenir}</span>${nFaites?`<span class="count" style="background:var(--ok);color:#fff">✅ ${nFaites}</span>`:""}</summary>

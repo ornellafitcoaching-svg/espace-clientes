@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e25">
+<link rel="stylesheet" href="css/app.css?v=e26">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e25"></script>
-<script src="js/supabaseClient.js?v=e25"></script>
-<script src="js/auth.js?v=e25"></script>
-<script src="js/db.js?v=e25"></script>
-<script src="js/calc.js?v=e25"></script>
-<script src="js/ui/modal.js?v=e25"></script>
-<script src="js/ui/progress.js?v=e25"></script>
+<script src="js/config.js?v=e26"></script>
+<script src="js/supabaseClient.js?v=e26"></script>
+<script src="js/auth.js?v=e26"></script>
+<script src="js/db.js?v=e26"></script>
+<script src="js/calc.js?v=e26"></script>
+<script src="js/ui/modal.js?v=e26"></script>
+<script src="js/ui/progress.js?v=e26"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -48,9 +48,9 @@ function makeCode(prenom){
 }
 
 // ============================ CHARGEMENT / RENDU ============================
-async function reload(){ D = await DB.dossier(CID); render(); }
+async function reload(focusTitle){ D = await DB.dossier(CID); render(focusTitle); }
 
-function render(){
+function render(focusTitle){
   if (!D || !D.cliente){ document.getElementById("main").innerHTML =
     `<div class="card"><p class="empty">Cliente introuvable.</p></div>`; return; }
   // Mémoriser l'état déplié des sections + la position de défilement AVANT de tout redessiner,
@@ -128,7 +128,13 @@ function render(){
   // Restaurer les sections ouvertes + la position (même nombre de sections → même ordre).
   const secs = document.querySelectorAll('#main .section-block');
   if (prevOpen.length === secs.length) secs.forEach((d, i) => { d.open = prevOpen[i]; });
-  if (prevY) window.scrollTo(0, prevY);
+  if (focusTitle) {
+    // Après un ajout : ouvrir la section concernée et y descendre pour voir l'élément ajouté.
+    const sec = [...secs].find(d => { const s = d.querySelector('summary'); return s && s.textContent.trim().startsWith(focusTitle); });
+    if (sec) { sec.open = true; sec.scrollIntoView({ behavior:"smooth", block:"start" }); }
+  } else if (prevY) {
+    window.scrollTo(0, prevY);
+  }
   loadPhotoThumbs();
 }
 
@@ -413,7 +419,7 @@ async function addPhoto(){
         ok++;
         if (files.length > 1) UI.toast(`Envoi… ${ok}/${files.length}`);
       }
-      UI.toast(`${ok} photo${ok>1?"s":""} ajoutée${ok>1?"s":""} ✓`); reload();
+      UI.toast(`${ok} photo${ok>1?"s":""} ajoutée${ok>1?"s":""} ✓`); reload("Photos de progression");
     }catch(e){ console.error(e); UI.toast("Erreur photo : "+(e.message||e),"err"); }
   };
   input.click();
@@ -538,7 +544,7 @@ async function addMensuSession(){
   if (!rows.length){ UI.toast("Aucune mesure saisie"); return; }
   try{ await window.sb.from("mensurations").insert(rows);
     const mgRow = rows.find(r=>r.type==="masse_grasse");
-    UI.toast(rows.length+" mesure(s) enregistrée(s)"+(mgRow?` · masse grasse ${mgRow.valeur}% calculée ✓`:" ✓")); reload(); }
+    UI.toast(rows.length+" mesure(s) enregistrée(s)"+(mgRow?` · masse grasse ${mgRow.valeur}% calculée ✓`:" ✓")); reload("Mensurations & évolution"); }
   catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 
@@ -566,7 +572,7 @@ async function addBilanCoach(rec){
     if (rec) await DB.update("bilans", rec.id, bilanPayload);
     else await DB.insert("bilans", bilanPayload);
     if (rows.length) await window.sb.from("mensurations").insert(rows);
-    UI.toast("Bilan enregistré ✓"); reload();
+    UI.toast("Bilan enregistré ✓"); reload("Bilans");
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 
@@ -578,7 +584,8 @@ async function addOrEdit(entity, rec){
     const payload = cfg.payload(v);
     if (rec) await DB.update(cfg.table, rec.id, payload);
     else await DB.insert(cfg.table, payload);
-    UI.toast("Enregistré ✓"); reload();
+    const FOCUS = { seance:"Séances", objectif:"Objectifs", paiement:"Paiements", note:"Notes privées" }[entity];
+    UI.toast("Enregistré ✓"); reload(FOCUS);
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 
@@ -593,7 +600,7 @@ async function progEnvoye(kind){
   try{
     if (existing) await DB.update("programmes", existing.id, patch);
     else await DB.insert("programmes", patch);
-    UI.toast("Programme "+kind+(patch.envoye?" marqué envoyé ✓":" décoché ✓")); reload();
+    UI.toast("Programme "+kind+(patch.envoye?" marqué envoyé ✓":" décoché ✓")); reload("Programmes");
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 

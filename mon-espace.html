@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e25">
+<link rel="stylesheet" href="css/app.css?v=e26">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e25"></script>
-<script src="js/supabaseClient.js?v=e25"></script>
-<script src="js/auth.js?v=e25"></script>
-<script src="js/db.js?v=e25"></script>
-<script src="js/calc.js?v=e25"></script>
-<script src="js/ui/modal.js?v=e25"></script>
-<script src="js/ui/progress.js?v=e25"></script>
+<script src="js/config.js?v=e26"></script>
+<script src="js/supabaseClient.js?v=e26"></script>
+<script src="js/auth.js?v=e26"></script>
+<script src="js/db.js?v=e26"></script>
+<script src="js/calc.js?v=e26"></script>
+<script src="js/ui/modal.js?v=e26"></script>
+<script src="js/ui/progress.js?v=e26"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -144,7 +144,8 @@ function viewSeances(){
   const all = (D.seances||[]).slice();
   const today = Calc.today();
   // À venir = séances "prévues" datées d'aujourd'hui ou plus tard, du plus proche au plus lointain.
-  const upcoming = all.filter(x=>x.statut==="prevue" && x.date>=today).sort((a,b)=>a.date<b.date?-1:1);
+  const upcoming = all.filter(x=>x.statut==="prevue" && x.date>=today)
+    .sort((a,b)=> a.date!==b.date ? (a.date<b.date?-1:1) : ((a.heure||"99")<(b.heure||"99")?-1:1));
   const rest = all.filter(x=>!(x.statut==="prevue" && x.date>=today)).sort((a,b)=>a.date<b.date?1:-1);
   if (!all.length) return empty("Aucune séance enregistrée pour l'instant.");
   // Décompte : réalisées / forfait + restantes + à venir.
