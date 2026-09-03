@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e27">
+<link rel="stylesheet" href="css/app.css?v=e28">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e27"></script>
-<script src="js/supabaseClient.js?v=e27"></script>
-<script src="js/auth.js?v=e27"></script>
-<script src="js/db.js?v=e27"></script>
-<script src="js/calc.js?v=e27"></script>
-<script src="js/ui/modal.js?v=e27"></script>
-<script src="js/ui/progress.js?v=e27"></script>
+<script src="js/config.js?v=e28"></script>
+<script src="js/supabaseClient.js?v=e28"></script>
+<script src="js/auth.js?v=e28"></script>
+<script src="js/db.js?v=e28"></script>
+<script src="js/calc.js?v=e28"></script>
+<script src="js/ui/modal.js?v=e28"></script>
+<script src="js/ui/progress.js?v=e28"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -242,14 +242,18 @@ function sectionPaiements(){
 
 function sectionSeances(){
   const list = D.seances||[];
+  // Décompte calculé sur TOUTES les séances (les réalisées comptent toujours)…
   const st = Calc.seancesStats(D.accompagnement, list);
   const aVenir = list.filter(x=>x.statut==="prevue" && x.date>=Calc.today()).length;
+  // …mais on MASQUE de la liste les séances "faites" fictives du CRM (datées 31/08/2026),
+  // sans les supprimer : le compteur reste juste, les fausses dates ne s'affichent plus.
+  const show = list.filter(x=>!(x.statut==="realisee" && x.date==="2026-08-31"));
   const decompte = `<div class="mensu-card" style="margin-bottom:10px">
     <div class="cl-line"><span>✅ Réalisées</span><strong style="color:var(--ok)">${st.realisees}${st.prevues?` / ${st.prevues}`:""}</strong></div>
     ${st.prevues?`<div class="cl-line"><span>⏳ Restantes (forfait)</span><strong>${st.restantes}</strong></div>`:""}
     <div class="cl-line"><span>📅 Programmées à venir</span><strong>${aVenir}</strong></div>
   </div>`;
-  const body = decompte + (list.length ? list.map(x=>`
+  const body = decompte + (show.length ? show.map(x=>`
     <div class="item">
       <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}${x.heure?`<small style="display:block;font-weight:600;color:var(--text-light)">${Calc.fmtHeure(x.heure)}</small>`:""}</div>
       <div class="ibody">
@@ -259,8 +263,8 @@ function sectionSeances(){
         ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}
         ${x.statut==="prevue"?`<button class="btn-accent btn-sm" data-act="seance-done" data-id="${x.id}" style="margin-top:8px">✅ Marquer faite</button>`:""}
       </div>${delEdit("seance",x.id)}
-    </div>`).join("") : `<p class="empty">Aucune séance enregistrée.</p>`);
-  return block("Séances", list.length, body, false);
+    </div>`).join("") : `<p class="empty">Aucune séance à afficher.</p>`);
+  return block("Séances", show.length, body, false);
 }
 
 function sectionProgrammes(){
