@@ -19,6 +19,12 @@ window.Calc = {
     const dt = this.parse(d);
     return dt ? dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
   },
+  // Avec le jour de la semaine : "lun. 7 sept." (pour les séances / RDV).
+  fmtJour(d) {
+    if (!d) return "—";
+    const dt = this.parse(d);
+    return dt ? dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "—";
+  },
   // Heure "09:30" ou "09:30:00" → "9h30" (et "09:00" → "9h"). Vide si absente.
   fmtHeure(h) {
     if (!h) return "";

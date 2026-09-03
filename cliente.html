@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e26">
+<link rel="stylesheet" href="css/app.css?v=e27">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e26"></script>
-<script src="js/supabaseClient.js?v=e26"></script>
-<script src="js/auth.js?v=e26"></script>
-<script src="js/db.js?v=e26"></script>
-<script src="js/calc.js?v=e26"></script>
-<script src="js/ui/modal.js?v=e26"></script>
-<script src="js/ui/progress.js?v=e26"></script>
+<script src="js/config.js?v=e27"></script>
+<script src="js/supabaseClient.js?v=e27"></script>
+<script src="js/auth.js?v=e27"></script>
+<script src="js/db.js?v=e27"></script>
+<script src="js/calc.js?v=e27"></script>
+<script src="js/ui/modal.js?v=e27"></script>
+<script src="js/ui/progress.js?v=e27"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -183,6 +183,7 @@ function sectionAccesCliente(){
   const code = cl.access_code || "";
   const body = has ? `
     <p class="isub" style="margin-bottom:10px">La cliente consulte son suivi en <strong>lecture seule</strong> sur la page de connexion cliente. Le code sert d'identifiant <em>et</em> de mot de passe.</p>
+    <div class="cl-line" style="margin-bottom:10px"><span>📲 Connexions à l'espace</span><strong>${cl.derniere_connexion ? `${cl.nb_connexions||1} visite${(cl.nb_connexions||1)>1?"s":""} · dernière le ${Calc.fmt(String(cl.derniere_connexion).slice(0,10))}` : "jamais connectée"}</strong></div>
     <div class="code-box">
       <span class="code-val" id="codeVal">${esc(code)}</span>
       <button class="btn-ghost btn-sm" data-act="copy-code">Copier</button>
@@ -250,7 +251,7 @@ function sectionSeances(){
   </div>`;
   const body = decompte + (list.length ? list.map(x=>`
     <div class="item">
-      <div class="idate">${Calc.fmtShort(x.date)}${x.heure?`<small style="display:block;font-weight:600;color:var(--text-light)">${Calc.fmtHeure(x.heure)}</small>`:""}</div>
+      <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}${x.heure?`<small style="display:block;font-weight:600;color:var(--text-light)">${Calc.fmtHeure(x.heure)}</small>`:""}</div>
       <div class="ibody">
         <div class="ititle">${esc(x.type||"Séance")} ${x.statut==="realisee"?`<span class="tag tag-done">✅ Fait</span>`:`<span class="tag">${x.statut}</span>`}</div>
         <div class="isub">${[x.objectif&&esc(x.objectif),x.intensite&&("Intensité "+esc(x.intensite)),x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>

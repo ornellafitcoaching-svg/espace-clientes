@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e26">
+<link rel="stylesheet" href="css/app.css?v=e27">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e26"></script>
-<script src="js/supabaseClient.js?v=e26"></script>
-<script src="js/auth.js?v=e26"></script>
-<script src="js/db.js?v=e26"></script>
-<script src="js/calc.js?v=e26"></script>
-<script src="js/ui/modal.js?v=e26"></script>
-<script src="js/ui/progress.js?v=e26"></script>
+<script src="js/config.js?v=e27"></script>
+<script src="js/supabaseClient.js?v=e27"></script>
+<script src="js/auth.js?v=e27"></script>
+<script src="js/db.js?v=e27"></script>
+<script src="js/calc.js?v=e27"></script>
+<script src="js/ui/modal.js?v=e27"></script>
+<script src="js/ui/progress.js?v=e27"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -103,7 +103,7 @@ function renderAgenda(){
     <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${nAvenir}</span>${nFaites?`<span class="count" style="background:var(--ok);color:#fff">✅ ${nFaites}</span>`:""}</summary>
     <div class="section-body">` + dates.map(d=>`
       <div class="card" style="margin-top:8px;padding:10px 12px">
-        <div class="idate" style="font-weight:700;margin-bottom:6px">${Calc.fmtShort(d)}</div>
+        <div class="idate" style="font-weight:700;margin-bottom:6px;text-transform:capitalize">${Calc.fmtJour(d)}</div>
         ${byDate[d].map(it=>{
           const hh = Calc.fmtHeure(it.heure);
           const nom = `<a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>`;
@@ -237,9 +237,10 @@ function renderList() {
       </div>
       ${s.prevues ? UI.progressBar(s.pct, `${s.realisees} / ${s.prevues} séances`) : ''}
       ${s.prevues ? `<div class="cl-line"><span>Séances faites</span><strong>${s.realisees} / ${s.prevues}</strong></div>` : ''}
-      <div class="cl-line"><span>📅 Séances à venir</span><strong>${upcoming.length ? `${upcoming.length} · le ${Calc.fmtShort(upcoming[0].date)}${Calc.fmtHeure(upcoming[0].heure)?` à ${Calc.fmtHeure(upcoming[0].heure)}`:''}` : '—'}</strong></div>
+      <div class="cl-line"><span>📅 Séances à venir</span><strong style="text-transform:capitalize">${upcoming.length ? `${upcoming.length} · ${Calc.fmtJour(upcoming[0].date)}${Calc.fmtHeure(upcoming[0].heure)?` à ${Calc.fmtHeure(upcoming[0].heure)}`:''}` : '—'}</strong></div>
       <div class="cl-line"><span>Dernier bilan</span><strong>${Calc.fmt(b.dernier)}</strong></div>
       <div class="cl-line"><span>Prochain bilan</span><strong>${Calc.fmt(b.prochain)}</strong></div>
+      <div class="cl-line"><span>📲 Espace</span><strong>${cl.derniere_connexion ? `vu ${Calc.fmtShort(String(cl.derniere_connexion).slice(0,10))}` : 'jamais connectée'}</strong></div>
       ${al.length ? `<div class="cl-alerts">${al.map(a=>{
         // Pastille « bilan » cliquable → WhatsApp (data-wa géré par délégation, cf. init).
         if (a.type === "bilan") {

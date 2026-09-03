@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e26">
+<link rel="stylesheet" href="css/app.css?v=e27">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e26"></script>
-<script src="js/supabaseClient.js?v=e26"></script>
-<script src="js/auth.js?v=e26"></script>
-<script src="js/db.js?v=e26"></script>
-<script src="js/calc.js?v=e26"></script>
-<script src="js/ui/modal.js?v=e26"></script>
-<script src="js/ui/progress.js?v=e26"></script>
+<script src="js/config.js?v=e27"></script>
+<script src="js/supabaseClient.js?v=e27"></script>
+<script src="js/auth.js?v=e27"></script>
+<script src="js/db.js?v=e27"></script>
+<script src="js/calc.js?v=e27"></script>
+<script src="js/ui/modal.js?v=e27"></script>
+<script src="js/ui/progress.js?v=e27"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -123,7 +123,7 @@ function viewAccueil(){
       ${tile("Ton objectif", esc(cl.objectif_principal||"—"))}
       ${ac&&ac.seances_prevues ? tile("Séances", s.realisees+" / "+s.prevues, s.restantes+" restantes") : tile("Séances réalisées", s.realisees)}
       ${poidsTile}
-      ${nextSeance ? tile("Prochaine séance", Calc.fmt(nextSeance.date), [Calc.fmtHeure(nextSeance.heure), esc(nextSeance.type||"")].filter(Boolean).join(" · ")) : ""}
+      ${nextSeance ? tile("Prochaine séance", Calc.fmtJour(nextSeance.date), [Calc.fmtHeure(nextSeance.heure), esc(nextSeance.type||"")].filter(Boolean).join(" · ")) : ""}
       ${b.dernier ? tile("Prochain bilan", Calc.fmt(b.prochain), bilanSub) : ""}
       ${sport&&sport.envoye ? tile("Programme sportif", "Disponible", "envoyé le "+Calc.fmt(sport.date_envoi)) : ""}
       ${ac&&ac.nutrition_active ? tile("Suivi nutrition", "Actif") : ""}
@@ -131,6 +131,9 @@ function viewAccueil(){
     ${ac&&ac.seances_prevues ? `<div class="card" style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>` : ""}
     <div class="card" style="margin-top:16px">
       <p class="isub" style="color:var(--text-mid)">Utilise le menu ci-dessus pour parcourir tes séances, mensurations, bilans, photos et programmes. Tout est mis à jour au fil de ton accompagnement 💪</p>
+    </div>
+    <div class="card" style="margin-top:16px;border-left:4px solid var(--ok)">
+      <p class="isub" style="color:var(--text-mid)">🔒 <strong>Ton espace est 100% privé.</strong> Il n'y a qu'Ornella et toi qui y avez accès. Tes photos, mensurations et bilans ne sont visibles que par vous deux 💛</p>
     </div>`;
 }
 
@@ -160,7 +163,7 @@ function viewSeances(){
       const hh = Calc.fmtHeure(x.heure);
       const wa = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Je souhaiterais modifier ma séance prévue le ${Calc.fmt(x.date)}${hh?` à ${hh}`:""}${x.type?` (${x.type})`:""}.`);
       return `<div class="item">
-      <div class="idate">${Calc.fmtShort(x.date)}${hh?`<small style="display:block;font-weight:600;color:var(--text-light)">${hh}</small>`:""}</div>
+      <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}${hh?`<small style="display:block;font-weight:600;color:var(--text-light)">${hh}</small>`:""}</div>
       <div class="ibody">
         <div class="ititle">${esc(x.type||"Séance")} <span class="tag">à venir</span></div>
         ${seanceBody(x)}
@@ -171,7 +174,7 @@ function viewSeances(){
   if (rest.length){
     out += `${upcoming.length?`<h4 class="view-title" style="margin-top:18px">Séances passées</h4>`:""}<div class="card">` + rest.map(x=>`
     <div class="item">
-      <div class="idate">${Calc.fmtShort(x.date)}</div>
+      <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}</div>
       <div class="ibody">
         <div class="ititle">${esc(x.type||"Séance")} ${x.statut==="realisee"?`<span class="tag tag-done">✅ Fait</span>`:`<span class="tag">${esc(x.statut)}</span>`}</div>
         ${seanceBody(x)}
@@ -512,6 +515,8 @@ document.getElementById("main").addEventListener("click", (e)=>{
     PRENOM = me.prenom || "";
     mountWhatsApp();
     render();
+    // Enregistre la connexion (dernière visite + compteur) — pour que la coach sache qui vient.
+    sb.rpc("touch_connexion").catch(()=>{});
   }catch(e){
     console.error(e);
     document.getElementById("main").innerHTML = empty("Impossible de charger ton suivi. Réessaie plus tard.");

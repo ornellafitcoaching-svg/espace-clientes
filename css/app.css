@@ -323,4 +323,6 @@ button{font-family:inherit;cursor:pointer}
   .alert{flex-wrap:wrap}
   .alert-cta{margin-left:0}
   .sel-bar{width:auto}
+  /* Lignes (agenda, listes) : autoriser le retour à la ligne plutôt que déborder */
+  .cl-line{flex-wrap:wrap;gap:4px}
 }
