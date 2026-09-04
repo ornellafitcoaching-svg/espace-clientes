@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e32">
+<link rel="stylesheet" href="css/app.css?v=e33">
 </head>
 <body>
 <header class="topbar">
@@ -23,18 +23,20 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e32"></script>
-<script src="js/supabaseClient.js?v=e32"></script>
-<script src="js/auth.js?v=e32"></script>
-<script src="js/db.js?v=e32"></script>
-<script src="js/calc.js?v=e32"></script>
-<script src="js/ui/modal.js?v=e32"></script>
-<script src="js/ui/progress.js?v=e32"></script>
+<script src="js/config.js?v=e33"></script>
+<script src="js/supabaseClient.js?v=e33"></script>
+<script src="js/auth.js?v=e33"></script>
+<script src="js/db.js?v=e33"></script>
+<script src="js/calc.js?v=e33"></script>
+<script src="js/ui/modal.js?v=e33"></script>
+<script src="js/ui/progress.js?v=e33"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
 let PRENOM = "";       // prénom de la cliente (pour les messages WhatsApp)
 const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+// Adresse la cliente en "tu" ou "vous" selon son réglage (D.cliente.tutoiement).
+function adr(tu, vous){ return (D && D.cliente && D.cliente.tutoiement===false) ? vous : tu; }
 
 // Lien WhatsApp pré-rempli (null si aucun numéro configuré → bouton masqué).
 function waHref(text){
@@ -82,11 +84,11 @@ function bilanNudge(){
   const has = (D.bilans||[]).length;
   let titre = "", sub = "";
   if (b.joursAvant !== null && b.joursAvant <= 3){
-    if (b.joursAvant < 0){ titre = "C'est le moment de ton bilan 📊"; sub = `Il était prévu le ${Calc.fmt(b.prochain)} — pas de souci, fais-le dès que tu peux !`; }
-    else if (b.joursAvant === 0){ titre = "C'est le jour de ton bilan ! 📊"; sub = "On refait le point + tes mensurations, ça prend 2 minutes."; }
-    else { titre = "Ton bilan approche 📊"; sub = `Prévu dans ${b.joursAvant} j (le ${Calc.fmt(b.prochain)}). Tu peux déjà le faire.`; }
+    if (b.joursAvant < 0){ titre = adr("C'est le moment de ton bilan 📊","C'est le moment de votre bilan 📊"); sub = `Il était prévu le ${Calc.fmt(b.prochain)} — pas de souci, ${adr("fais-le dès que tu peux","faites-le dès que vous pouvez")} !`; }
+    else if (b.joursAvant === 0){ titre = adr("C'est le jour de ton bilan ! 📊","C'est le jour de votre bilan ! 📊"); sub = adr("On refait le point + tes mensurations, ça prend 2 minutes.","On refait le point + vos mensurations, ça prend 2 minutes."); }
+    else { titre = adr("Ton bilan approche 📊","Votre bilan approche 📊"); sub = `Prévu dans ${b.joursAvant} j (le ${Calc.fmt(b.prochain)}). ${adr("Tu peux déjà le faire.","Vous pouvez déjà le faire.")}`; }
   } else if (!has && ac && ac.date_debut){
-    titre = "Fais ton premier bilan 📊"; sub = "Un point de départ pour suivre tous tes progrès ✨";
+    titre = adr("Fais ton premier bilan 📊","Faites votre premier bilan 📊"); sub = adr("Un point de départ pour suivre tous tes progrès ✨","Un point de départ pour suivre tous vos progrès ✨");
   } else return "";
   return `<div class="card nudge-bilan" style="margin-bottom:16px">
     <div class="nudge-title">${titre}</div>
@@ -115,12 +117,12 @@ function viewAccueil(){
   return `
     <div style="margin:6px 0 18px">
       <div class="hero-hello">Bonjour <em>${esc(cl.prenom)}</em> 👋</div>
-      <p class="page-sub" style="margin-bottom:0">Voici ton suivi, mis à jour par Ornella.</p>
+      <p class="page-sub" style="margin-bottom:0">${adr("Voici ton suivi, mis à jour par Ornella.","Voici votre suivi, mis à jour par Ornella.")}</p>
     </div>
     ${bilanNudge()}
     ${motOrnella()}
     <div class="stat-grid">
-      ${tile("Ton objectif", esc(cl.objectif_principal||"—"))}
+      ${tile(adr("Ton objectif","Votre objectif"), esc(cl.objectif_principal||"—"))}
       ${ac&&ac.seances_prevues ? tile("Séances", s.realisees+" / "+s.prevues, s.restantes+" restantes") : tile("Séances réalisées", s.realisees)}
       ${poidsTile}
       ${nextSeance ? tile("Prochaine séance", Calc.fmtJour(nextSeance.date), [Calc.fmtHeure(nextSeance.heure), esc(nextSeance.type||"")].filter(Boolean).join(" · ")) : ""}
@@ -133,7 +135,7 @@ function viewAccueil(){
       <p class="isub" style="color:var(--text-mid)">Utilise le menu ci-dessus pour parcourir tes séances, mensurations, bilans, photos et programmes. Tout est mis à jour au fil de ton accompagnement 💪</p>
     </div>
     <div class="card" style="margin-top:16px;border-left:4px solid var(--ok)">
-      <p class="isub" style="color:var(--text-mid)">🔒 <strong>Ton espace est 100% privé.</strong> Il n'y a qu'Ornella et toi qui y avez accès. Tes photos, mensurations et bilans ne sont visibles que par vous deux 💛</p>
+      <p class="isub" style="color:var(--text-mid)">🔒 <strong>${adr("Ton espace est 100% privé.","Votre espace est 100% privé.")}</strong> ${adr("Il n'y a qu'Ornella et toi qui y avez accès. Tes photos, mensurations et bilans ne sont visibles que par vous deux 💛","Il n'y a qu'Ornella et vous qui y avez accès. Vos photos, mensurations et bilans ne sont visibles que par vous deux 💛")}</p>
     </div>`;
 }
 
@@ -317,7 +319,7 @@ function viewBilans(){
   const list = (D.bilans||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
   const b = Calc.bilanStats(D.bilans, D.accompagnement && D.accompagnement.date_debut);
   const entete = `<div class="card" style="background:var(--panel);color:#fff">
-      <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);font-weight:700">Ton rythme</div>
+      <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);font-weight:700">${adr("Ton rythme","Votre rythme")}</div>
       <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:700">Un bilan toutes les 4 semaines 📋</div>
       <div class="isub" style="color:rgba(255,255,255,.7);margin-top:2px">On refait le point + les mensurations à chaque bilan.${b.prochain?` Prochain : <strong style="color:#fff">${Calc.fmt(b.prochain)}</strong>${b.joursAvant!=null&&b.joursAvant>=0?` (dans ${b.joursAvant} j)`:""}.`:""}</div>
       <button id="addBilanBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>➕</span> Faire mon bilan</button>
@@ -515,15 +517,19 @@ document.getElementById("main").addEventListener("click", (e)=>{
           seances, bilans, mensurations, objectifs, programmes, photos,
           notes: [], paiements: [] };
     PRENOM = me.prenom || "";
-    mountWhatsApp();
-    render();
-    // Enregistre la connexion (dernière visite + compteur) — pour que la coach sache qui vient.
-    // NB : le builder Supabase n'a pas de .catch → on l'enveloppe dans Promise.resolve.
-    Promise.resolve(sb.rpc("touch_connexion")).catch(()=>{});
   }catch(e){
     console.error(e);
     document.getElementById("main").innerHTML = empty("Impossible de charger ton suivi. Réessaie plus tard.");
+    return;
   }
+  // À partir d'ici les données SONT chargées → l'affichage est garanti : on isole
+  // chaque étape secondaire pour qu'une erreur (extra, WhatsApp, connexion…) ne
+  // puisse JAMAIS blanchir l'espace de la cliente.
+  try { mountWhatsApp(); } catch(e){ console.error(e); }
+  try { render(); } catch(e){ console.error(e); }
+  // Enregistre la connexion (dernière visite + compteur) — totalement découplé du chargement.
+  // NB : le builder Supabase n'a pas de .catch → on l'enveloppe dans Promise.resolve.
+  try { Promise.resolve(sb.rpc("touch_connexion")).catch(()=>{}); } catch(e){ console.error(e); }
 })();
 </script>
 </body>
