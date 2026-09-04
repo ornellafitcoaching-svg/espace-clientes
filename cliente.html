@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e33">
+<link rel="stylesheet" href="css/app.css?v=e34">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e33"></script>
-<script src="js/supabaseClient.js?v=e33"></script>
-<script src="js/auth.js?v=e33"></script>
-<script src="js/db.js?v=e33"></script>
-<script src="js/calc.js?v=e33"></script>
-<script src="js/ui/modal.js?v=e33"></script>
-<script src="js/ui/progress.js?v=e33"></script>
+<script src="js/config.js?v=e34"></script>
+<script src="js/supabaseClient.js?v=e34"></script>
+<script src="js/auth.js?v=e34"></script>
+<script src="js/db.js?v=e34"></script>
+<script src="js/calc.js?v=e34"></script>
+<script src="js/ui/modal.js?v=e34"></script>
+<script src="js/ui/progress.js?v=e34"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -183,7 +183,7 @@ function sectionAccesCliente(){
   const code = cl.access_code || "";
   const body = has ? `
     <p class="isub" style="margin-bottom:10px">La cliente consulte son suivi en <strong>lecture seule</strong> sur la page de connexion cliente. Le code sert d'identifiant <em>et</em> de mot de passe.</p>
-    <div class="cl-line" style="margin-bottom:10px"><span>📲 Connexions à l'espace</span><strong>${cl.derniere_connexion ? `${cl.nb_connexions||1} visite${(cl.nb_connexions||1)>1?"s":""} · dernière le ${Calc.fmt(String(cl.derniere_connexion).slice(0,10))}` : "jamais connectée"}</strong></div>
+    <div class="cl-line" style="margin-bottom:10px"><span>📲 Connexions à l'espace</span><strong style="text-align:right">${cl.derniere_connexion ? `${cl.nb_connexions||1} visite${(cl.nb_connexions||1)>1?"s":""}<br><small style="font-weight:600;text-transform:capitalize">dernière : ${Calc.fmtDateHeure(cl.derniere_connexion)}</small>` : "jamais connectée"}</strong></div>
     <div class="code-box">
       <span class="code-val" id="codeVal">${esc(code)}</span>
       <button class="btn-ghost btn-sm" data-act="copy-code">Copier</button>

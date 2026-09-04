@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e33">
+<link rel="stylesheet" href="css/app.css?v=e34">
 </head>
 <body>
 <header class="topbar">
@@ -39,13 +39,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e33"></script>
-<script src="js/supabaseClient.js?v=e33"></script>
-<script src="js/auth.js?v=e33"></script>
-<script src="js/db.js?v=e33"></script>
-<script src="js/calc.js?v=e33"></script>
-<script src="js/ui/modal.js?v=e33"></script>
-<script src="js/ui/progress.js?v=e33"></script>
+<script src="js/config.js?v=e34"></script>
+<script src="js/supabaseClient.js?v=e34"></script>
+<script src="js/auth.js?v=e34"></script>
+<script src="js/db.js?v=e34"></script>
+<script src="js/calc.js?v=e34"></script>
+<script src="js/ui/modal.js?v=e34"></script>
+<script src="js/ui/progress.js?v=e34"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -240,7 +240,7 @@ function renderList() {
       <div class="cl-line"><span>📅 Séances à venir</span><strong style="text-transform:capitalize">${upcoming.length ? `${upcoming.length} · ${Calc.fmtJour(upcoming[0].date)}${Calc.fmtHeure(upcoming[0].heure)?` à ${Calc.fmtHeure(upcoming[0].heure)}`:''}` : '—'}</strong></div>
       <div class="cl-line"><span>Dernier bilan</span><strong>${Calc.fmt(b.dernier)}</strong></div>
       <div class="cl-line"><span>Prochain bilan</span><strong>${Calc.fmt(b.prochain)}</strong></div>
-      <div class="cl-line"><span>📲 Espace</span><strong>${cl.derniere_connexion ? `vu ${Calc.fmtShort(String(cl.derniere_connexion).slice(0,10))}` : 'jamais connectée'}</strong></div>
+      <div class="cl-line"><span>📲 Espace</span><strong style="text-align:right;text-transform:capitalize">${cl.derniere_connexion ? `vu ${Calc.fmtDateHeure(cl.derniere_connexion)}` : 'jamais connectée'}</strong></div>
       ${al.length ? `<div class="cl-alerts">${al.map(a=>{
         // Pastille « bilan » cliquable → WhatsApp (data-wa géré par délégation, cf. init).
         if (a.type === "bilan") {

@@ -32,6 +32,15 @@ window.Calc = {
     const dt = this.parse(d);
     return dt ? dt.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }) : "—";
   },
+  // Date + heure d'un timestamp complet (ex. connexion) : "lun. 4 sept. à 10h24" (heure locale).
+  fmtDateHeure(ts) {
+    if (!ts) return "—";
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return "—";
+    const jour = d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+    const h = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }).replace(":", "h");
+    return jour + " à " + h;
+  },
   // Heure "09:30" ou "09:30:00" → "9h30" (et "09:00" → "9h"). Vide si absente.
   fmtHeure(h) {
     if (!h) return "";
