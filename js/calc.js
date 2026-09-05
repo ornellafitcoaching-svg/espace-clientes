@@ -262,6 +262,12 @@ window.Calc = {
   labelRecup(v) {
     return { bonne: "Bonne", moyenne: "Moyenne", difficile: "Difficile" }[v] || v || "—";
   },
+  labelSeancesOk(v) {
+    return { oui: "Oui, tout va bien", a_ajuster: "Ça va, à ajuster", non: "Non, pas trop" }[v] || v || "—";
+  },
+  labelFrequenceOk(v) {
+    return { bonne: "Parfaite", trop: "Trop", pas_assez: "Pas assez" }[v] || v || "—";
+  },
 
   // ---- Âge / IMC ----------------------------------------------------------
   age(dateNaissance) {

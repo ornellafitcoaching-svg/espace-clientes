@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e35">
+<link rel="stylesheet" href="css/app.css?v=e36">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e35"></script>
-<script src="js/supabaseClient.js?v=e35"></script>
-<script src="js/auth.js?v=e35"></script>
-<script src="js/db.js?v=e35"></script>
-<script src="js/calc.js?v=e35"></script>
-<script src="js/ui/modal.js?v=e35"></script>
-<script src="js/ui/progress.js?v=e35"></script>
+<script src="js/config.js?v=e36"></script>
+<script src="js/supabaseClient.js?v=e36"></script>
+<script src="js/auth.js?v=e36"></script>
+<script src="js/db.js?v=e36"></script>
+<script src="js/calc.js?v=e36"></script>
+<script src="js/ui/modal.js?v=e36"></script>
+<script src="js/ui/progress.js?v=e36"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -337,6 +337,10 @@ function sectionBilanDemarrage(){
           x.motivation!=null&&("Motivation "+scale(x.motivation,5)),
           x.plaisir!=null&&("Plaisir "+scale(x.plaisir,5)),
         ].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+        ${(x.seances_ok||x.frequence_ok)?`<div class="isub">${[
+          x.seances_ok&&("Séances : "+Calc.labelSeancesOk(x.seances_ok)),
+          x.frequence_ok&&("Fréquence : "+Calc.labelFrequenceOk(x.frequence_ok)),
+        ].filter(Boolean).join(" · ")}</div>`:""}
         ${x.douleur_zones?`<div class="isub">📍 Zones : ${esc(x.douleur_zones)}</div>`:""}
         ${x.exercices_difficiles?`<div class="isub">⚠️ Difficiles : ${esc(x.exercices_difficiles)}</div>`:""}
         ${x.exercices_preferes?`<div class="isub">💛 Préférés : ${esc(x.exercices_preferes)}</div>`:""}
@@ -510,6 +514,10 @@ function bilanDemarrageFields(x){ x=x||{}; return [
     {value:"trop_facile",label:"Trop facile"},{value:"adaptee",label:"Bien adaptée"},{value:"trop_dure",label:"Un peu trop dure"}]},
   { name:"recuperation", label:"Récupération", type:"select", half:true, value:x.recuperation||"bonne", options:[
     {value:"bonne",label:"Bonne"},{value:"moyenne",label:"Moyenne"},{value:"difficile",label:"Difficile"}]},
+  { name:"seances_ok", label:"Les séances conviennent ?", type:"select", half:true, value:x.seances_ok||"oui", options:[
+    {value:"oui",label:"Oui, tout va bien"},{value:"a_ajuster",label:"Ça va, à ajuster"},{value:"non",label:"Non, pas trop"}]},
+  { name:"frequence_ok", label:"La fréquence convient ?", type:"select", half:true, value:x.frequence_ok||"bonne", options:[
+    {value:"bonne",label:"Parfaite"},{value:"trop",label:"Trop"},{value:"pas_assez",label:"Pas assez"}]},
   { name:"energie", label:"Énergie / forme (1–5)", type:"number", half:true, value:x.energie },
   { name:"motivation", label:"Motivation (1–5)", type:"number", half:true, value:x.motivation },
   { name:"plaisir", label:"Plaisir en séance (1–5)", type:"number", half:true, value:x.plaisir },

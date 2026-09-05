@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e35">
+<link rel="stylesheet" href="css/app.css?v=e36">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e35"></script>
-<script src="js/supabaseClient.js?v=e35"></script>
-<script src="js/auth.js?v=e35"></script>
-<script src="js/db.js?v=e35"></script>
-<script src="js/calc.js?v=e35"></script>
-<script src="js/ui/modal.js?v=e35"></script>
-<script src="js/ui/progress.js?v=e35"></script>
+<script src="js/config.js?v=e36"></script>
+<script src="js/supabaseClient.js?v=e36"></script>
+<script src="js/auth.js?v=e36"></script>
+<script src="js/db.js?v=e36"></script>
+<script src="js/calc.js?v=e36"></script>
+<script src="js/ui/modal.js?v=e36"></script>
+<script src="js/ui/progress.js?v=e36"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -335,6 +335,10 @@ async function addMyBilanDemarrage(){
       {value:"trop_facile",label:"Trop facile"},{value:"adaptee",label:"Bien adaptée"},{value:"trop_dure",label:"Un peu trop dure"}]},
     { name:"recuperation", label:adr("Ta récupération entre les séances","Votre récupération entre les séances"), type:"select", value:"bonne", options:[
       {value:"bonne",label:"Bonne"},{value:"moyenne",label:"Moyenne"},{value:"difficile",label:"Difficile"}]},
+    { name:"seances_ok", label:adr("Est-ce que les séances te conviennent ?","Est-ce que les séances vous conviennent ?"), type:"select", value:"oui", options:[
+      {value:"oui",label:"Oui, tout va bien"},{value:"a_ajuster",label:"Ça va, à ajuster"},{value:"non",label:"Non, pas trop"}]},
+    { name:"frequence_ok", label:adr("La fréquence des séances te convient ?","La fréquence des séances vous convient ?"), type:"select", value:"bonne", options:[
+      {value:"bonne",label:"Parfaite"},{value:"trop",label:"Trop"},{value:"pas_assez",label:"Pas assez"}]},
     { name:"energie", label:adr("Ton énergie / ta forme (1 → 5)","Votre énergie / forme (1 → 5)"), type:"number" },
     { name:"motivation", label:adr("Ta motivation en ce moment (1 → 5)","Votre motivation en ce moment (1 → 5)"), type:"number" },
     { name:"plaisir", label:"Le plaisir pendant les séances (1 → 5)", type:"number" },
@@ -349,6 +353,7 @@ async function addMyBilanDemarrage(){
   const row = { cliente_id:D.cliente.id, date:v.date, saisi_par:"cliente",
     douleur:num("douleur"), douleur_zones:v.douleur_zones||null,
     intensite:v.intensite||null, recuperation:v.recuperation||null,
+    seances_ok:v.seances_ok||null, frequence_ok:v.frequence_ok||null,
     energie:num("energie"), motivation:num("motivation"), plaisir:num("plaisir"),
     exercices_difficiles:v.exercices_difficiles||null, exercices_preferes:v.exercices_preferes||null,
     gene_a_signaler:v.gene_a_signaler||null, commentaire:v.commentaire||null };
@@ -360,6 +365,8 @@ async function addMyBilanDemarrage(){
     if (row.douleur!=null) parts.push(`Douleurs/courbatures : ${row.douleur}/10`+(row.douleur_zones?` (${row.douleur_zones})`:""));
     if (row.intensite) parts.push(`Intensité : ${Calc.labelIntensiteBilan(row.intensite)}`);
     if (row.recuperation) parts.push(`Récupération : ${Calc.labelRecup(row.recuperation)}`);
+    if (row.seances_ok) parts.push(`Séances conviennent : ${Calc.labelSeancesOk(row.seances_ok)}`);
+    if (row.frequence_ok) parts.push(`Fréquence : ${Calc.labelFrequenceOk(row.frequence_ok)}`);
     if (row.energie!=null) parts.push(`Énergie : ${row.energie}/5`);
     if (row.motivation!=null) parts.push(`Motivation : ${row.motivation}/5`);
     if (row.plaisir!=null) parts.push(`Plaisir : ${row.plaisir}/5`);
@@ -391,6 +398,7 @@ function bilanDemarrageCard(){
     </div>
     <div class="isub">${[x.douleur!=null&&("Douleurs "+scale(x.douleur,10)),x.intensite&&("Intensité : "+Calc.labelIntensiteBilan(x.intensite)),x.recuperation&&("Récup : "+Calc.labelRecup(x.recuperation))].filter(Boolean).join(" · ")||"&nbsp;"}</div>
     <div class="isub">${[x.energie!=null&&("Énergie "+scale(x.energie,5)),x.motivation!=null&&("Motivation "+scale(x.motivation,5)),x.plaisir!=null&&("Plaisir "+scale(x.plaisir,5))].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+    ${(x.seances_ok||x.frequence_ok)?`<div class="isub">${[x.seances_ok&&("Séances : "+Calc.labelSeancesOk(x.seances_ok)),x.frequence_ok&&("Fréquence : "+Calc.labelFrequenceOk(x.frequence_ok))].filter(Boolean).join(" · ")}</div>`:""}
     ${x.douleur_zones?`<div class="isub">📍 ${esc(x.douleur_zones)}</div>`:""}
     ${x.exercices_difficiles?`<div class="isub">⚠️ ${esc(x.exercices_difficiles)}</div>`:""}
     ${x.exercices_preferes?`<div class="isub">💛 ${esc(x.exercices_preferes)}</div>`:""}
