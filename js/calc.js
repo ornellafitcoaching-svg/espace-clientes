@@ -148,10 +148,8 @@ window.Calc = {
     if (s.prevues > 0 && s.restantes <= 2) {
       out.push({ type: "seances", label: "Séances presque finies", icon: "🏋️" });
     }
-    // Bilan de démarrage à demander (après ~5 séances, une seule fois).
-    if (this.bilanDemarrageDue(c.accompagnement, c.seances, c.bilansDemarrage)) {
-      out.push({ type: "bilan_demarrage", label: "Bilan de démarrage à demander", icon: "🩹" });
-    }
+    // NB : le bilan de démarrage n'est PAS une alerte automatique — c'est Ornella
+    // qui choisit de l'envoyer via le bouton sur la fiche (pas de notif imposée).
     const suivi = this.suiviStats(c.accompagnement);
     if (suivi.joursRestants !== null && suivi.joursRestants <= 14 && suivi.joursRestants >= 0) {
       out.push({ type: "fin", label: "Suivi bientôt terminé", icon: "⏳" });
