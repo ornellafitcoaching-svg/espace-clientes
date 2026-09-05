@@ -148,6 +148,10 @@ window.Calc = {
     if (s.prevues > 0 && s.restantes <= 2) {
       out.push({ type: "seances", label: "Séances presque finies", icon: "🏋️" });
     }
+    // Bilan de démarrage à demander (après ~5 séances, une seule fois).
+    if (this.bilanDemarrageDue(c.accompagnement, c.seances, c.bilansDemarrage)) {
+      out.push({ type: "bilan_demarrage", label: "Bilan de démarrage à demander", icon: "🩹" });
+    }
     const suivi = this.suiviStats(c.accompagnement);
     if (suivi.joursRestants !== null && suivi.joursRestants <= 14 && suivi.joursRestants >= 0) {
       out.push({ type: "fin", label: "Suivi bientôt terminé", icon: "⏳" });
@@ -229,6 +233,36 @@ window.Calc = {
       + "Vous y retrouvez vos séances à venir (avec les horaires), vos bilans, vos mensurations, votre évolution "
       + "et vos programmes.\n\n👉 Votre accès en 1 clic : " + lien
       + "\n\nN'hésitez pas si vous avez la moindre question. Belle journée ! 💪";
+  },
+
+  // ---- Bilan de démarrage (ressenti des premières séances) ----------------
+  // Seuil : proposé à la coach dès que la cliente atteint ce nb de séances réalisées.
+  SEUIL_BILAN_DEMARRAGE: 5,
+  // À demander ? (>= 5 séances réalisées ET aucun bilan de démarrage déjà rempli)
+  bilanDemarrageDue(accompagnement, seances, bilansDemarrage) {
+    if (bilansDemarrage && bilansDemarrage.length) return false;
+    const s = this.seancesStats(accompagnement, seances);
+    return s.realisees >= this.SEUIL_BILAN_DEMARRAGE;
+  },
+  // Message « demande de bilan de démarrage » pré-rempli (tutoiement selon cl.tutoiement).
+  bilanDemarrageMsg(cl) {
+    const lien = this.espaceLink(cl.access_code);
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 Tu as déjà quelques séances derrière toi, bravo ! 💪\n\n"
+        + "J'aimerais faire un petit point sur ton ressenti (douleurs/courbatures, intensité, récupération, "
+        + "ce que tu aimes ou pas) pour ajuster au mieux tes séances.\n\nÇa prend 2 min, directement dans ton espace "
+        + "(connexion en 1 clic) : " + lien + "\n\nMerci ma belle 💛";
+    }
+    return "Bonjour " + cl.prenom + " 😊 Vous avez déjà quelques séances derrière vous, bravo ! 💪\n\n"
+      + "J'aimerais faire un point sur votre ressenti (douleurs/courbatures, intensité, récupération, "
+      + "ce que vous aimez ou pas) pour ajuster au mieux vos séances.\n\nCela prend 2 min, directement dans votre espace "
+      + "(connexion en 1 clic) : " + lien + "\n\nMerci à vous 💛";
+  },
+  labelIntensiteBilan(v) {
+    return { trop_facile: "Trop facile", adaptee: "Bien adaptée", trop_dure: "Un peu trop dure" }[v] || v || "—";
+  },
+  labelRecup(v) {
+    return { bonne: "Bonne", moyenne: "Moyenne", difficile: "Difficile" }[v] || v || "—";
   },
 
   // ---- Âge / IMC ----------------------------------------------------------

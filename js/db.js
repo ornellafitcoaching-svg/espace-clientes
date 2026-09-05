@@ -79,12 +79,15 @@ window.DB = {
 
   // ---- Bundle : tout le dossier d'une cliente en 1 aller-retour groupé -----
   async dossier(clienteId) {
-    const [cliente, accompagnement, seances, bilans, mensurations, objectifs, programmes, photos, notes, paiements] =
+    const [cliente, accompagnement, seances, bilans, bilans_demarrage, mensurations, objectifs, programmes, photos, notes, paiements] =
       await Promise.all([
         this.cliente(clienteId),
         this.accompagnement(clienteId),
         this.list("seances", clienteId, { col: "date", asc: false }),
         this.list("bilans", clienteId, { col: "date", asc: false }),
+        // Résilient : si la table n'existe pas encore (migration 12 non exécutée),
+        // on renvoie [] au lieu de faire échouer tout le dossier.
+        this.list("bilans_demarrage", clienteId, { col: "date", asc: false }).catch(() => []),
         this.list("mensurations", clienteId, { col: "date", asc: true }),
         this.list("objectifs", clienteId, { col: "date_creation", asc: false }),
         this.list("programmes", clienteId, { col: "created_at", asc: false }),
@@ -92,7 +95,7 @@ window.DB = {
         this.list("notes_privees", clienteId, { col: "date", asc: false }),
         this.list("paiements", clienteId, { col: "date", asc: false }),
       ]);
-    return { cliente, accompagnement, seances, bilans, mensurations, objectifs, programmes, photos, notes, paiements };
+    return { cliente, accompagnement, seances, bilans, bilans_demarrage, mensurations, objectifs, programmes, photos, notes, paiements };
   },
 
   async deleteCliente(clienteId) {

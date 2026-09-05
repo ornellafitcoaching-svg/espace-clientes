@@ -125,11 +125,12 @@ function renderAgenda(){
 
 // ---- Chargement groupé (peu de requêtes, quel que soit le nb de clientes) ----
 async function loadAll() {
-  const [clientes, accomp, seances, bilans, programmes] = await Promise.all([
+  const [clientes, accomp, seances, bilans, bilansDem, programmes] = await Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
     sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois"),
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
+    sb.from("bilans_demarrage").select("cliente_id,date"),
     sb.from("programmes").select("cliente_id,kind,envoye"),
   ]);
   const group = (rows, key="cliente_id") => {
@@ -138,6 +139,7 @@ async function loadAll() {
   const accMap = {}; (accomp.data||[]).forEach(a => accMap[a.cliente_id] = a);
   const seaMap = group(seances.data ? seances : {data:[]});
   const bilMap = group(bilans.data ? bilans : {data:[]});
+  const bilDemMap = group(bilansDem.data ? bilansDem : {data:[]});
   const proMap = group(programmes.data ? programmes : {data:[]});
 
   STATE.clientes = (clientes.data||[]).map(cl => ({
@@ -145,6 +147,7 @@ async function loadAll() {
     accompagnement: accMap[cl.id] || null,
     seances: (seaMap[cl.id]||[]).map(s=>({id:s.id, statut:s.statut, date:s.date, type:s.type, heure:s.heure})),
     bilans: bilMap[cl.id]||[],
+    bilansDemarrage: bilDemMap[cl.id]||[],
     programmes: proMap[cl.id]||[],
   }));
 }
@@ -155,7 +158,7 @@ function renderAlerts() {
   const all = [];
   STATE.clientes.forEach(c => Calc.alertes(c).forEach(a => all.push({ ...a, c })));
   if (!all.length) { box.innerHTML = ""; return; }
-  const order = { nouveau_bilan:0, bilan:1, programme:2, fin:3, seances:4, renouveler:5 };
+  const order = { nouveau_bilan:0, bilan:1, bilan_demarrage:2, programme:3, fin:4, seances:5, renouveler:6 };
   all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
   box.innerHTML = all.slice(0,8).map(a => {
     const cl = a.c.cliente;
@@ -171,6 +174,18 @@ function renderAlerts() {
       }
       // Pas de numéro enregistré → renvoie vers la fiche pour l'ajouter.
       return `<a class="alert" href="cliente.html?id=${cl.id}" title="Ajoute son numéro de téléphone dans sa fiche pour demander le bilan en un clic">
+           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           <span class="alert-cta muted">☎️ n° manquant</span></a>`;
+    }
+    // Bilan de démarrage → cliquer envoie la demande à la cliente sur WhatsApp.
+    if (a.type === "bilan_demarrage") {
+      const wa = Calc.waHref(cl.telephone, Calc.bilanDemarrageMsg(cl));
+      if (wa) {
+        return `<a class="alert alert-action" href="${wa}" target="_blank" rel="noopener">
+           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           <span class="alert-cta">Demander 📲</span></a>`;
+      }
+      return `<a class="alert" href="cliente.html?id=${cl.id}" title="Ajoute son numéro de téléphone dans sa fiche pour demander en un clic">
            <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
            <span class="alert-cta muted">☎️ n° manquant</span></a>`;
     }
@@ -246,6 +261,10 @@ function renderList() {
         if (a.type === "bilan") {
           const wa = Calc.waHref(cl.telephone, Calc.bilanMsg(cl, b.joursAvant !== null && b.joursAvant < 0));
           if (wa) return `<span class="dot-alert dot-wa" data-wa="${wa}" title="Demander le bilan sur WhatsApp">${a.icon} ${a.label} 📲</span>`;
+        }
+        if (a.type === "bilan_demarrage") {
+          const wa = Calc.waHref(cl.telephone, Calc.bilanDemarrageMsg(cl));
+          if (wa) return `<span class="dot-alert dot-wa" data-wa="${wa}" title="Demander le bilan de démarrage sur WhatsApp">${a.icon} ${a.label} 📲</span>`;
         }
         return `<span class="dot-alert">${a.icon} ${a.label}</span>`;
       }).join('')}</div>` : ''}

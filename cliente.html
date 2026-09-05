@@ -119,6 +119,7 @@ function render(focusTitle){
     ${sectionSeances()}
     ${sectionProgrammes()}
     ${sectionBilans()}
+    ${sectionBilanDemarrage()}
     ${sectionMensurations()}
     ${sectionPhotos()}
     ${sectionObjectifs()}
@@ -307,6 +308,45 @@ function sectionBilans(){
   return block("Bilans", list.length, body, false);
 }
 
+// Bilan de démarrage : ressenti des premières séances (douleur, intensité, récup…),
+// à demander après ~5 séances. Distinct du bilan périodique.
+function sectionBilanDemarrage(){
+  const list = D.bilans_demarrage||[];
+  const cl = D.cliente;
+  const st = Calc.seancesStats(D.accompagnement, D.seances);
+  const due = Calc.bilanDemarrageDue(D.accompagnement, D.seances, list);
+  const wa = Calc.waHref(cl.telephone, Calc.bilanDemarrageMsg(cl));
+  const scale = (v,max)=> v!=null ? `${v}/${max}` : "—";
+  const hint = due
+    ? `<div class="mensu-card" style="margin-bottom:10px;border-color:rgba(212,163,115,.55)"><div class="isub">🩹 <strong>${st.realisees} séances réalisées</strong> — c'est le bon moment pour demander son ressenti des premières séances.</div></div>`
+    : (list.length ? "" : `<p class="isub" style="color:var(--text-light);margin-bottom:8px">À envoyer quand tu veux (idéal après ~${Calc.SEUIL_BILAN_DEMARRAGE} séances).</p>`);
+  const askBtn = wa
+    ? `<div style="margin-bottom:12px"><a class="btn-accent btn-sm" href="${wa}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px">📲 Demander le bilan de démarrage</a></div>`
+    : `<p class="isub" style="margin-bottom:12px">Ajoute son numéro de téléphone (bouton « Modifier ») pour lui demander en un clic sur WhatsApp.</p>`;
+  const body = hint + askBtn + (list.length ? list.map(x=>`
+    <div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div>
+      <div class="ibody">
+        <div class="ititle">Ressenti des premières séances</div>
+        <div class="isub">${[
+          x.douleur!=null&&("Douleur "+scale(x.douleur,10)),
+          x.intensite&&("Intensité : "+Calc.labelIntensiteBilan(x.intensite)),
+          x.recuperation&&("Récup : "+Calc.labelRecup(x.recuperation)),
+        ].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+        <div class="isub">${[
+          x.energie!=null&&("Énergie "+scale(x.energie,5)),
+          x.motivation!=null&&("Motivation "+scale(x.motivation,5)),
+          x.plaisir!=null&&("Plaisir "+scale(x.plaisir,5)),
+        ].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+        ${x.douleur_zones?`<div class="isub">📍 Zones : ${esc(x.douleur_zones)}</div>`:""}
+        ${x.exercices_difficiles?`<div class="isub">⚠️ Difficiles : ${esc(x.exercices_difficiles)}</div>`:""}
+        ${x.exercices_preferes?`<div class="isub">💛 Préférés : ${esc(x.exercices_preferes)}</div>`:""}
+        ${x.gene_a_signaler?`<div class="isub" style="color:var(--danger)">🚨 À signaler : ${esc(x.gene_a_signaler)}</div>`:""}
+        ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
+      </div>${delEdit("bilan_demarrage",x.id)}</div>`).join("") : `<p class="empty">Aucun bilan de démarrage rempli pour l'instant.</p>`)
+    + `<div style="margin-top:10px"><button class="link" data-act="add-bilan_demarrage">＋ Saisir moi-même le bilan de démarrage</button></div>`;
+  return block("Bilan de démarrage 🩹", list.length, body, false);
+}
+
 function sectionMensurations(){
   const types = Calc.mensuTypes(D.mensurations);
   const body = types.length ? `<div class="mensu-grid">` + types.map(t=>{
@@ -463,6 +503,22 @@ function bilanFields(x){ x=x||{}; return [
   { name:"nouveaux_objectifs", label:"Nouveaux objectifs", type:"textarea", value:x.nouveaux_objectifs },
   { name:"commentaire_coach", label:"Commentaire coach", type:"textarea", value:x.commentaire_coach },
 ];}
+function bilanDemarrageFields(x){ x=x||{}; return [
+  { name:"date", label:"Date", type:"date", half:true, value:x.date||Calc.today() },
+  { name:"douleur", label:"Douleur / courbatures (0–10)", type:"number", half:true, value:x.douleur },
+  { name:"intensite", label:"Intensité ressentie", type:"select", half:true, value:x.intensite||"adaptee", options:[
+    {value:"trop_facile",label:"Trop facile"},{value:"adaptee",label:"Bien adaptée"},{value:"trop_dure",label:"Un peu trop dure"}]},
+  { name:"recuperation", label:"Récupération", type:"select", half:true, value:x.recuperation||"bonne", options:[
+    {value:"bonne",label:"Bonne"},{value:"moyenne",label:"Moyenne"},{value:"difficile",label:"Difficile"}]},
+  { name:"energie", label:"Énergie / forme (1–5)", type:"number", half:true, value:x.energie },
+  { name:"motivation", label:"Motivation (1–5)", type:"number", half:true, value:x.motivation },
+  { name:"plaisir", label:"Plaisir en séance (1–5)", type:"number", half:true, value:x.plaisir },
+  { name:"douleur_zones", label:"Zones de douleur", half:true, value:x.douleur_zones, placeholder:"jambes, dos…" },
+  { name:"exercices_difficiles", label:"Exercices difficiles / inconfortables", type:"textarea", value:x.exercices_difficiles },
+  { name:"exercices_preferes", label:"Exercices préférés", type:"textarea", value:x.exercices_preferes },
+  { name:"gene_a_signaler", label:"🚨 Douleur inhabituelle / gêne à signaler", type:"textarea", value:x.gene_a_signaler },
+  { name:"commentaire", label:"Commentaire", type:"textarea", value:x.commentaire },
+];}
 function mensuFields(x){ x=x||{}; return [
   { name:"type", label:"Mesure", half:true, value:x.type, placeholder:"tour_taille, poids…", required:true },
   { name:"valeur", label:"Valeur", type:"number", half:true, value:x.valeur, required:true },
@@ -503,18 +559,19 @@ function progFields(kind,x){ x=x||{}; return [
 const ENT = {
   seance:      { table:"seances",      fields:seanceFields,  payload:seancePayload, title:"Séance" },
   bilan:       { table:"bilans",       fields:bilanFields,   payload:v=>({cliente_id:CID,...v}), title:"Bilan" },
+  bilan_demarrage: { table:"bilans_demarrage", fields:bilanDemarrageFields, payload:v=>({cliente_id:CID,...v}), title:"Bilan de démarrage" },
   mensuration: { table:"mensurations", fields:mensuFields,   payload:v=>({cliente_id:CID,...v}), title:"Mensuration" },
   objectif:    { table:"objectifs",    fields:objectifFields,payload:v=>({cliente_id:CID,...v}), title:"Objectif" },
   note:        { table:"notes_privees",fields:noteFields,    payload:v=>({cliente_id:CID,...v}), title:"Note privée" },
   paiement:    { table:"paiements",    fields:paiementFields,payload:v=>({cliente_id:CID,...v}), title:"Paiement" },
 };
 function findRec(entity,id){
-  const map = {seance:"seances",bilan:"bilans",mensuration:"mensurations",objectif:"objectifs",
+  const map = {seance:"seances",bilan:"bilans",bilan_demarrage:"bilans_demarrage",mensuration:"mensurations",objectif:"objectifs",
                note:"notes",programme:"programmes",paiement:"paiements"};
   return (D[map[entity]]||[]).find(r=>r.id===id);
 }
 // entity → nom de la table Supabase (partagé suppression simple + en lot).
-const TBL = {seance:"seances",bilan:"bilans",mensuration:"mensurations",objectif:"objectifs",
+const TBL = {seance:"seances",bilan:"bilans",bilan_demarrage:"bilans_demarrage",mensuration:"mensurations",objectif:"objectifs",
              note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements"};
 
 // Saisie COMPLÈTE des mensurations : toutes les mesures d'un coup, une date.
@@ -735,6 +792,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="add-seance") return addOrEdit("seance");
   if (act==="add-bilan") return addBilanCoach();
   if (act==="edit-bilan") return addBilanCoach(findRec("bilan", id));
+  if (act==="add-bilan_demarrage") return addOrEdit("bilan_demarrage");
   if (act==="add-mensu") return addMensuSession();
   if (act==="add-objectif") return addOrEdit("objectif");
   if (act==="add-paiement") return addOrEdit("paiement");
@@ -775,7 +833,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="del"){
     const entity = el.dataset.entity;
     if (!(await UI.confirm("Supprimer cet élément ?"))) return;
-    const tbl = {seance:"seances",bilan:"bilans",mensuration:"mensurations",objectif:"objectifs",
+    const tbl = {seance:"seances",bilan:"bilans",bilan_demarrage:"bilans_demarrage",mensuration:"mensurations",objectif:"objectifs",
                  note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements"}[entity];
     // On garde une copie complète AVANT suppression → permet le "retour arrière".
     const backup = entity!=="photo" ? findRec(entity, id) : null;

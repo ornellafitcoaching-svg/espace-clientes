@@ -96,6 +96,16 @@ function bilanNudge(){
     <button id="nudgeBilanBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>➕</span> Faire mon bilan</button>
   </div>`;
 }
+// Carte « nudge » pour le bilan de démarrage (ressenti des premières séances), après ~5 séances.
+function bilanDemarrageNudge(){
+  if ((D.bilans_demarrage||[]).length) return "";
+  if (!Calc.bilanDemarrageDue(D.accompagnement, D.seances, D.bilans_demarrage)) return "";
+  return `<div class="card nudge-bilan" style="margin-bottom:16px">
+    <div class="nudge-title">${adr("Comment se passent tes premières séances ? 🩹","Comment se passent vos premières séances ? 🩹")}</div>
+    <div class="isub nudge-sub">${adr("Un point rapide (douleurs, intensité, ce que tu aimes) pour qu'Ornella ajuste au mieux tes séances.","Un point rapide (douleurs, intensité, ce que vous aimez) pour qu'Ornella ajuste au mieux vos séances.")}</div>
+    <button id="nudgeDemarrageBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>🩹</span> Faire mon bilan de démarrage</button>
+  </div>`;
+}
 
 // ============================ VUES ============================
 function viewAccueil(){
@@ -120,6 +130,7 @@ function viewAccueil(){
       <p class="page-sub" style="margin-bottom:0">${adr("Voici ton suivi, mis à jour par Ornella.","Voici votre suivi, mis à jour par Ornella.")}</p>
     </div>
     ${bilanNudge()}
+    ${bilanDemarrageNudge()}
     ${motOrnella()}
     <div class="stat-grid">
       ${tile(adr("Ton objectif","Votre objectif"), esc(cl.objectif_principal||"—"))}
@@ -315,6 +326,79 @@ async function addMyBilan(){
     if (wa) window.open(wa, "_blank");
   }catch(e){ console.error(e); UI.toast("Impossible d'envoyer : "+(e.message||e), "err"); }
 }
+// Bilan de démarrage rempli par la cliente : ressenti des premières séances → coach.
+async function addMyBilanDemarrage(){
+  const fields = [
+    { name:"date", label:"Date", type:"date", value:Calc.today() },
+    { name:"douleur", label:adr("Douleurs / courbatures après tes séances (0 = aucune → 10 = très fortes)","Douleurs / courbatures après vos séances (0 = aucune → 10 = très fortes)"), type:"number" },
+    { name:"douleur_zones", label:"Si oui, à quels endroits ?", placeholder:"jambes, dos, épaules…" },
+    { name:"intensite", label:adr("Comment tu trouves l'intensité ?","Comment trouvez-vous l'intensité ?"), type:"select", value:"adaptee", options:[
+      {value:"trop_facile",label:"Trop facile"},{value:"adaptee",label:"Bien adaptée"},{value:"trop_dure",label:"Un peu trop dure"}]},
+    { name:"recuperation", label:adr("Ta récupération entre les séances","Votre récupération entre les séances"), type:"select", value:"bonne", options:[
+      {value:"bonne",label:"Bonne"},{value:"moyenne",label:"Moyenne"},{value:"difficile",label:"Difficile"}]},
+    { name:"energie", label:adr("Ton énergie / ta forme (1 → 5)","Votre énergie / forme (1 → 5)"), type:"number" },
+    { name:"motivation", label:adr("Ta motivation en ce moment (1 → 5)","Votre motivation en ce moment (1 → 5)"), type:"number" },
+    { name:"plaisir", label:"Le plaisir pendant les séances (1 → 5)", type:"number" },
+    { name:"exercices_difficiles", label:"Des exercices difficiles ou inconfortables ?", type:"textarea" },
+    { name:"exercices_preferes", label:adr("Tes exercices préférés","Vos exercices préférés"), type:"textarea" },
+    { name:"gene_a_signaler", label:"Une douleur inhabituelle / gêne à signaler ?", type:"textarea" },
+    { name:"commentaire", label:"Autre chose à me dire ?", type:"textarea" },
+  ];
+  const v = await UI.form({ title:"Mon bilan de démarrage", submit:"Envoyer à Ornella", fields });
+  if (!v) return;
+  const num = k => (v[k]!=null && v[k]!=="") ? Number(v[k]) : null;
+  const row = { cliente_id:D.cliente.id, date:v.date, saisi_par:"cliente",
+    douleur:num("douleur"), douleur_zones:v.douleur_zones||null,
+    intensite:v.intensite||null, recuperation:v.recuperation||null,
+    energie:num("energie"), motivation:num("motivation"), plaisir:num("plaisir"),
+    exercices_difficiles:v.exercices_difficiles||null, exercices_preferes:v.exercices_preferes||null,
+    gene_a_signaler:v.gene_a_signaler||null, commentaire:v.commentaire||null };
+  try{
+    const r = await sb.from("bilans_demarrage").insert(row); if (r.error) throw r.error;
+    D.bilans_demarrage = (D.bilans_demarrage||[]).concat([row]);
+    UI.toast("Bilan de démarrage envoyé à Ornella ✓"); render();
+    const parts = [];
+    if (row.douleur!=null) parts.push(`Douleurs/courbatures : ${row.douleur}/10`+(row.douleur_zones?` (${row.douleur_zones})`:""));
+    if (row.intensite) parts.push(`Intensité : ${Calc.labelIntensiteBilan(row.intensite)}`);
+    if (row.recuperation) parts.push(`Récupération : ${Calc.labelRecup(row.recuperation)}`);
+    if (row.energie!=null) parts.push(`Énergie : ${row.energie}/5`);
+    if (row.motivation!=null) parts.push(`Motivation : ${row.motivation}/5`);
+    if (row.plaisir!=null) parts.push(`Plaisir : ${row.plaisir}/5`);
+    if (row.exercices_difficiles) parts.push(`Exos difficiles : ${row.exercices_difficiles}`);
+    if (row.exercices_preferes) parts.push(`Exos préférés : ${row.exercices_preferes}`);
+    if (row.gene_a_signaler) parts.push(`À signaler : ${row.gene_a_signaler}`);
+    if (row.commentaire) parts.push(row.commentaire);
+    const msg = `Bonjour Ornella, c'est ${PRENOM} 🙂 Voici mon bilan de démarrage :\n`
+      + (parts.length?"• "+parts.join("\n• "):"(pas de commentaire)");
+    const wa = waHref(msg);
+    if (wa) window.open(wa, "_blank");
+  }catch(e){ console.error(e); UI.toast("Impossible d'envoyer : "+(e.message||e), "err"); }
+}
+// Carte « bilan de démarrage » affichée dans l'onglet Bilans (bouton si non fait, sinon récap).
+function bilanDemarrageCard(){
+  const list = (D.bilans_demarrage||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  const scale = (val,max)=> val!=null ? `${val}/${max}` : "—";
+  if (!list.length){
+    const due = Calc.bilanDemarrageDue(D.accompagnement, D.seances, list);
+    return `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold)">
+      <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">🩹 Bilan de démarrage</div>
+      <div class="isub" style="color:var(--text-mid);margin-top:4px">${due?adr("C'est le bon moment pour faire le point sur tes premières séances.","C'est le bon moment pour faire le point sur vos premières séances."):adr("Un point sur le ressenti de tes premières séances (douleurs, intensité…).","Un point sur le ressenti de vos premières séances (douleurs, intensité…).")}</div>
+      <button id="addDemarrageBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>🩹</span> Faire mon bilan de démarrage</button>
+    </div>`;
+  }
+  return list.map(x=>`<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold)">
+    <div class="row between" style="margin-bottom:6px">
+      <h4 style="font-size:1.15rem">🩹 Bilan de démarrage</h4><span class="tag">${Calc.fmt(x.date)}</span>
+    </div>
+    <div class="isub">${[x.douleur!=null&&("Douleurs "+scale(x.douleur,10)),x.intensite&&("Intensité : "+Calc.labelIntensiteBilan(x.intensite)),x.recuperation&&("Récup : "+Calc.labelRecup(x.recuperation))].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+    <div class="isub">${[x.energie!=null&&("Énergie "+scale(x.energie,5)),x.motivation!=null&&("Motivation "+scale(x.motivation,5)),x.plaisir!=null&&("Plaisir "+scale(x.plaisir,5))].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+    ${x.douleur_zones?`<div class="isub">📍 ${esc(x.douleur_zones)}</div>`:""}
+    ${x.exercices_difficiles?`<div class="isub">⚠️ ${esc(x.exercices_difficiles)}</div>`:""}
+    ${x.exercices_preferes?`<div class="isub">💛 ${esc(x.exercices_preferes)}</div>`:""}
+    ${x.gene_a_signaler?`<div class="isub" style="color:var(--danger)">🚨 ${esc(x.gene_a_signaler)}</div>`:""}
+    ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
+  </div>`).join("");
+}
 function viewBilans(){
   const list = (D.bilans||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
   const b = Calc.bilanStats(D.bilans, D.accompagnement && D.accompagnement.date_debut);
@@ -324,8 +408,8 @@ function viewBilans(){
       <div class="isub" style="color:rgba(255,255,255,.7);margin-top:2px">On refait le point + les mensurations à chaque bilan.${b.prochain?` Prochain : <strong style="color:#fff">${Calc.fmt(b.prochain)}</strong>${b.joursAvant!=null&&b.joursAvant>=0?` (dans ${b.joursAvant} j)`:""}.`:""}</div>
       <button id="addBilanBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>➕</span> Faire mon bilan</button>
     </div>`;
-  if (!list.length) return entete + empty("Ton premier bilan apparaîtra ici.");
-  return entete + list.map(x=>{
+  if (!list.length) return entete + bilanDemarrageCard() + empty("Ton premier bilan apparaîtra ici.");
+  return entete + bilanDemarrageCard() + list.map(x=>{
     const mesures = mensuAutour(x.date);
     const mensuBlock = mesures.length ? `
       <div class="mensu-card" style="margin-top:10px">
@@ -485,6 +569,8 @@ document.getElementById("main").addEventListener("click", (e)=>{
   if (e.target.closest("#addMensuBtn")){ addMyMensu(); return; }
   if (e.target.closest("#addBilanBtn")){ addMyBilan(); return; }
   if (e.target.closest("#nudgeBilanBtn")){ VIEW="bilans"; render(); addMyBilan(); return; }
+  if (e.target.closest("#addDemarrageBtn")){ addMyBilanDemarrage(); return; }
+  if (e.target.closest("#nudgeDemarrageBtn")){ VIEW="bilans"; render(); addMyBilanDemarrage(); return; }
   const b = e.target.closest("[data-view]"); if (!b) return;
   VIEW = b.dataset.view; render();
   window.scrollTo({ top:0, behavior:"smooth" });
@@ -504,17 +590,20 @@ document.getElementById("main").addEventListener("click", (e)=>{
     if (!me){ document.getElementById("main").innerHTML = empty("Aucun dossier n'est encore associé à ce code. Contacte Ornella."); return; }
     // Accompagnement via la vue "mon_accompagnement" (sans le prix) + les tables
     // que la cliente peut lire en SELECT (séances, bilans, mensurations…).
-    const [accRes, seances, bilans, mensurations, objectifs, programmes, photos] = await Promise.all([
+    const [accRes, seances, bilans, bilans_demarrage, mensurations, objectifs, programmes, photos] = await Promise.all([
       sb.from("mon_accompagnement").select("*").limit(1),
       DB.list("seances", me.id, { col:"date", asc:false }),
       DB.list("bilans", me.id, { col:"date", asc:false }),
+      // Résilient : si la migration 12 (table bilans_demarrage) n'est pas encore
+      // exécutée, on renvoie [] au lieu de blanchir l'espace de la cliente.
+      DB.list("bilans_demarrage", me.id, { col:"date", asc:false }).catch(()=>[]),
       DB.list("mensurations", me.id, { col:"date", asc:true }),
       DB.list("objectifs", me.id, { col:"date_creation", asc:false }),
       DB.list("programmes", me.id, { col:"created_at", asc:false }),
       DB.list("photos", me.id, { col:"date", asc:false }),
     ]);
     D = { cliente: me, accompagnement: (accRes.data && accRes.data[0]) || null,
-          seances, bilans, mensurations, objectifs, programmes, photos,
+          seances, bilans, bilans_demarrage, mensurations, objectifs, programmes, photos,
           notes: [], paiements: [] };
     PRENOM = me.prenom || "";
   }catch(e){
