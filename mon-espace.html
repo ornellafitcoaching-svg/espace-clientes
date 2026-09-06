@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e43">
+<link rel="stylesheet" href="css/app.css?v=e44">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e43"></script>
-<script src="js/supabaseClient.js?v=e43"></script>
-<script src="js/auth.js?v=e43"></script>
-<script src="js/db.js?v=e43"></script>
-<script src="js/calc.js?v=e43"></script>
-<script src="js/ui/modal.js?v=e43"></script>
-<script src="js/ui/progress.js?v=e43"></script>
+<script src="js/config.js?v=e44"></script>
+<script src="js/supabaseClient.js?v=e44"></script>
+<script src="js/auth.js?v=e44"></script>
+<script src="js/db.js?v=e44"></script>
+<script src="js/calc.js?v=e44"></script>
+<script src="js/ui/modal.js?v=e44"></script>
+<script src="js/ui/progress.js?v=e44"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -149,6 +149,23 @@ function seanceCarteBtn(){
   return `<a href="${wa}" target="_blank" rel="noopener" class="btn-accent btn-sm" style="margin-bottom:16px;display:inline-flex;align-items:center;gap:6px"><span>➕</span> ${adr("Demander une séance en plus (à la carte)","Demander une séance en plus (à la carte)")}</a>`;
 }
 
+// Boutons d'abonnement calendrier PERSO de la cliente (Apple + Google).
+// Clé = son code d'accès → elle ne voit que SES séances. Auto-sync.
+function calendarSubBtns(){
+  const code = D.cliente && D.cliente.access_code;
+  if (!code) return "";
+  const base = "xvetwfqzkkcfchxxifuu.supabase.co/functions/v1/agenda-ics?code=" + encodeURIComponent(code);
+  const webcal = "webcal://" + base;
+  const google = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(webcal);
+  return `<div class="card" style="margin-bottom:16px">
+    <div class="isub" style="color:var(--text-mid);margin-bottom:10px">📅 ${adr("Ajoute tes séances à ton calendrier (elles se mettront à jour toutes seules) :","Ajoutez vos séances à votre calendrier (mise à jour automatique) :")}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <a class="btn-accent btn-sm" href="${webcal}" style="display:inline-flex;align-items:center;gap:6px"><span>📆</span> Apple / iPhone</a>
+      <a class="btn-ghost btn-sm" href="${google}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px"><span>📆</span> Google Agenda</a>
+    </div>
+  </div>`;
+}
+
 // ============================ VUES ============================
 function viewAccueil(){
   const cl = D.cliente, ac = D.accompagnement;
@@ -216,6 +233,7 @@ function viewSeances(){
     ${tile("📅 À venir", upcoming.length)}
   </div>`;
   out += seanceCarteBtn();
+  out += calendarSubBtns();
   if (upcoming.length){
     out += `<h4 class="view-title" style="margin-top:0">📅 Mes prochaines séances</h4><div class="card">` + upcoming.map(x=>{
       const hh = Calc.fmtHeure(x.heure);

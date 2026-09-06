@@ -45,23 +45,39 @@ function nowStampUTC(): string {
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
-  if (!TOKEN || url.searchParams.get("token") !== TOKEN) {
-    return new Response("Forbidden", { status: 403 });
-  }
+  const token = url.searchParams.get("token");
+  const code = url.searchParams.get("code"); // lien perso cliente (= son code d'accès)
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  // Deux accès possibles :
+  //  • ?token=  → agenda COACH (toutes les clientes)
+  //  • ?code=   → agenda d'UNE cliente (uniquement SES séances ; clé = son code d'accès)
+  let clienteId: string | null = null;
+  if (TOKEN && token === TOKEN) {
+    // coach : pas de filtre
+  } else if (code) {
+    const { data: cl } = await supabase
+      .from("clientes").select("id").ilike("access_code", code).maybeSingle();
+    if (!cl) return new Response("Forbidden", { status: 403 });
+    clienteId = (cl as any).id;
+  } else {
+    return new Response("Forbidden", { status: 403 });
+  }
+
   // Fenêtre : 30 jours en arrière → futur. Non annulées.
   const depuis = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString().slice(0, 10);
-  const { data, error } = await supabase
+  let q = supabase
     .from("seances")
     .select("id,date,heure,type,duree,statut,objectif,clientes(prenom,nom,type,adresse)")
     .neq("statut", "annulee")
     .gte("date", depuis)
     .order("date");
+  if (clienteId) q = q.eq("cliente_id", clienteId);
+  const { data, error } = await q;
 
   if (error) return new Response(error.message, { status: 500 });
 
