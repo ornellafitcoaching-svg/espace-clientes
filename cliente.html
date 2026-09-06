@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e41">
+<link rel="stylesheet" href="css/app.css?v=e42">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e41"></script>
-<script src="js/supabaseClient.js?v=e41"></script>
-<script src="js/auth.js?v=e41"></script>
-<script src="js/db.js?v=e41"></script>
-<script src="js/calc.js?v=e41"></script>
-<script src="js/ui/modal.js?v=e41"></script>
-<script src="js/ui/progress.js?v=e41"></script>
+<script src="js/config.js?v=e42"></script>
+<script src="js/supabaseClient.js?v=e42"></script>
+<script src="js/auth.js?v=e42"></script>
+<script src="js/db.js?v=e42"></script>
+<script src="js/calc.js?v=e42"></script>
+<script src="js/ui/modal.js?v=e42"></script>
+<script src="js/ui/progress.js?v=e42"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -82,6 +82,20 @@ function render(focusTitle){
       </div>
     </div>
 
+    <!-- ACTIONS RAPIDES (en haut pour être visibles tout de suite, surtout sur mobile) -->
+    <div class="quick" style="margin-bottom:14px">
+      <button class="qbtn qbtn-accent" data-act="add-seance"><span class="i">🏋️</span> Séance</button>
+      <button class="qbtn" data-act="recap-seances"><span class="i">📲</span> Récap séances</button>
+      <button class="qbtn" data-act="add-bilan"><span class="i">📋</span> Bilan</button>
+      <button class="qbtn" data-act="add-mensu"><span class="i">📏</span> Mensurations</button>
+      <button class="qbtn" data-act="add-photo"><span class="i">📸</span> Photo</button>
+      <button class="qbtn" data-act="add-objectif"><span class="i">🎯</span> Objectif</button>
+      <button class="qbtn" data-act="add-paiement"><span class="i">💶</span> Paiement</button>
+      <button class="qbtn" data-act="add-note"><span class="i">🔒</span> Note privée</button>
+      <button class="qbtn" data-act="prog-sportif"><span class="i">📤</span> Prog. sportif envoyé</button>
+      ${(ac&&ac.nutrition_active)?`<button class="qbtn" data-act="prog-nutrition"><span class="i">🥗</span> Prog. nutrition envoyé</button>`:''}
+    </div>
+
     <!-- RÉSUMÉ -->
     <div class="card card-dark">
       <div class="summary">
@@ -97,20 +111,6 @@ function render(focusTitle){
         <div class="sum-item"><div class="k">Encaissé</div><div class="v">${Calc.euro(pay.total)}<small>${pay.prix!=null?"forfait "+Calc.euro(pay.prix)+(pay.reste>0?" · reste "+Calc.euro(pay.reste):(pay.reste<0?"":" · soldé")):""}</small></div></div>
       </div>
       ${s.prevues?`<div style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>`:''}
-    </div>
-
-    <!-- ACTIONS RAPIDES -->
-    <div class="quick">
-      <button class="qbtn qbtn-accent" data-act="add-seance"><span class="i">🏋️</span> Séance</button>
-      <button class="qbtn" data-act="recap-seances"><span class="i">📲</span> Récap séances</button>
-      <button class="qbtn" data-act="add-bilan"><span class="i">📋</span> Bilan</button>
-      <button class="qbtn" data-act="add-mensu"><span class="i">📏</span> Mensurations</button>
-      <button class="qbtn" data-act="add-photo"><span class="i">📸</span> Photo</button>
-      <button class="qbtn" data-act="add-objectif"><span class="i">🎯</span> Objectif</button>
-      <button class="qbtn" data-act="add-paiement"><span class="i">💶</span> Paiement</button>
-      <button class="qbtn" data-act="add-note"><span class="i">🔒</span> Note privée</button>
-      <button class="qbtn" data-act="prog-sportif"><span class="i">📤</span> Prog. sportif envoyé</button>
-      ${(ac&&ac.nutrition_active)?`<button class="qbtn" data-act="prog-nutrition"><span class="i">🥗</span> Prog. nutrition envoyé</button>`:''}
     </div>
 
     ${sectionAccesCliente()}
