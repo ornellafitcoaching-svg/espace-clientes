@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e39">
+<link rel="stylesheet" href="css/app.css?v=e40">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e39"></script>
-<script src="js/supabaseClient.js?v=e39"></script>
-<script src="js/auth.js?v=e39"></script>
-<script src="js/db.js?v=e39"></script>
-<script src="js/calc.js?v=e39"></script>
-<script src="js/ui/modal.js?v=e39"></script>
-<script src="js/ui/progress.js?v=e39"></script>
+<script src="js/config.js?v=e40"></script>
+<script src="js/supabaseClient.js?v=e40"></script>
+<script src="js/auth.js?v=e40"></script>
+<script src="js/db.js?v=e40"></script>
+<script src="js/calc.js?v=e40"></script>
+<script src="js/ui/modal.js?v=e40"></script>
+<script src="js/ui/progress.js?v=e40"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -174,8 +174,23 @@ function sectionAccompagnement(ac,s,suivi){
       ${(ac.nut_calories!=null||ac.nut_proteines!=null||ac.nut_glucides!=null||ac.nut_lipides!=null)?`<div class="cl-line" style="margin-top:6px"><span>Objectifs / jour</span><strong>${[ac.nut_calories!=null?ac.nut_calories+" kcal":null,ac.nut_proteines!=null?"P "+ac.nut_proteines+"g":null,ac.nut_glucides!=null?"G "+ac.nut_glucides+"g":null,ac.nut_lipides!=null?"L "+ac.nut_lipides+"g":null].filter(Boolean).join(" · ")}</strong></div>`:`<div class="isub">Aucun objectif calorique/macros saisi.</div>`}
       ${ac.nut_conseils?`<div class="isub" style="margin-top:6px;white-space:pre-wrap">${esc(ac.nut_conseils)}</div>`:""}
     </div>`:""}
-    <div style="margin-top:12px"><button class="link" data-act="edit-accomp">Modifier l'accompagnement</button></div>`;
+    ${renouvellementsBlock(ac)}
+    <div style="margin-top:12px">
+      <button class="btn-accent btn-sm" data-act="renouveler-accomp"><span>🔄</span> Renouveler l'accompagnement</button>
+      &nbsp;<button class="link" data-act="edit-accomp">Modifier l'accompagnement</button>
+    </div>`;
   return block("Accompagnement", null, body, false);
+}
+// Historique des renouvellements (le plus récent en haut).
+function renouvellementsBlock(ac){
+  const list = (ac && Array.isArray(ac.renouvellements)) ? ac.renouvellements : [];
+  if (!list.length) return "";
+  const rows = [...list].sort((a,b)=> (a.date<b.date?1:-1)).map(r=>{
+    const fin = r.nb_mois ? Calc.dateFin(r.date, r.nb_mois) : null;
+    return `<div class="cl-line"><span>🔄 ${Calc.fmt(r.date)}</span><strong>${esc(r.formule||"—")}${r.nb_mois?` · ${r.nb_mois} mois`:""}${fin?` → ${Calc.fmt(fin)}`:""}</strong></div>`;
+  }).join("");
+  return `<div class="mensu-card" style="margin-top:10px;background:var(--cream)">
+    <h4 style="font-size:.9rem">🔄 Renouvellements</h4>${rows}</div>`;
 }
 
 function sectionAccesCliente(){
@@ -767,6 +782,38 @@ async function editCliente(){
     UI.toast("Enregistré ✓"); reload();
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
+// Renouvellement : enregistre la date + ce qu'elle a pris + la durée, met à jour
+// l'engagement en cours (début/fin/formule) et garde l'historique. Le compte à
+// rebours de l'espace cliente se recalcule tout seul (basé sur date_fin).
+async function renouvelerAccomp(){
+  const ac = D.accompagnement||{};
+  const v = await UI.form({ title:"🔄 Renouveler l'accompagnement", submit:"Enregistrer le renouvellement", fields:[
+    { name:"date", label:"Date du renouvellement", type:"date", value:Calc.today(), required:true },
+    { name:"formule", label:"Ce qu'elle a pris (formule / offre)", value:ac.formule, required:true, placeholder:"Coaching distanciel — 3 mois" },
+    { name:"nb_mois", label:"Durée (mois)", type:"number", half:true, value:ac.nb_mois||3 },
+    { name:"prix", label:"Prix (€)", type:"number", half:true, value:ac.prix },
+    { name:"seances_prevues", label:"Séances du forfait (total)", type:"number", half:true, value:"" },
+    { name:"freq_prevue", label:"Fréquence", half:true, value:ac.freq_prevue, placeholder:"2/semaine" },
+  ]});
+  if (!v) return;
+  const entry = { date:v.date, formule:v.formule, nb_mois:(v.nb_mois!=null&&v.nb_mois!=="")?Number(v.nb_mois):null };
+  const hist = (Array.isArray(ac.renouvellements)?ac.renouvellements:[]).concat([entry]);
+  const patch = {
+    date_debut: v.date,
+    date_fin: v.nb_mois ? Calc.dateFin(v.date, v.nb_mois) : null,
+    nb_mois: entry.nb_mois,
+    formule: v.formule,
+    renouvellements: hist,
+  };
+  if (v.prix!=null && v.prix!=="") patch.prix = Number(v.prix);
+  if (v.seances_prevues!=null && v.seances_prevues!=="") { patch.seances_prevues = Number(v.seances_prevues); patch.seances_faites_init = 0; }
+  if (v.freq_prevue) patch.freq_prevue = v.freq_prevue;
+  try{
+    await DB.saveAccompagnement(CID, patch);
+    if (D.cliente.statut !== "active") await DB.update("clientes", CID, { statut:"active" });
+    UI.toast("Renouvellement enregistré ✓"); reload("Accompagnement");
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
 async function editAccomp(){
   const ac = D.accompagnement||{};
   const v = await UI.form({ title:"Accompagnement", fields:[
@@ -830,6 +877,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="toggle-select") return setSelMode(!SELMODE);
   if (act==="edit-cliente") return editCliente();
   if (act==="edit-accomp") return editAccomp();
+  if (act==="renouveler-accomp") return renouvelerAccomp();
   if (act==="create-access") return createAccess();
   if (act==="regen-access") return regenAccess();
   if (act==="copy-code"){
