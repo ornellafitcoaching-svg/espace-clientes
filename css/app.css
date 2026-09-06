@@ -246,6 +246,17 @@ button{font-family:inherit;cursor:pointer}
 .field textarea{resize:vertical}
 .field .invalid{border-color:var(--danger)}
 .field-static{font-size:.92rem;color:var(--text-mid);padding:4px 0}
+.field-hint{font-size:.72rem;color:var(--text-light);line-height:1.45;font-weight:500;margin-top:1px}
+.field-note{grid-column:span 2;background:linear-gradient(135deg,rgba(201,99,88,.09),rgba(201,99,88,.02));
+  border-left:4px solid var(--accent);border-radius:12px;padding:11px 14px;font-size:.82rem;
+  line-height:1.5;color:var(--text-mid)}
+.field-note strong{color:var(--accent-deep)}
+.guide-mesure h4{font-family:'Cormorant Garamond',serif;font-size:1.25rem;color:var(--accent-deep);margin:14px 0 6px}
+.guide-mesure h4:first-child{margin-top:0}
+.guide-mesure ul{margin:0 0 4px;padding-left:20px}
+.guide-mesure li{font-size:.86rem;line-height:1.55;color:var(--text-mid);margin-bottom:6px}
+.guide-mesure li b{color:var(--text-mid)}
+.guide-mesure .gm-rule{background:var(--cream);border-radius:12px;padding:12px 14px;margin-bottom:4px}
 @media(min-width:560px){.modal-overlay{align-items:center}.modal{border-radius:22px}}
 
 /* ---- Toast ---------------------------------------------------------------- */

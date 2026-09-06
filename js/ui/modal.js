@@ -1,7 +1,7 @@
 // ============================================================================
 // modal.js — modale de formulaire générique (pour toutes les actions rapides).
 // UI.form({ title, fields:[...], submit:'Enregistrer' }) → Promise(values|null)
-//   field = { name, label, type, value, options, required, placeholder, half }
+//   field = { name, label, type, value, options, required, placeholder, half, hint }
 //   types : text | textarea | number | date | select | checkbox | hidden | static
 // ============================================================================
 window.UI = window.UI || {};
@@ -48,7 +48,8 @@ UI.form = function (opts) {
         control = `<input type="${f.type || "text"}" id="${id}" name="${f.name}" value="${val}"
                     placeholder="${f.placeholder || ""}" ${f.required ? "required" : ""}>`;
       }
-      wrap.innerHTML = `<span class="field-label">${f.label || ""}${f.required ? " *" : ""}</span>${control}`;
+      const hint = f.hint ? `<span class="field-hint">${f.hint}</span>` : "";
+      wrap.innerHTML = `<span class="field-label">${f.label || ""}${f.required ? " *" : ""}</span>${control}${hint}`;
       form.appendChild(wrap);
     });
 
