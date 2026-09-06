@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e38">
+<link rel="stylesheet" href="css/app.css?v=e39">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e38"></script>
-<script src="js/supabaseClient.js?v=e38"></script>
-<script src="js/auth.js?v=e38"></script>
-<script src="js/db.js?v=e38"></script>
-<script src="js/calc.js?v=e38"></script>
-<script src="js/ui/modal.js?v=e38"></script>
-<script src="js/ui/progress.js?v=e38"></script>
+<script src="js/config.js?v=e39"></script>
+<script src="js/supabaseClient.js?v=e39"></script>
+<script src="js/auth.js?v=e39"></script>
+<script src="js/db.js?v=e39"></script>
+<script src="js/calc.js?v=e39"></script>
+<script src="js/ui/modal.js?v=e39"></script>
+<script src="js/ui/progress.js?v=e39"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -107,6 +107,38 @@ function bilanDemarrageNudge(){
   </div>`;
 }
 
+// Carte « temps restant » : combien de temps il reste sur le programme.
+// S'affiche dès qu'une date de fin est connue (ou déductible de début + durée).
+function tempsRestantCard(){
+  const ac = D.accompagnement;
+  if (!ac) return "";
+  const finLe = ac.date_fin || Calc.dateFin(ac.date_debut, ac.nb_mois);
+  if (!finLe) return "";
+  const jr = Calc.daysFromToday(finLe);
+  const su = Calc.suiviStats(ac);
+  const pct = su.pctTemps;
+  let titre, sub;
+  if (jr > 0){
+    const sem = Math.floor(jr/7), j = jr%7;
+    const label = jr >= 14 ? `${sem} semaine${sem>1?"s":""}${j?` et ${j} j`:""}` : `${jr} jour${jr>1?"s":""}`;
+    titre = adr(`Il te reste ${label} 💪`, `Il vous reste ${label} 💪`);
+    sub = `Programme jusqu'au ${Calc.fmt(finLe)}`;
+  } else if (jr === 0){
+    titre = adr("C'est le dernier jour de ton programme 🎉","C'est le dernier jour de votre programme 🎉");
+    sub = adr("Bravo pour tout ce chemin ! On fait le bilan ?","Bravo pour tout ce chemin ! On fait le bilan ?");
+  } else {
+    titre = adr("Ton programme est terminé 🏁","Votre programme est terminé 🏁");
+    sub = `Depuis le ${Calc.fmt(finLe)}. ` + adr("Envie de continuer l'aventure ? Parle-en à Ornella 💬","Envie de continuer l'aventure ? Parlez-en à Ornella 💬");
+  }
+  const wa = jr <= 0 ? waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Mon programme se termine, j'aimerais parler de la suite 💛`) : null;
+  return `<div class="card nudge-bilan" style="margin-bottom:16px">
+    <div class="nudge-title">${titre}</div>
+    <div class="isub nudge-sub">${sub}</div>
+    ${pct!=null ? `<div style="margin-top:12px">${UI.progressBar(pct, `${pct}% du programme écoulé`)}</div>` : ""}
+    ${wa ? `<a href="${wa}" target="_blank" rel="noopener" class="btn-accent btn-sm" style="margin-top:12px"><span>💬</span> ${adr("Parler de la suite","Parler de la suite")}</a>` : ""}
+  </div>`;
+}
+
 // ============================ VUES ============================
 function viewAccueil(){
   const cl = D.cliente, ac = D.accompagnement;
@@ -129,6 +161,7 @@ function viewAccueil(){
       <div class="hero-hello">Bonjour <em>${esc(cl.prenom)}</em> 👋</div>
       <p class="page-sub" style="margin-bottom:0">${adr("Voici ton suivi, mis à jour par Ornella.","Voici votre suivi, mis à jour par Ornella.")}</p>
     </div>
+    ${tempsRestantCard()}
     ${bilanNudge()}
     ${motOrnella()}
     <div class="stat-grid">
