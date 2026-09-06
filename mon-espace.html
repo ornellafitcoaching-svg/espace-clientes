@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e37">
+<link rel="stylesheet" href="css/app.css?v=e38">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e37"></script>
-<script src="js/supabaseClient.js?v=e37"></script>
-<script src="js/auth.js?v=e37"></script>
-<script src="js/db.js?v=e37"></script>
-<script src="js/calc.js?v=e37"></script>
-<script src="js/ui/modal.js?v=e37"></script>
-<script src="js/ui/progress.js?v=e37"></script>
+<script src="js/config.js?v=e38"></script>
+<script src="js/supabaseClient.js?v=e38"></script>
+<script src="js/auth.js?v=e38"></script>
+<script src="js/db.js?v=e38"></script>
+<script src="js/calc.js?v=e38"></script>
+<script src="js/ui/modal.js?v=e38"></script>
+<script src="js/ui/progress.js?v=e38"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -241,6 +241,45 @@ const MENSU_NOTE_FIELD = { name:"_note_mesure", type:"static", value:
    <span style="opacity:.85">👉 Mieux vaut ne pas mesurer que mal mesurer. Un écart bizarre = souvent un mètre mal placé.</span></div>` };
 
 // Guide complet "Comment bien me mesurer" (ouvert depuis l'onglet Mensurations).
+// Schéma SVG (silhouette de face + emplacement du mètre pour chaque mesure).
+const MESURE_SVG = `
+<svg viewBox="0 0 300 430" role="img" aria-label="Où placer le mètre sur le corps"
+     style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto 8px">
+  <g fill="#F1D1CC" stroke="#D8A7A0" stroke-width="1">
+    <circle cx="140" cy="42" r="22"/>
+    <path d="M128,64 C120,66 100,72 96,88 C92,104 92,112 94,128 C96,148 112,156 116,176
+             C110,192 92,200 90,216 L106,232 L140,224 L174,232 L190,216 C188,200 170,192 164,176
+             C168,156 184,148 186,128 C188,112 188,104 184,88 C180,72 160,66 152,64 Z"/>
+    <path d="M96,90 C80,98 72,140 74,180 C74,188 82,188 84,180 C86,146 92,110 100,98 Z"/>
+    <path d="M184,90 C200,98 208,140 206,180 C206,188 198,188 196,180 C194,146 188,110 180,98 Z"/>
+    <path d="M90,218 L106,232 L138,226 C136,270 128,320 126,352 L122,406 L104,406 L100,352 C96,300 90,260 90,218 Z"/>
+    <path d="M190,218 L174,232 L142,226 C144,270 152,320 154,352 L158,406 L176,406 L180,352 C184,300 190,260 190,218 Z"/>
+  </g>
+  <g stroke="#C96358" stroke-width="2.2" stroke-dasharray="5 4" stroke-linecap="round">
+    <line x1="118" y1="68"  x2="162" y2="68"/>
+    <line x1="88"  y1="124" x2="192" y2="124"/>
+    <line x1="96"  y1="138" x2="184" y2="138"/>
+    <line x1="110" y1="176" x2="170" y2="176"/>
+    <line x1="84"  y1="214" x2="196" y2="214"/>
+    <line x1="70"  y1="150" x2="100" y2="150"/>
+    <line x1="90"  y1="258" x2="140" y2="258"/>
+    <line x1="92"  y1="344" x2="126" y2="344"/>
+  </g>
+  <g fill="#A84E45" font-family="'DM Sans',sans-serif" font-size="12" font-weight="700">
+    <text x="167" y="72"  text-anchor="start">Cou</text>
+    <text x="197" y="128" text-anchor="start">Poitrine</text>
+    <text x="189" y="142" text-anchor="start">Sous-poitrine</text>
+    <text x="175" y="180" text-anchor="start">Taille</text>
+    <text x="201" y="218" text-anchor="start">Hanches</text>
+    <text x="65"  y="154" text-anchor="end">Bras</text>
+    <text x="85"  y="262" text-anchor="end">Cuisse</text>
+    <text x="87"  y="348" text-anchor="end">Mollet</text>
+  </g>
+</svg>
+<p style="text-align:center;font-size:.72rem;color:var(--text-light);margin:0 0 6px">
+  Vue de face — le mètre reste bien horizontal. (Fessiers &amp; tour de dos : mêmes hauteurs, côté arrière.)
+</p>`;
+
 function guideMesureHtml(){
   const rows = [
     ["Poids","le matin, à jeun, après être allée aux toilettes — toujours la même balance"],
@@ -256,6 +295,7 @@ function guideMesureHtml(){
     ["Tour de mollet","partie la plus large — toujours le même mollet"],
   ];
   return `<div class="guide-mesure">
+    ${MESURE_SVG}
     <div class="gm-rule">
       <h4>Les 5 règles d'or</h4>
       <ul>

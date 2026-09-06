@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e37">
+<link rel="stylesheet" href="css/app.css?v=e38">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e37"></script>
-<script src="js/supabaseClient.js?v=e37"></script>
-<script src="js/auth.js?v=e37"></script>
-<script src="js/db.js?v=e37"></script>
-<script src="js/calc.js?v=e37"></script>
-<script src="js/ui/modal.js?v=e37"></script>
-<script src="js/ui/progress.js?v=e37"></script>
+<script src="js/config.js?v=e38"></script>
+<script src="js/supabaseClient.js?v=e38"></script>
+<script src="js/auth.js?v=e38"></script>
+<script src="js/db.js?v=e38"></script>
+<script src="js/calc.js?v=e38"></script>
+<script src="js/ui/modal.js?v=e38"></script>
+<script src="js/ui/progress.js?v=e38"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -597,9 +597,23 @@ const MENSU_PRESETS = [
   { name:"tour_bras",     label:"Tour de bras (cm)",       unite:"cm" },
   { name:"tour_mollet",   label:"Tour de mollet (cm)",     unite:"cm" },
 ];
+// Où placer le mètre (rappel affiché sous chaque champ, mêmes repères que côté cliente).
+const MENSU_HINTS = {
+  poids:         "Le matin, à jeun, après les toilettes. Toujours la même balance.",
+  tour_cou:      "Juste sous la pomme d'Adam, mètre horizontal.",
+  poitrine:      "Sur la partie la plus forte (niveau des mamelons).",
+  sous_poitrine: "Juste sous la poitrine, ligne du soutien-gorge.",
+  tour_dos:      "Même hauteur que la poitrine, mètre horizontal dans le dos.",
+  tour_taille:   "Partie la plus fine du ventre (souvent au-dessus du nombril), ventre non rentré.",
+  tour_hanches:  "Partie la plus large des hanches et des fesses.",
+  tour_fessiers: "Partie la plus rebondie des fesses, pieds joints.",
+  tour_cuisse:   "Haut de la cuisse, partie la plus large. Toujours la même jambe.",
+  tour_bras:     "Milieu du bras, relâché. Toujours le même bras.",
+  tour_mollet:   "Partie la plus large du mollet. Toujours le même mollet.",
+};
 async function addMensuSession(){
   const fields = [{ name:"date", label:"Date", type:"date", value:Calc.today() }]
-    .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
+    .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true, hint:MENSU_HINTS[p.name]||"" })));
   const v = await UI.form({ title:"Mensurations", submit:"Enregistrer", fields });
   if (!v) return;
   const rows = MENSU_PRESETS
