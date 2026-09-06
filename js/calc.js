@@ -163,12 +163,29 @@ window.Calc = {
     // Une cliente présentiel (sans nutrition) est coachée en personne : rien à envoyer.
     const type = c.cliente && c.cliente.type;
     const nutritionActive = c.accompagnement && c.accompagnement.nutrition_active;
+    const active = c.cliente && c.cliente.statut === "active";
     const besoinSport = type === "distanciel" || type === "hybride";
     const sportEnvoye = (c.programmes || []).some((p) => p.kind === "sportif" && p.envoye);
-    const nutEnvoye = (c.programmes || []).some((p) => p.kind === "nutrition" && p.envoye);
-    const aEnvoyer = (besoinSport && !sportEnvoye) || (nutritionActive && !nutEnvoye);
-    if (c.cliente && c.cliente.statut === "active" && aEnvoyer) {
-      out.push({ type: "programme", label: "Programme à envoyer", icon: "📤" });
+    if (active && besoinSport && !sportEnvoye) {
+      out.push({ type: "programme", label: "Programme sportif à envoyer", icon: "📤" });
+    }
+    // Nutrition MENSUELLE : rappel ~1 mois après le dernier programme nutrition envoyé
+    // (ex. Monya). S'il n'y en a jamais eu → rappel d'envoyer le 1er.
+    if (active && nutritionActive) {
+      const dates = (c.programmes || [])
+        .filter((p) => p.kind === "nutrition")
+        .map((p) => p.date_envoi || (p.created_at ? String(p.created_at).slice(0, 10) : null))
+        .filter(Boolean)
+        .sort();
+      if (!dates.length) {
+        out.push({ type: "programme", label: "1er programme nutrition à envoyer", icon: "🥗" });
+      } else {
+        const prochain = this.dateFin(dates[dates.length - 1], 1); // dernier envoi + 1 mois
+        const jr = this.daysFromToday(prochain);
+        if (jr !== null && jr <= 3) {
+          out.push({ type: "nutrition_mensuelle", label: "Programme nutrition du mois à renvoyer", icon: "🥗" });
+        }
+      }
     }
     return out;
   },
