@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
   const depuis = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("seances")
-    .select("id,date,heure,type,duree,statut,objectif,clientes(prenom,nom,type)")
+    .select("id,date,heure,type,duree,statut,objectif,clientes(prenom,nom,type,adresse)")
     .neq("statut", "annulee")
     .gte("date", depuis)
     .order("date");
@@ -98,6 +98,7 @@ Deno.serve(async (req) => {
     L.push(`DTSTART;TZID=Europe/Paris:${start}`);
     L.push(`DTEND;TZID=Europe/Paris:${end}`);
     L.push(`SUMMARY:${esc(summary)}`);
+    if (cl.adresse) L.push(`LOCATION:${esc(cl.adresse)}`);
     if ((s as any).objectif) L.push(`DESCRIPTION:${esc((s as any).objectif)}`);
     L.push((s as any).statut === "realisee" ? "STATUS:CONFIRMED" : "STATUS:TENTATIVE");
     // Rappel 2h avant (uniquement pour les séances à venir, pas les faites).

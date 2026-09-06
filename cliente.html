@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e42">
+<link rel="stylesheet" href="css/app.css?v=e43">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e42"></script>
-<script src="js/supabaseClient.js?v=e42"></script>
-<script src="js/auth.js?v=e42"></script>
-<script src="js/db.js?v=e42"></script>
-<script src="js/calc.js?v=e42"></script>
-<script src="js/ui/modal.js?v=e42"></script>
-<script src="js/ui/progress.js?v=e42"></script>
+<script src="js/config.js?v=e43"></script>
+<script src="js/supabaseClient.js?v=e43"></script>
+<script src="js/auth.js?v=e43"></script>
+<script src="js/db.js?v=e43"></script>
+<script src="js/calc.js?v=e43"></script>
+<script src="js/ui/modal.js?v=e43"></script>
+<script src="js/ui/progress.js?v=e43"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -749,6 +749,7 @@ async function editCliente(){
     { name:"objectifs_secondaires", label:"Objectifs secondaires", type:"textarea", value:cl.objectifs_secondaires },
     { name:"telephone", label:"Téléphone", half:true, value:cl.telephone },
     { name:"email_perso", label:"Email perso", half:true, value:cl.email_perso },
+    { name:"adresse", label:"Adresse (lieu des séances présentiel — s'affiche dans ton agenda Apple)", value:cl.adresse, placeholder:"12 rue des Lilas, 91000 Évry" },
     { name:"date_naissance", label:"Date de naissance", type:"date", half:true, value:cl.date_naissance },
     { name:"taille_cm", label:"Taille (cm)", type:"number", half:true, value:cl.taille_cm },
     { name:"niveau", label:"Niveau", type:"select", half:true, value:cl.niveau||"", options:[
@@ -772,7 +773,7 @@ async function editCliente(){
   // Date de fin prévisionnelle auto (début + durée) si non renseignée — n'écrase jamais une date saisie.
   if (v.date_debut && v.nb_mois && !v.date_fin) v.date_fin = Calc.dateFin(v.date_debut, v.nb_mois);
   const CLIENTE_KEYS = ["prenom","nom","type","statut","objectif_principal","objectifs_secondaires",
-    "telephone","email_perso","date_naissance","taille_cm","niveau","disponibilites","tutoiement","sante","allergies"];
+    "telephone","email_perso","adresse","date_naissance","taille_cm","niveau","disponibilites","tutoiement","sante","allergies"];
   const ACCOMP_KEYS = ["date_debut","date_fin","nb_mois","formule","prix","seances_prevues","seances_faites_init","freq_prevue","nutrition_active"];
   const cliP = {}, accP = {};
   CLIENTE_KEYS.forEach(k=>{ if (k in v) cliP[k]=v[k]; });
