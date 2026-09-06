@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e40">
+<link rel="stylesheet" href="css/app.css?v=e41">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e40"></script>
-<script src="js/supabaseClient.js?v=e40"></script>
-<script src="js/auth.js?v=e40"></script>
-<script src="js/db.js?v=e40"></script>
-<script src="js/calc.js?v=e40"></script>
-<script src="js/ui/modal.js?v=e40"></script>
-<script src="js/ui/progress.js?v=e40"></script>
+<script src="js/config.js?v=e41"></script>
+<script src="js/supabaseClient.js?v=e41"></script>
+<script src="js/auth.js?v=e41"></script>
+<script src="js/db.js?v=e41"></script>
+<script src="js/calc.js?v=e41"></script>
+<script src="js/ui/modal.js?v=e41"></script>
+<script src="js/ui/progress.js?v=e41"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -102,6 +102,7 @@ function render(focusTitle){
     <!-- ACTIONS RAPIDES -->
     <div class="quick">
       <button class="qbtn qbtn-accent" data-act="add-seance"><span class="i">🏋️</span> Séance</button>
+      <button class="qbtn" data-act="recap-seances"><span class="i">📲</span> Récap séances</button>
       <button class="qbtn" data-act="add-bilan"><span class="i">📋</span> Bilan</button>
       <button class="qbtn" data-act="add-mensu"><span class="i">📏</span> Mensurations</button>
       <button class="qbtn" data-act="add-photo"><span class="i">📸</span> Photo</button>
@@ -869,6 +870,11 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="add-photo") return addPhoto();
   if (act==="prog-sportif") return progEnvoye("sportif");
   if (act==="prog-nutrition") return progEnvoye("nutrition");
+  if (act==="recap-seances"){
+    const wa = Calc.waHref(D.cliente.telephone, Calc.recapSeancesMsg(D.cliente, D.seances));
+    if (!wa){ UI.toast("Numéro de téléphone manquant pour cette cliente","err"); return; }
+    window.open(wa, "_blank"); return;
+  }
   if (act==="seance-done"){
     try{ await DB.update("seances", id, { statut:"realisee" }); UI.toast("Séance marquée faite ✓"); reload(); }
     catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }

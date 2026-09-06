@@ -79,6 +79,9 @@ Deno.serve(async (req) => {
   ];
 
   for (const s of (data ?? [])) {
+    // Exclut les fausses séances CRM reconstituées (réalisées, datées du 31/08/2026,
+    // sans heure) — mêmes que celles masquées dans l'espace, sinon doublons agenda.
+    if ((s as any).statut === "realisee" && (s as any).date === "2026-08-31") continue;
     const cl = (s as any).clientes || {};
     const duree = Number((s as any).duree) || 60;
     const start = stamp((s as any).date, (s as any).heure);

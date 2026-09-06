@@ -218,6 +218,25 @@ window.Calc = {
     return "Bonjour " + cl.prenom + " 😊 Petit rappel : nous avons séance prévue le " + quand
       + " 💪 Au plaisir de vous voir ! Si vous avez besoin de décaler, dites-le-moi 🙂";
   },
+  // Récap de TOUTES les séances à venir d'une cliente (WhatsApp) + invite à demander une modif.
+  recapSeancesMsg(cl, seances) {
+    const today = this.today();
+    const list = (seances || [])
+      .filter(s => s.statut === "prevue" && s.date && s.date >= today)
+      .sort((a, b) => a.date !== b.date ? (a.date < b.date ? -1 : 1) : ((a.heure||"99") < (b.heure||"99") ? -1 : 1));
+    const lignes = list.map(s => {
+      const h = this.fmtHeure(s.heure);
+      return "• " + this.fmtJour(s.date) + (h ? " à " + h : "") + (s.type ? " — " + s.type : "");
+    }).join("\n");
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 Voici le récap de tes prochaines séances :\n\n"
+        + (lignes || "(aucune séance programmée pour le moment)")
+        + "\n\nSi tu as besoin de modifier ou décaler une séance, réponds-moi ici et on s'arrange 🙂 💪";
+    }
+    return "Bonjour " + cl.prenom + " 😊 Voici le récap de vos prochaines séances :\n\n"
+      + (lignes || "(aucune séance programmée pour le moment)")
+      + "\n\nSi vous avez besoin de modifier ou décaler une séance, répondez-moi ici et on s'arrange 🙂 💪";
+  },
   // Message « invitation à l'espace » pré-rempli (tutoiement selon cl.tutoiement).
   accessInviteMsg(cl) {
     const lien = this.espaceLink(cl.access_code);
