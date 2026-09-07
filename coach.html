@@ -30,6 +30,8 @@
   <div class="alerts" id="alerts"></div>
   <div id="agenda"></div>
   <div id="bilansSuivi"></div>
+  <div id="bilansDemarrage"></div>
+  <div id="sansSeance"></div>
 
   <div class="toolbar">
     <div class="search"><input id="q" placeholder="Rechercher (prénom, nom, objectif…)"></div>
@@ -156,15 +158,22 @@ function renderBilans(){
   // Ligne d'une cliente (réutilisée dans les deux blocs).
   const rowHtml = (r) => {
     const cl = r.cl;
-    let detail;
-    if (!r.aRempli){ detail = r.demarree ? `<span style="color:#c0564b">aucun bilan pour l'instant</span>` : `pas encore démarré`; }
-    else {
+    let detail, prochain = "";
+    if (!r.aRempli){
+      if (!r.demarree){ detail = `pas encore démarrée`; }
+      else if (r.b.joursAvant!==null && r.b.joursAvant<0){
+        detail = `<span style="color:#c0564b">1er bilan en retard de ${Math.abs(r.b.joursAvant)} j</span>`;
+      } else {
+        detail = `<span style="color:#c0564b">aucun bilan pour l'instant</span>`;
+        prochain = r.b.prochain ? ` · 1er bilan prévu le ${Calc.fmt(r.b.prochain)}` : "";
+      }
+    } else {
       const d = r.dernier;
       const qui = d.saisi_par==="cliente" ? "rempli par elle" : "saisi par toi";
       const quand = d.created_at ? Calc.fmt(String(d.created_at).slice(0,10)) : Calc.fmt(d.date);
       detail = `dernier : <strong>${Calc.fmt(d.date)}</strong> · ${qui} le ${quand} · ${r.bilans.length} au total`;
+      prochain = r.b.prochain ? ` · prochain le ${Calc.fmt(r.b.prochain)}` : "";
     }
-    const prochain = r.b.prochain ? ` · prochain le ${Calc.fmt(r.b.prochain)}` : "";
     const wa = (r.prio<=2) ? Calc.waHref(cl.telephone, Calc.bilanMsg(cl, r.b.joursAvant!==null && r.b.joursAvant<0)) : null;
     return `<div class="cl-line" style="padding:7px 0;gap:8px;flex-wrap:wrap">
       <a href="cliente.html?id=${cl.id}" style="text-decoration:none;color:inherit;min-width:0;flex:1 1 55%">
@@ -199,15 +208,74 @@ function renderBilans(){
     </div></details>`;
 }
 
+// ---- Suivi des bilans de démarrage (ressenti des premières séances) ----
+function renderBilansDemarrage(){
+  const box = document.getElementById("bilansDemarrage");
+  const suivies = STATE.clientes.filter(c => c.cliente.statut !== "termine" && c.accompagnement && c.accompagnement.date_debut);
+  const aFaire = [], faits = [];
+  suivies.forEach(c => {
+    const done = (c.bilansDemarrage||[]).length > 0;
+    if (done){
+      const d = [...c.bilansDemarrage].sort((a,b)=>a.date<b.date?1:-1)[0];
+      faits.push({ cl:c.cliente, date:d.date });
+    } else if (Calc.bilanDemarrageDue(c.accompagnement, c.seances, c.bilansDemarrage)){
+      const st = Calc.seancesStats(c.accompagnement, c.seances);
+      aFaire.push({ cl:c.cliente, realisees:st.realisees });
+    }
+  });
+  if (!aFaire.length && !faits.length){ box.innerHTML = ""; return; }
+  const rowA = r => {
+    const wa = Calc.waHref(r.cl.telephone, Calc.bilanDemarrageMsg(r.cl));
+    return `<div class="cl-line" style="padding:7px 0;gap:8px;flex-wrap:wrap">
+      <a href="cliente.html?id=${r.cl.id}" style="text-decoration:none;color:inherit;flex:1 1 55%"><strong>${esc(r.cl.prenom)} ${esc(r.cl.nom||"")}</strong>
+      <span style="display:block;font-size:.8rem;color:var(--text-light)">${r.realisees} séances faites — ressenti pas encore demandé</span></a>
+      <span style="display:flex;gap:6px;align-items:center;flex:none"><span class="dot-alert" style="background:#fbe6d6;color:#b87316">🩹 À demander</span>${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener" title="Demander le ressenti sur WhatsApp">📲</a>`:""}</span>
+    </div>`;
+  };
+  const rowF = r => `<div class="cl-line" style="padding:7px 0;gap:8px;flex-wrap:wrap">
+      <a href="cliente.html?id=${r.cl.id}" style="text-decoration:none;color:inherit;flex:1 1 55%"><strong>${esc(r.cl.prenom)} ${esc(r.cl.nom||"")}</strong>
+      <span style="display:block;font-size:.8rem;color:var(--text-light)">fait le ${Calc.fmt(r.date)}</span></a>
+      <span class="dot-alert" style="background:#e7f4ec;color:#2f8f5b;flex:none">✅ Fait</span></div>`;
+  const sub = (t,arr,col,fn) => arr.length
+    ? `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:${col};margin:10px 2px 2px">${t} (${arr.length})</div><div class="card" style="margin-top:4px;padding:6px 12px">${arr.map(fn).join("")}</div>`
+    : "";
+  box.innerHTML = `<details class="section-block" style="margin:14px 0">
+    <summary><span class="chev">▸</span>🩹 Bilans de démarrage<span class="count">${aFaire.length+faits.length}</span>${aFaire.length?`<span class="count" style="background:#b87316;color:#fff">🩹 ${aFaire.length}</span>`:""}</summary>
+    <div class="section-body">
+      ${sub("🩹 Ressenti à demander", aFaire, "#b87316", rowA)}
+      ${sub("✅ Déjà fait", faits, "#2f8f5b", rowF)}
+    </div></details>`;
+}
+
+// ---- Clientes actives sans aucune séance à venir (trou dans le planning) ----
+function renderSansSeance(){
+  const box = document.getElementById("sansSeance");
+  const today = Calc.today();
+  const sans = STATE.clientes.filter(c => {
+    if (c.cliente.statut !== "active") return false;
+    return !(c.seances||[]).some(s => s.statut==="prevue" && s.date && s.date>=today);
+  }).sort((a,b)=>(a.cliente.prenom||"").localeCompare(b.cliente.prenom||""));
+  if (!sans.length){ box.innerHTML = ""; return; }
+  box.innerHTML = `<details class="section-block" style="margin:14px 0">
+    <summary><span class="chev">▸</span>🗓️ Sans séance programmée<span class="count" style="background:#b87316;color:#fff">${sans.length}</span></summary>
+    <div class="section-body"><div class="card" style="margin-top:8px;padding:6px 12px">
+    ${sans.map(c=>`<div class="cl-line" style="padding:7px 0;gap:8px;flex-wrap:wrap">
+      <a href="cliente.html?id=${c.cliente.id}" style="text-decoration:none;color:inherit;flex:1 1 60%"><strong>${esc(c.cliente.prenom)} ${esc(c.cliente.nom||"")}</strong>
+      <span style="display:block;font-size:.8rem;color:var(--text-light)">aucune séance à venir</span></a>
+      <a class="tag" href="cliente.html?id=${c.cliente.id}" style="flex:none">➕ Programmer</a></div>`).join("")}
+    </div></div></details>`;
+}
+
 // ---- Chargement groupé (peu de requêtes, quel que soit le nb de clientes) ----
 async function loadAll() {
-  const [clientes, accomp, seances, bilans, bilansDem, programmes] = await Promise.all([
+  const [clientes, accomp, seances, bilans, bilansDem, programmes, mensu] = await Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
     sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois"),
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("bilans_demarrage").select("cliente_id,date"),
     sb.from("programmes").select("cliente_id,kind,envoye,date_envoi,created_at"),
+    sb.from("mensurations").select("cliente_id,type"),
   ]);
   const group = (rows, key="cliente_id") => {
     const m = {}; (rows.data||[]).forEach(r => { (m[r[key]] ||= []).push(r); }); return m;
@@ -217,15 +285,25 @@ async function loadAll() {
   const bilMap = group(bilans.data ? bilans : {data:[]});
   const bilDemMap = group(bilansDem.data ? bilansDem : {data:[]});
   const proMap = group(programmes.data ? programmes : {data:[]});
+  // Types de mensurations par cliente → sert au repère « cou manquant pour l'IMG ».
+  const mensTypes = {}; (mensu.data||[]).forEach(m => { (mensTypes[m.cliente_id] ||= new Set()).add(m.type); });
 
-  STATE.clientes = (clientes.data||[]).map(cl => ({
-    cliente: cl,
-    accompagnement: accMap[cl.id] || null,
-    seances: (seaMap[cl.id]||[]).map(s=>({id:s.id, statut:s.statut, date:s.date, type:s.type, heure:s.heure})),
-    bilans: bilMap[cl.id]||[],
-    bilansDemarrage: bilDemMap[cl.id]||[],
-    programmes: proMap[cl.id]||[],
-  }));
+  STATE.clientes = (clientes.data||[]).map(cl => {
+    const t = mensTypes[cl.id] || new Set();
+    // IMG (masse grasse) possible seulement si taille+hanches+cou + taille au profil.
+    // On signale quand tout est là SAUF le cou (et pas encore d'IMG) → un cou suffirait.
+    const imgCouManquant = t.has("tour_taille") && t.has("tour_hanches") && !!cl.taille_cm
+                           && !t.has("tour_cou") && !t.has("masse_grasse");
+    return {
+      cliente: cl,
+      accompagnement: accMap[cl.id] || null,
+      seances: (seaMap[cl.id]||[]).map(s=>({id:s.id, statut:s.statut, date:s.date, type:s.type, heure:s.heure})),
+      bilans: bilMap[cl.id]||[],
+      bilansDemarrage: bilDemMap[cl.id]||[],
+      programmes: proMap[cl.id]||[],
+      imgCouManquant,
+    };
+  });
 }
 
 // ---- Alertes globales ----
@@ -347,6 +425,7 @@ function renderList() {
         }
         return `<span class="dot-alert">${a.icon} ${a.label}</span>`;
       }).join('')}</div>` : ''}
+      ${c.imgCouManquant ? `<div class="cl-alerts"><span class="dot-alert" style="background:#f8f2d6;color:#977f14" title="Ajoute son tour de cou (même date) pour calculer sa masse grasse">📏 IMG : cou manquant</span></div>` : ''}
     </a>`;
   }).join("") + `</div>`;
 }
@@ -418,12 +497,12 @@ document.getElementById("newCliente").onclick = async () => {
       const { error } = await sb.from("seances").update({ statut:"realisee" }).eq("id", btn.dataset.done);
       if (error) throw error;
       UI.toast("Séance marquée faite ✓");
-      await loadAll(); renderAlerts(); renderAgenda(); renderBilans(); renderList();
+      await loadAll(); renderAlerts(); renderAgenda(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderList();
     } catch(err){ console.error(err); UI.toast("Erreur : "+(err.message||err),"err"); btn.disabled = false; }
   });
   try {
     await loadAll();
-    renderAlerts(); renderAgenda(); renderBilans(); renderFilters(); renderList();
+    renderAlerts(); renderAgenda(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
   } catch(e){
     console.error(e);
     document.getElementById("content").innerHTML =
