@@ -413,7 +413,7 @@ function viewMensurations(){
     </div>`;
   const types = Calc.mensuTypes(D.mensurations);
   if (!types.length) return addBtn + empty("Aucune mensuration pour l'instant. Ajoute tes mesures avec le bouton ci-dessus 👆");
-  return addBtn + `<div class="mensu-grid">` + types.map(t=>{
+  const grid = `<div class="mensu-grid">` + types.map(t=>{
     const ev = Calc.mensuEvolution(D.mensurations, t);
     const dir = ev.diff<0?"down":(ev.diff>0?"up":"");
     const sign = ev.diff>0?"+":"";
@@ -423,6 +423,54 @@ function viewMensurations(){
       <div class="isub">${ev.depart}${esc(ev.unite)} → ${ev.derniere}${esc(ev.unite)}</div>
     </div>`;
   }).join("") + `</div>`;
+  return addBtn + grid + corrigeMensuBloc();
+}
+// Bloc « corriger mes mesures » : les 2 dernières dates, chaque mesure modifiable/supprimable.
+// (masse grasse exclue : elle est calculée automatiquement.)
+function corrigeMensuBloc(){
+  const recent = (D.mensurations||[]).filter(m=>m.type!=="masse_grasse").slice().sort((a,b)=> a.date<b.date?1:-1);
+  if (!recent.length) return "";
+  const dates=[], byDate={};
+  recent.forEach(m=>{ if(!byDate[m.date]){ byDate[m.date]=[]; dates.push(m.date); } byDate[m.date].push(m); });
+  const showDates = dates.slice(0,2);
+  return `<details class="section-block" style="margin-top:16px">
+    <summary><span class="chev">▸</span>✏️ Corriger mes mesures</summary>
+    <div class="section-body">
+      <p class="isub" style="color:var(--text-light);margin:6px 2px 10px">Une faute de frappe&nbsp;? ${adr("Modifie ou supprime une mesure ci-dessous.","Modifiez ou supprimez une mesure ci-dessous.")}</p>
+      ${showDates.map(d=>`<div class="card" style="margin-bottom:8px;padding:8px 12px">
+        <div class="idate" style="font-weight:700;text-transform:capitalize;margin-bottom:4px">${Calc.fmtJour(d)}</div>
+        ${byDate[d].map(m=>`<div class="cl-line" style="padding:5px 0">
+          <span>${esc(m.type.replace(/_/g," "))}</span>
+          <span style="display:flex;gap:10px;align-items:center;flex:none">
+            <strong>${m.valeur} ${esc(m.unite||"")}</strong>
+            <button class="icon-btn" data-edit-mensu="${m.id}" title="Modifier">✏️</button>
+            <button class="icon-btn" data-del-mensu="${m.id}" title="Supprimer">🗑</button>
+          </span></div>`).join("")}
+      </div>`).join("")}
+    </div></details>`;
+}
+async function editMyMensu(id){
+  const m = (D.mensurations||[]).find(x=>String(x.id)===String(id)); if(!m) return;
+  const v = await UI.form({ title:"Corriger : "+m.type.replace(/_/g," "), submit:"Enregistrer", fields:[
+    { name:"valeur", label:"Valeur ("+(m.unite||"")+")", type:"number", value:m.valeur, required:true },
+  ]});
+  if (!v || v.valeur===""||v.valeur==null) return;
+  try{
+    const { error } = await sb.from("mensurations").update({ valeur:Number(v.valeur) }).eq("id", id);
+    if (error) throw error;
+    m.valeur = Number(v.valeur);
+    UI.toast("Mesure corrigée ✓"); render();
+  }catch(e){ console.error(e); UI.toast("Impossible de modifier"+(e&&e.message?" : "+e.message:""), "err"); }
+}
+async function delMyMensu(id){
+  const m = (D.mensurations||[]).find(x=>String(x.id)===String(id)); if(!m) return;
+  if (!(await UI.confirm(adr("Supprimer cette mesure ?","Supprimer cette mesure ?")))) return;
+  try{
+    const { error } = await sb.from("mensurations").delete().eq("id", id);
+    if (error) throw error;
+    D.mensurations = (D.mensurations||[]).filter(x=>String(x.id)!==String(id));
+    UI.toast("Mesure supprimée ✓"); render();
+  }catch(e){ console.error(e); UI.toast("Impossible de supprimer"+(e&&e.message?" : "+e.message:""), "err"); }
 }
 
 function viewEvolution(){
@@ -752,6 +800,8 @@ document.getElementById("main").addEventListener("click", (e)=>{
   if (e.target.closest("#nudgeBilanBtn")){ VIEW="bilans"; render(); addMyBilan(); return; }
   if (e.target.closest("#addDemarrageBtn")){ addMyBilanDemarrage(); return; }
   if (e.target.closest("#nudgeDemarrageBtn")){ VIEW="bilans"; render(); addMyBilanDemarrage(); return; }
+  const em = e.target.closest("[data-edit-mensu]"); if (em){ editMyMensu(em.dataset.editMensu); return; }
+  const dm = e.target.closest("[data-del-mensu]"); if (dm){ delMyMensu(dm.dataset.delMensu); return; }
   const b = e.target.closest("[data-view]"); if (!b) return;
   VIEW = b.dataset.view; render();
   window.scrollTo({ top:0, behavior:"smooth" });

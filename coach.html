@@ -291,9 +291,11 @@ async function loadAll() {
   STATE.clientes = (clientes.data||[]).map(cl => {
     const t = mensTypes[cl.id] || new Set();
     // IMG (masse grasse) possible seulement si taille+hanches+cou + taille au profil.
+    const aTailleHanches = t.has("tour_taille") && t.has("tour_hanches") && !t.has("masse_grasse");
     // On signale quand tout est là SAUF le cou (et pas encore d'IMG) → un cou suffirait.
-    const imgCouManquant = t.has("tour_taille") && t.has("tour_hanches") && !!cl.taille_cm
-                           && !t.has("tour_cou") && !t.has("masse_grasse");
+    const imgCouManquant = aTailleHanches && !!cl.taille_cm && !t.has("tour_cou");
+    // Ou quand c'est la taille (profil) qui manque → l'IMG est bloqué à la racine.
+    const imgTailleManquante = aTailleHanches && !cl.taille_cm;
     return {
       cliente: cl,
       accompagnement: accMap[cl.id] || null,
@@ -302,6 +304,7 @@ async function loadAll() {
       bilansDemarrage: bilDemMap[cl.id]||[],
       programmes: proMap[cl.id]||[],
       imgCouManquant,
+      imgTailleManquante,
     };
   });
 }
@@ -425,7 +428,7 @@ function renderList() {
         }
         return `<span class="dot-alert">${a.icon} ${a.label}</span>`;
       }).join('')}</div>` : ''}
-      ${c.imgCouManquant ? `<div class="cl-alerts"><span class="dot-alert" style="background:#f8f2d6;color:#977f14" title="Ajoute son tour de cou (même date) pour calculer sa masse grasse">📏 IMG : cou manquant</span></div>` : ''}
+      ${(c.imgCouManquant||c.imgTailleManquante) ? `<div class="cl-alerts">${c.imgCouManquant?`<span class="dot-alert" style="background:#f8f2d6;color:#977f14" title="Ajoute son tour de cou (même date) pour calculer sa masse grasse">📏 IMG : cou manquant</span>`:''}${c.imgTailleManquante?`<span class="dot-alert" style="background:#f8f2d6;color:#977f14" title="Renseigne sa taille (cm) dans sa fiche pour débloquer le calcul de masse grasse">📏 IMG : taille manquante</span>`:''}</div>` : ''}
     </a>`;
   }).join("") + `</div>`;
 }
