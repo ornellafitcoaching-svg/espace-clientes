@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e44">
+<link rel="stylesheet" href="css/app.css?v=e45">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e44"></script>
-<script src="js/supabaseClient.js?v=e44"></script>
-<script src="js/auth.js?v=e44"></script>
-<script src="js/db.js?v=e44"></script>
-<script src="js/calc.js?v=e44"></script>
-<script src="js/ui/modal.js?v=e44"></script>
-<script src="js/ui/progress.js?v=e44"></script>
+<script src="js/config.js?v=e45"></script>
+<script src="js/supabaseClient.js?v=e45"></script>
+<script src="js/auth.js?v=e45"></script>
+<script src="js/db.js?v=e45"></script>
+<script src="js/calc.js?v=e45"></script>
+<script src="js/ui/modal.js?v=e45"></script>
+<script src="js/ui/progress.js?v=e45"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -601,8 +601,8 @@ const TBL = {seance:"seances",bilan:"bilans",bilan_demarrage:"bilans_demarrage",
 // Saisie COMPLÈTE des mensurations : toutes les mesures d'un coup, une date.
 const MENSU_PRESETS = [
   { name:"poids",         label:"Poids (kg)",              unite:"kg" },
+  { name:"tour_cou",      label:"Tour de cou (cm) ⭐",      unite:"cm" },
   { name:"masse_grasse",  label:"Masse grasse (% — auto)", unite:"%"  },
-  { name:"tour_cou",      label:"Tour de cou (cm)",        unite:"cm" },
   { name:"poitrine",      label:"Poitrine (cm)",           unite:"cm" },
   { name:"sous_poitrine", label:"Sous-poitrine (cm)",      unite:"cm" },
   { name:"tour_dos",      label:"Tour de dos (cm)",        unite:"cm" },
@@ -616,7 +616,7 @@ const MENSU_PRESETS = [
 // Où placer le mètre (rappel affiché sous chaque champ, mêmes repères que côté cliente).
 const MENSU_HINTS = {
   poids:         "Le matin, à jeun, après les toilettes. Toujours la même balance.",
-  tour_cou:      "Juste sous la pomme d'Adam, mètre horizontal.",
+  tour_cou:      "⭐ Indispensable pour calculer la masse grasse. Juste sous la pomme d'Adam, mètre horizontal.",
   poitrine:      "Sur la partie la plus forte (niveau des mamelons).",
   sous_poitrine: "Juste sous la poitrine, ligne du soutien-gorge.",
   tour_dos:      "Le tour du buste au niveau du dos : sous les aisselles, à l'endroit le plus large du dos, bras le long du corps.",
@@ -644,7 +644,11 @@ async function addMensuSession(){
   if (!rows.length){ UI.toast("Aucune mesure saisie"); return; }
   try{ await window.sb.from("mensurations").insert(rows);
     const mgRow = rows.find(r=>r.type==="masse_grasse");
-    UI.toast(rows.length+" mesure(s) enregistrée(s)"+(mgRow?` · masse grasse ${mgRow.valeur}% calculée ✓`:" ✓")); reload("Mensurations & évolution"); }
+    let mgVal = mgRow ? mgRow.valeur : null;
+    // Si l'IMG n'a pas été calculé dans cette saisie (ex. on ajoute juste le cou à une date
+    // qui a déjà taille+hanches), on le complète à partir de l'état complet de cette date.
+    if (mgVal == null){ const mg = await recalcMasseGrasse(v.date); if (mg != null) mgVal = mg; }
+    UI.toast(rows.length+" mesure(s) enregistrée(s)"+(mgVal!=null?` · masse grasse ${mgVal}% calculée ✓`:" ✓")); reload("Mensurations & évolution"); }
   catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 
@@ -676,6 +680,22 @@ async function addBilanCoach(rec){
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 
+// Recalcule la masse grasse (US Navy) pour une date donnée si taille+hanches+cou y sont
+// présents et qu'aucun IMG n'y figure encore. Permet de rattraper d'anciens bilans en
+// ajoutant simplement le tour de cou. Ne touche jamais à un IMG déjà enregistré.
+async function recalcMasseGrasse(date){
+  if (!date || !D || !D.cliente || !D.cliente.taille_cm) return null;
+  const { data } = await window.sb.from("mensurations")
+    .select("id,type,valeur").eq("cliente_id", CID).eq("date", date);
+  if (!data) return null;
+  const get = t => { const r = data.find(x=>x.type===t); return r?r.valeur:null; };
+  if (data.some(x=>x.type==="masse_grasse")) return null; // déjà un IMG ce jour-là → on ne l'écrase pas
+  const mg = Calc.masseGrasseNavy(get("tour_taille"), get("tour_hanches"), get("tour_cou"), D.cliente.taille_cm);
+  if (mg == null) return null; // pas assez de mesures (souvent le cou qui manque)
+  await window.sb.from("mensurations").insert({ cliente_id:CID, date, type:"masse_grasse", valeur:mg, unite:"%" });
+  return mg;
+}
+
 async function addOrEdit(entity, rec){
   const cfg = ENT[entity];
   const v = await UI.form({ title:(rec?"Modifier ":"")+cfg.title, fields:cfg.fields(rec) });
@@ -684,8 +704,14 @@ async function addOrEdit(entity, rec){
     const payload = cfg.payload(v);
     if (rec) await DB.update(cfg.table, rec.id, payload);
     else await DB.insert(cfg.table, payload);
-    const FOCUS = { seance:"Séances", objectif:"Objectifs", paiement:"Paiements", note:"Notes privées" }[entity];
-    UI.toast("Enregistré ✓"); reload(FOCUS);
+    // Une mesure ajoutée/modifiée peut compléter le trio taille+hanches+cou → IMG auto.
+    let extra = "";
+    if (entity === "mensuration"){
+      const mg = await recalcMasseGrasse(payload.date);
+      if (mg != null) extra = ` · masse grasse ${mg}% calculée ✓`;
+    }
+    const FOCUS = { seance:"Séances", objectif:"Objectifs", paiement:"Paiements", note:"Notes privées", mensuration:"Mensurations & évolution" }[entity];
+    UI.toast("Enregistré ✓"+extra); reload(FOCUS);
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 

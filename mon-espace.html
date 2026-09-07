@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e44">
+<link rel="stylesheet" href="css/app.css?v=e45">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e44"></script>
-<script src="js/supabaseClient.js?v=e44"></script>
-<script src="js/auth.js?v=e44"></script>
-<script src="js/db.js?v=e44"></script>
-<script src="js/calc.js?v=e44"></script>
-<script src="js/ui/modal.js?v=e44"></script>
-<script src="js/ui/progress.js?v=e44"></script>
+<script src="js/config.js?v=e45"></script>
+<script src="js/supabaseClient.js?v=e45"></script>
+<script src="js/auth.js?v=e45"></script>
+<script src="js/db.js?v=e45"></script>
+<script src="js/calc.js?v=e45"></script>
+<script src="js/ui/modal.js?v=e45"></script>
+<script src="js/ui/progress.js?v=e45"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -263,7 +263,7 @@ function viewSeances(){
 // Mesures que la cliente peut renseigner elle-même (mêmes clés que côté coach).
 const MY_MENSU_PRESETS = [
   { name:"poids",         label:"Poids (kg)",            unite:"kg" },
-  { name:"tour_cou",      label:"Tour de cou (cm)",      unite:"cm" },
+  { name:"tour_cou",      label:"Tour de cou (cm) ⭐",    unite:"cm" },
   { name:"poitrine",      label:"Poitrine (cm)",         unite:"cm" },
   { name:"sous_poitrine", label:"Sous-poitrine (cm)",    unite:"cm" },
   { name:"tour_dos",      label:"Tour de dos (cm)",      unite:"cm" },
@@ -277,7 +277,7 @@ const MY_MENSU_PRESETS = [
 // Où placer le mètre pour chaque mesure (affiché sous chaque champ).
 const MENSU_HINTS = {
   poids:         "Le matin, à jeun, après les toilettes. Toujours la même balance, au même moment.",
-  tour_cou:      "Juste sous la pomme d'Adam, mètre bien horizontal.",
+  tour_cou:      "⭐ Indispensable pour calculer ta masse grasse. Juste sous la pomme d'Adam, mètre bien horizontal.",
   poitrine:      "Sur la partie la plus forte de la poitrine (au niveau des mamelons).",
   sous_poitrine: "Juste sous la poitrine, sur la ligne du soutien-gorge.",
   tour_dos:      "Le tour du buste au niveau du dos : sous les aisselles, à l'endroit le plus large du dos, bras le long du corps.",
