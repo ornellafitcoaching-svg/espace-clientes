@@ -29,6 +29,7 @@
 
   <div class="alerts" id="alerts"></div>
   <div id="agenda"></div>
+  <div id="bilansSuivi"></div>
 
   <div class="toolbar">
     <div class="search"><input id="q" placeholder="Rechercher (prénom, nom, objectif…)"></div>
@@ -121,6 +122,81 @@ function renderAgenda(){
             </span></div>`;
         }).join("")}
       </div>`).join("") + `</div></details>`;
+}
+
+// ---- Suivi des bilans : qui a rempli, quand, et qui doit le faire ----
+function renderBilans(){
+  const box = document.getElementById("bilansSuivi");
+  // On suit les clientes en cours (on n'affiche pas les accompagnements terminés).
+  const suivies = STATE.clientes.filter(c => c.cliente.statut !== "termine");
+  const COL = { // couleur de la pastille par priorité
+    red:   "background:#fdecea;color:#c0564b",
+    orange:"background:#fbe6d6;color:#b87316",
+    yellow:"background:#f8f2d6;color:#977f14",
+    green: "background:#e7f4ec;color:#2f8f5b",
+    grey:  "background:#ececec;color:#8a8a8a",
+  };
+  const rows = suivies.map(c => {
+    const cl = c.cliente;
+    const bilans = (c.bilans||[]).slice().sort((a,b)=> a.date<b.date?1:-1);
+    const dernier = bilans[0] || null;
+    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut);
+    const demarree = !!(c.accompagnement && c.accompagnement.date_debut);
+    const aRempli = bilans.length > 0;
+    let prio, chip, col;
+    if (!aRempli){
+      if (demarree){ prio=0; chip="❌ Jamais rempli"; col=COL.red; }
+      else { prio=4; chip="Pas encore démarré"; col=COL.grey; }
+    } else if (b.joursAvant!==null && b.joursAvant<0){ prio=1; chip=`🟠 En retard de ${Math.abs(b.joursAvant)} j`; col=COL.orange; }
+    else if (b.joursAvant!==null && b.joursAvant<=7){ prio=2; chip=`🟡 Prochain dans ${b.joursAvant} j`; col=COL.yellow; }
+    else { prio=3; chip="✅ À jour"; col=COL.green; }
+    return { cl, bilans, dernier, b, prio, chip, col, aRempli, demarree };
+  });
+
+  // Ligne d'une cliente (réutilisée dans les deux blocs).
+  const rowHtml = (r) => {
+    const cl = r.cl;
+    let detail;
+    if (!r.aRempli){ detail = r.demarree ? `<span style="color:#c0564b">aucun bilan pour l'instant</span>` : `pas encore démarré`; }
+    else {
+      const d = r.dernier;
+      const qui = d.saisi_par==="cliente" ? "rempli par elle" : "saisi par toi";
+      const quand = d.created_at ? Calc.fmt(String(d.created_at).slice(0,10)) : Calc.fmt(d.date);
+      detail = `dernier : <strong>${Calc.fmt(d.date)}</strong> · ${qui} le ${quand} · ${r.bilans.length} au total`;
+    }
+    const prochain = r.b.prochain ? ` · prochain le ${Calc.fmt(r.b.prochain)}` : "";
+    const wa = (r.prio<=2) ? Calc.waHref(cl.telephone, Calc.bilanMsg(cl, r.b.joursAvant!==null && r.b.joursAvant<0)) : null;
+    return `<div class="cl-line" style="padding:7px 0;gap:8px;flex-wrap:wrap">
+      <a href="cliente.html?id=${cl.id}" style="text-decoration:none;color:inherit;min-width:0;flex:1 1 55%">
+        <strong>${esc(cl.prenom)} ${esc(cl.nom||"")}</strong>
+        <span style="display:block;font-size:.8rem;color:var(--text-light)">${detail}${prochain}</span>
+      </a>
+      <span style="display:flex;gap:6px;align-items:center;flex:none">
+        <span class="dot-alert" style="${r.col}">${r.chip}</span>
+        ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener" title="Demander le bilan sur WhatsApp">📲</a>`:""}
+      </span>
+    </div>`;
+  };
+
+  // Bloc 1 : PAS rempli (jamais + pas encore démarrées en gris tout en bas).
+  const pasRempli = rows.filter(r=>!r.aRempli && r.demarree).sort((a,b)=>(a.cl.prenom||"").localeCompare(b.cl.prenom||""));
+  const pasDemarree = rows.filter(r=>!r.aRempli && !r.demarree).sort((a,b)=>(a.cl.prenom||"").localeCompare(b.cl.prenom||""));
+  // Bloc 2 : ONT rempli (les plus urgents d'abord : en retard, puis bientôt, puis à jour ; date récente d'abord).
+  const ontRempli = rows.filter(r=>r.aRempli).sort((a,b)=> a.prio-b.prio || (a.dernier.date<b.dernier.date?1:-1));
+
+  const sub = (titre, arr, couleur) => arr.length
+    ? `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:${couleur};margin:10px 2px 2px">${titre} (${arr.length})</div>`
+      + `<div class="card" style="margin-top:4px;padding:6px 12px">${arr.map(rowHtml).join("")}</div>`
+    : "";
+
+  box.innerHTML = `<details class="section-block" open style="margin:14px 0">
+    <summary><span class="chev">▸</span>📋 Suivi des bilans<span class="count">${rows.length}</span>${pasRempli.length?`<span class="count" style="background:var(--danger,#c0564b);color:#fff">❌ ${pasRempli.length}</span>`:""}</summary>
+    <div class="section-body">
+      ${sub("❌ Pas encore rempli", pasRempli, "#c0564b")}
+      ${sub("✅ Ont rempli leur bilan", ontRempli, "#2f8f5b")}
+      ${sub("· Pas encore démarrées", pasDemarree, "#8a8a8a")}
+      ${!rows.length?`<p class="empty">Aucune cliente à suivre.</p>`:""}
+    </div></details>`;
 }
 
 // ---- Chargement groupé (peu de requêtes, quel que soit le nb de clientes) ----
@@ -342,12 +418,12 @@ document.getElementById("newCliente").onclick = async () => {
       const { error } = await sb.from("seances").update({ statut:"realisee" }).eq("id", btn.dataset.done);
       if (error) throw error;
       UI.toast("Séance marquée faite ✓");
-      await loadAll(); renderAlerts(); renderAgenda(); renderList();
+      await loadAll(); renderAlerts(); renderAgenda(); renderBilans(); renderList();
     } catch(err){ console.error(err); UI.toast("Erreur : "+(err.message||err),"err"); btn.disabled = false; }
   });
   try {
     await loadAll();
-    renderAlerts(); renderAgenda(); renderFilters(); renderList();
+    renderAlerts(); renderAgenda(); renderBilans(); renderFilters(); renderList();
   } catch(e){
     console.error(e);
     document.getElementById("content").innerHTML =
