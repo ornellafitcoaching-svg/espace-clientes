@@ -117,7 +117,7 @@ function renderAgenda(){
             <span style="display:flex;gap:8px;align-items:center;flex:none">
               <button class="tag tag-done" data-done="${it.id}" title="Marquer cette séance comme faite">✅ Fait</button>
               ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
-              <a class="tag" href="cliente.html?id=${it.cl.id}">voir →</a>
+              <a class="tag" href="cliente.html?id=${it.cl.id}&editSeance=${it.id}" title="Modifier cette séance">✏️ Modifier</a>
             </span></div>`;
         }).join("")}
       </div>`).join("") + `</div></details>`;
@@ -221,9 +221,12 @@ function renderList() {
     const f = FILTERS.find(x=>x.key===STATE.filter);
     list = list.filter(f.test);
   }
+  // Raccourci global : total des séances restantes sur l'ensemble des clientes affichées.
+  const totRestantes = list.reduce((n,c)=> n + Calc.seancesStats(c.accompagnement, c.seances).restantes, 0);
   document.getElementById("sub").textContent =
     `${STATE.clientes.length} cliente${STATE.clientes.length>1?'s':''}` +
-    (list.length !== STATE.clientes.length ? ` · ${list.length} affichée${list.length>1?'s':''}` : "");
+    (list.length !== STATE.clientes.length ? ` · ${list.length} affichée${list.length>1?'s':''}` : "") +
+    (totRestantes ? ` · ⏳ ${totRestantes} séance${totRestantes>1?'s':''} restante${totRestantes>1?'s':''} au total` : "");
 
   if (!list.length) {
     cont.innerHTML = `<div class="card"><p class="empty">Aucune cliente ne correspond.</p></div>`;
@@ -251,7 +254,7 @@ function renderList() {
         <span class="st st-${cl.statut}">${Calc.labelStatut(cl.statut)}</span>
       </div>
       ${s.prevues ? UI.progressBar(s.pct, `${s.realisees} / ${s.prevues} séances`) : ''}
-      ${s.prevues ? `<div class="cl-line"><span>Séances faites</span><strong>${s.realisees} / ${s.prevues}</strong></div>` : ''}
+      ${s.prevues ? `<div class="cl-line"><span>Séances</span><strong>${s.realisees}/${s.prevues} faites · <span style="color:var(--accent)">${s.restantes} restantes</span></strong></div>` : ''}
       <div class="cl-line"><span>📅 Séances à venir</span><strong style="text-transform:capitalize">${upcoming.length ? `${upcoming.length} · ${Calc.fmtJour(upcoming[0].date)}${Calc.fmtHeure(upcoming[0].heure)?` à ${Calc.fmtHeure(upcoming[0].heure)}`:''}` : '—'}</strong></div>
       <div class="cl-line"><span>Dernier bilan</span><strong>${Calc.fmt(b.dernier)}</strong></div>
       <div class="cl-line"><span>Prochain bilan</span><strong>${Calc.fmt(b.prochain)}</strong></div>

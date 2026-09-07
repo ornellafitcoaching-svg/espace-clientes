@@ -1019,7 +1019,11 @@ function showUndo(tbl, rec){
   document.getElementById("main").addEventListener("change", (e)=>{
     if (e.target.classList && e.target.classList.contains("selchk")) updateSelCount();
   });
-  try{ await reload(); }
+  try{ await reload();
+    // Arrivée depuis l'agenda du dashboard avec ?editSeance=... → ouvre direct l'édition.
+    const sid = new URLSearchParams(location.search).get("editSeance");
+    if (sid){ const rec = findRec("seance", sid); if (rec) addOrEdit("seance", rec); }
+  }
   catch(e){ console.error(e); document.getElementById("main").innerHTML =
     `<div class="card"><p class="empty">Erreur de chargement. Vérifie la config Supabase et le SQL.</p></div>`; }
 })();
