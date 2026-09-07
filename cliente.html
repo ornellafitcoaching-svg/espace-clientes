@@ -271,7 +271,7 @@ function sectionSeances(){
     <div class="cl-line"><span>📅 Programmées à venir</span><strong>${aVenir}</strong></div>
   </div>`;
   const body = decompte + (show.length ? show.map(x=>`
-    <div class="item">
+    <div class="item seance-card" data-act="edit-seance" data-id="${x.id}" style="cursor:pointer">
       <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}${x.heure?`<small style="display:block;font-weight:600;color:var(--text-light)">${Calc.fmtHeure(x.heure)}</small>`:""}</div>
       <div class="ibody">
         <div class="ititle">${esc(x.type||"Séance")} ${x.statut==="realisee"?`<span class="tag tag-done">✅ Fait</span>`:`<span class="tag">${x.statut}</span>`}</div>
@@ -427,7 +427,7 @@ function sectionObjectifs(){
 function sectionTimeline(){
   const ev = [];
   (D.bilans||[]).forEach(x=>ev.push({d:x.date,t:"🟠 Bilan "+(x.semaine!=null?"S"+x.semaine:"")}));
-  (D.seances||[]).forEach(x=>ev.push({d:x.date,t:"🏋️ "+(x.type||"Séance")}));
+  (D.seances||[]).forEach(x=>ev.push({d:x.date,t:"🏋️ "+(x.type||"Séance"),act:"edit-seance",id:x.id}));
   (D.mensurations||[]).forEach(x=>ev.push({d:x.date,t:"📏 "+x.type.replace(/_/g," ")}));
   (D.photos||[]).forEach(x=>ev.push({d:x.date,t:"📸 Photo"}));
   (D.objectifs||[]).forEach(x=>ev.push({d:x.date_creation,t:"🎯 "+x.titre}));
@@ -435,7 +435,7 @@ function sectionTimeline(){
   (D.paiements||[]).forEach(x=>ev.push({d:x.date,t:"💶 Paiement "+Calc.euro(x.montant)+(x.mode?" ("+x.mode+")":"")}));
   ev.sort((a,b)=>(a.d<b.d?1:-1));
   const body = ev.length ? `<div class="tl">`+ev.slice(0,40).map(e=>`
-    <div class="tl-item"><div class="tl-date">${Calc.fmt(e.d)}</div><div class="tl-txt">${esc(e.t)}</div></div>`).join("")+`</div>`
+    <div class="tl-item"${e.act?` data-act="${e.act}" data-id="${e.id}" style="cursor:pointer"`:""}><div class="tl-date">${Calc.fmt(e.d)}</div><div class="tl-txt">${esc(e.t)}</div></div>`).join("")+`</div>`
     : `<p class="empty">Rien pour l'instant.</p>`;
   return block("Timeline", null, body, false);
 }
@@ -619,7 +619,7 @@ const MENSU_HINTS = {
   tour_cou:      "Juste sous la pomme d'Adam, mètre horizontal.",
   poitrine:      "Sur la partie la plus forte (niveau des mamelons).",
   sous_poitrine: "Juste sous la poitrine, ligne du soutien-gorge.",
-  tour_dos:      "Même hauteur que la poitrine, mètre horizontal dans le dos.",
+  tour_dos:      "Le tour du buste au niveau du dos : sous les aisselles, à l'endroit le plus large du dos, bras le long du corps.",
   tour_taille:   "Partie la plus fine du ventre (souvent au-dessus du nombril), ventre non rentré.",
   tour_hanches:  "Partie la plus large des hanches et des fesses.",
   tour_fessiers: "Partie la plus rebondie des fesses, pieds joints.",
@@ -860,6 +860,8 @@ async function editAccomp(){
 document.getElementById("main").addEventListener("click", async (e)=>{
   const el = e.target.closest("[data-act]"); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
+  // En mode « Sélection », un clic sur la carte séance sert à cocher, pas à éditer.
+  if (SELMODE && act==="edit-seance" && el.classList.contains("seance-card")) return;
   if (act==="add-seance") return addOrEdit("seance");
   if (act==="add-bilan") return addBilanCoach();
   if (act==="edit-bilan") return addBilanCoach(findRec("bilan", id));
@@ -872,7 +874,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="prog-sportif") return progEnvoye("sportif");
   if (act==="prog-nutrition") return progEnvoye("nutrition");
   if (act==="recap-seances"){
-    const wa = Calc.waHref(D.cliente.telephone, Calc.recapSeancesMsg(D.cliente, D.seances));
+    const wa = Calc.waHref(D.cliente.telephone, Calc.recapSeancesMsg(D.cliente, D.seances, D.accompagnement));
     if (!wa){ UI.toast("Numéro de téléphone manquant pour cette cliente","err"); return; }
     window.open(wa, "_blank"); return;
   }

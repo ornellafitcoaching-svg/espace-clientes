@@ -235,8 +235,8 @@ window.Calc = {
     return "Bonjour " + cl.prenom + " 😊 Petit rappel : nous avons séance prévue le " + quand
       + " 💪 Au plaisir de vous voir ! Si vous avez besoin de décaler, dites-le-moi 🙂";
   },
-  // Récap de TOUTES les séances à venir d'une cliente (WhatsApp) + invite à demander une modif.
-  recapSeancesMsg(cl, seances) {
+  // Récap de TOUTES les séances à venir d'une cliente (WhatsApp) + décompte fait/restant + invite à modif.
+  recapSeancesMsg(cl, seances, accompagnement) {
     const today = this.today();
     const list = (seances || [])
       .filter(s => s.statut === "prevue" && s.date && s.date >= today)
@@ -245,12 +245,27 @@ window.Calc = {
       const h = this.fmtHeure(s.heure);
       return "• " + this.fmtJour(s.date) + (h ? " à " + h : "") + (s.type ? " — " + s.type : "");
     }).join("\n");
+    // Décompte forfait : X faites · Y restantes (uniquement si un forfait est renseigné).
+    const st = this.seancesStats(accompagnement, seances);
+    const pluri = n => (n > 1 ? "s" : "");
+    const compte = st.prevues
+      ? "✅ " + st.realisees + " séance" + pluri(st.realisees) + " faite" + pluri(st.realisees)
+        + " · ⏳ " + st.restantes + " restante" + pluri(st.restantes)
+        + " sur ton forfait de " + st.prevues + "\n\n"
+      : "";
+    const compteVous = st.prevues
+      ? "✅ " + st.realisees + " séance" + pluri(st.realisees) + " faite" + pluri(st.realisees)
+        + " · ⏳ " + st.restantes + " restante" + pluri(st.restantes)
+        + " sur votre forfait de " + st.prevues + "\n\n"
+      : "";
     if (cl.tutoiement) {
       return "Coucou " + cl.prenom + " 🌸 Voici le récap de tes prochaines séances :\n\n"
+        + compte
         + (lignes || "(aucune séance programmée pour le moment)")
         + "\n\nSi tu as besoin de modifier ou décaler une séance, réponds-moi ici et on s'arrange 🙂 💪";
     }
     return "Bonjour " + cl.prenom + " 😊 Voici le récap de vos prochaines séances :\n\n"
+      + compteVous
       + (lignes || "(aucune séance programmée pour le moment)")
       + "\n\nSi vous avez besoin de modifier ou décaler une séance, répondez-moi ici et on s'arrange 🙂 💪";
   },
