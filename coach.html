@@ -102,22 +102,22 @@ function renderAgenda(){
   // Trier les séances d'une même date par HEURE (sans heure → à la fin).
   Object.values(byDate).forEach(arr => arr.sort((a,b)=> (a.heure||"99")<(b.heure||"99")?-1:((a.heure||"99")>(b.heure||"99")?1:0)));
   const dates = Object.keys(byDate).sort((a,b)=> a<b?-1:1);
-  box.innerHTML = `<details class="section-block" open style="margin:14px 0">
+  box.innerHTML = `<details class="section-block" style="margin:14px 0">
     <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${nAvenir}</span>${nFaites?`<span class="count" style="background:var(--ok);color:#fff">✅ ${nFaites}</span>`:""}</summary>
     <div class="section-body">` + dates.map(d=>`
       <div class="card" style="margin-top:8px;padding:10px 12px">
         <div class="idate" style="font-weight:700;margin-bottom:6px;text-transform:capitalize">${Calc.fmtJour(d)}</div>
         ${byDate[d].map(it=>{
           const hh = Calc.fmtHeure(it.heure);
-          const nom = `<a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>`;
+          const nom = `<a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;flex:1 1 100%;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>`;
           if (it.statut==="realisee"){
             // Séance faite : reste visible, grisée, marquée ✅ (ne disparaît pas).
             return `<div class="cl-line" style="padding:5px 0;opacity:.6">${nom}
               <span class="tag tag-done" style="cursor:default">✅ Fait</span></div>`;
           }
           const wa = Calc.waHref(it.cl.telephone, Calc.seanceRappelMsg(it.cl, it.date, it.type, it.heure));
-          return `<div class="cl-line" style="padding:5px 0">${nom}
-            <span style="display:flex;gap:8px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end">
+          return `<div class="cl-line" style="padding:5px 0;flex-wrap:wrap">${nom}
+            <span style="display:flex;gap:6px;align-items:center;flex:1 1 100%;flex-wrap:wrap;justify-content:flex-start;margin-top:4px">
               <button class="tag tag-done" data-done="${it.id}" title="Marquer cette séance comme faite">✅ Fait</button>
               <button class="tag" data-ics="${it.id}" data-cl="${it.cl.id}" title="Ajouter à mon agenda Apple (avec rappels)">📅 Agenda</button>
               ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
@@ -205,7 +205,7 @@ function renderBilans(){
       + `<div class="card" style="margin-top:4px;padding:6px 12px">${arr.map(rowHtml).join("")}</div>`
     : "";
 
-  box.innerHTML = `<details class="section-block" open style="margin:14px 0">
+  box.innerHTML = `<details class="section-block" style="margin:14px 0">
     <summary><span class="chev">▸</span>📋 Suivi des bilans<span class="count">${rows.length}</span>${aFaire.length?`<span class="count" style="background:#b87316;color:#fff">🔔 ${aFaire.length}</span>`:""}</summary>
     <div class="section-body">
       ${sub("🔔 Bilan à faire (retard ou ≤ 7 j)", aFaire, "#b87316")}
