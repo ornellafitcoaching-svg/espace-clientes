@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e50">
+<link rel="stylesheet" href="css/app.css?v=e51">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e50"></script>
-<script src="js/supabaseClient.js?v=e50"></script>
-<script src="js/auth.js?v=e50"></script>
-<script src="js/db.js?v=e50"></script>
-<script src="js/calc.js?v=e50"></script>
-<script src="js/ui/modal.js?v=e50"></script>
-<script src="js/ui/progress.js?v=e50"></script>
+<script src="js/config.js?v=e51"></script>
+<script src="js/supabaseClient.js?v=e51"></script>
+<script src="js/auth.js?v=e51"></script>
+<script src="js/db.js?v=e51"></script>
+<script src="js/calc.js?v=e51"></script>
+<script src="js/ui/modal.js?v=e51"></script>
+<script src="js/ui/progress.js?v=e51"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -420,7 +420,10 @@ function sectionMensurations(){
         <button class="link" data-act="edit-taille">Modifier</button></span></div>`
     : `<button class="btn-accent btn-sm" data-act="edit-taille" style="align-self:flex-start">📏 Renseigner sa taille (hauteur)</button>`;
   const actions = `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
-      <button class="btn-accent btn-sm" data-act="add-mensu" style="align-self:flex-start">➕ Saisir des mensurations</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-accent btn-sm" data-act="add-mensu">➕ Saisir des mensurations</button>
+        <button class="btn-ghost btn-sm" data-act="ask-mesure">📲 Demander une mesure</button>
+      </div>
       ${tailleCtl}
     </div>`;
   return block("Mensurations & évolution", (D.mensurations||[]).length, actions+body+listing, false);
@@ -680,6 +683,25 @@ async function editTaille(){
     UI.toast("Taille enregistrée ✓" + (done ? ` · ${done} masse grasse calculée` : ""));
     reload("Mensurations & évolution");
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
+
+// Demander une mesure manquante à la cliente par WhatsApp (ex. tour de cou pour l'IMG).
+// Propose en priorité les mesures jamais renseignées, avec la consigne de placement.
+async function askMesure(){
+  const cl = D.cliente;
+  if (!Calc.normalizeFrPhone(cl.telephone)){ UI.toast("Ajoute d'abord son numéro (bouton « Modifier »)","err"); return; }
+  const present = new Set((D.mensurations||[]).map(m=>m.type));
+  const clean = s => String(s||"").replace(/⭐/g,"").replace(/\s*\(.*?\)\s*/g," ").trim();
+  const choix = MENSU_PRESETS.filter(p=>p.name!=="masse_grasse");
+  const opts = choix.map(p=>({ value:p.name, label: clean(p.label) + (present.has(p.name)?"":" — manquante") }));
+  const premierManquant = (choix.find(p=>!present.has(p.name))||{}).name;
+  const v = await UI.form({ title:"Demander une mesure", submit:"Ouvrir WhatsApp", fields:[
+    { name:"type", label:"Quelle mesure lui demander ?", type:"select", options:opts, value:premierManquant },
+  ]});
+  if (!v || !v.type) return;
+  const preset = choix.find(p=>p.name===v.type);
+  const wa = Calc.waHref(cl.telephone, Calc.demandeMesureMsg(cl, clean(preset.label), MENSU_HINTS[v.type]||""));
+  if (wa) window.open(wa, "_blank");
 }
 
 async function addMensuSession(){
@@ -974,6 +996,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   }
   if (act==="toggle-select") return setSelMode(!SELMODE);
   if (act==="edit-taille") return editTaille();
+  if (act==="ask-mesure") return askMesure();
   if (act==="edit-mensu-date"){
     const oldDate = el.dataset.date;
     const v = await UI.form({ title:"Modifier la date du relevé", submit:"Enregistrer", fields:[

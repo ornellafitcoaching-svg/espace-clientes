@@ -296,6 +296,23 @@ window.Calc = {
       + "\n\nN'hésitez pas si vous avez la moindre question. Belle journée ! 💪";
   },
 
+  // Message « demander une mesure manquante » (ex. tour de cou pour l'IMG), tu/vous.
+  // label = nom lisible de la mesure ; hint = consigne de placement (facultatif).
+  demandeMesureMsg(cl, label, hint) {
+    const lien = this.espaceLink(cl.access_code);
+    const l = String(label || "").toLowerCase();
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 Il me manque une mesure pour compléter ton suivi : ton " + l + " 📏"
+        + (hint ? "\n📍 " + hint : "")
+        + "\n\nTu peux me l'envoyer par retour de message, ou l'ajouter toi-même dans ton espace (rubrique Mensurations) : " + lien
+        + "\n\nMerci ma belle 💛";
+    }
+    return "Bonjour " + cl.prenom + " 😊 Il me manque une mesure pour compléter votre suivi : votre " + l + " 📏"
+      + (hint ? "\n📍 " + hint : "")
+      + "\n\nVous pouvez me l'envoyer par retour de message, ou l'ajouter vous-même dans votre espace (rubrique Mensurations) : " + lien
+      + "\n\nMerci à vous 💛";
+  },
+
   // ---- Agenda Apple (.ics) ------------------------------------------------
   // Génère un événement iCalendar pour UNE séance, avec deux rappels :
   //   • 1 h avant la séance (pour ne pas l'oublier) ;
