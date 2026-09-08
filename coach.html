@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e52">
+<link rel="stylesheet" href="css/app.css?v=e53">
 </head>
 <body>
 <header class="topbar">
@@ -49,15 +49,15 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e52"></script>
-<script src="js/supabaseClient.js?v=e52"></script>
-<script src="js/auth.js?v=e52"></script>
-<script src="js/db.js?v=e52"></script>
-<script src="js/calc.js?v=e52"></script>
-<script src="js/ui/modal.js?v=e52"></script>
-<script src="js/ui/progress.js?v=e52"></script>
+<script src="js/config.js?v=e53"></script>
+<script src="js/supabaseClient.js?v=e53"></script>
+<script src="js/auth.js?v=e53"></script>
+<script src="js/db.js?v=e53"></script>
+<script src="js/calc.js?v=e53"></script>
+<script src="js/ui/modal.js?v=e53"></script>
+<script src="js/ui/progress.js?v=e53"></script>
 <script>
-let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "" };
+let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
 const FILTERS = [
   { key: "presentiel",  label: "Présentiel",  test: c => c.cliente.type === "presentiel" },
@@ -143,7 +143,33 @@ function renderAgenda(){
   const futureBlock = futureItems.length ? `<details class="section-block" style="margin:14px 0">
       <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${nFut}</span></summary>
       <div class="section-body">${groups(futureItems)}</div></details>` : "";
-  box.innerHTML = todayBlock + futureBlock;
+  const listContent = todayBlock + futureBlock;
+
+  // P4 — vue SEMAINE : les 7 prochains jours (aujourd'hui → +6), TOUS affichés (même
+  // vides) pour voir d'un coup les créneaux libres à remplir.
+  const base = Calc.parse(today);
+  const wk = []; for (let i=0;i<7;i++){ const d=new Date(base); d.setDate(d.getDate()+i); wk.push(Calc.ymd(d)); }
+  const byDate = {};
+  items.forEach(it => { if (it.date>=wk[0] && it.date<=wk[6]) (byDate[it.date] ||= []).push(it); });
+  Object.values(byDate).forEach(a => a.sort((x,y)=> (x.heure||"99")<(y.heure||"99")?-1:((x.heure||"99")>(y.heure||"99")?1:0)));
+  const nWeek = wk.reduce((n,d)=> n + (byDate[d]||[]).filter(i=>i.statut==="prevue").length, 0);
+  const weekCards = wk.map(d=>{
+    const arr = byDate[d]||[];
+    return `<div class="card" style="margin-top:8px;padding:10px 12px${d===today?';border:1px solid var(--accent)':''}">
+      <div class="idate" style="font-weight:700;margin-bottom:6px;text-transform:capitalize">${Calc.fmtJour(d)}${d===today?" · aujourd'hui":""}${arr.length?`<span class="count">${arr.length}</span>`:""}</div>
+      ${arr.length ? arr.map(line).join("") : `<p class="empty" style="margin:0">— aucune séance —</p>`}
+    </div>`;
+  }).join("");
+  const weekContent = `<details class="section-block" open style="margin:14px 0">
+      <summary><span class="chev">▸</span>🗓️ Ma semaine<span class="count" style="background:var(--accent);color:#fff">${nWeek}</span></summary>
+      <div class="section-body">${weekCards}</div></details>`;
+
+  // Sélecteur de vue.
+  const toggle = `<div class="chips" style="margin:14px 0 0">
+      <button class="chip ${STATE.agendaView!=="week"?"on":""}" data-view="list">📅 À venir</button>
+      <button class="chip ${STATE.agendaView==="week"?"on":""}" data-view="week">🗓️ Semaine</button>
+    </div>`;
+  box.innerHTML = toggle + (STATE.agendaView==="week" ? weekContent : listContent);
 }
 
 // ---- Suivi des bilans : qui a rempli, quand, et qui doit le faire ----
@@ -543,6 +569,9 @@ document.getElementById("newCliente").onclick = async () => {
   });
   // Bouton « ✅ Fait » dans l'agenda → passe la séance en réalisée + rafraîchit.
   document.getElementById("agenda").addEventListener("click", async (e) => {
+    // Bascule de vue « À venir » / « Semaine ».
+    const viewBtn = e.target.closest("[data-view]");
+    if (viewBtn){ e.preventDefault(); STATE.agendaView = viewBtn.dataset.view; renderAgenda(); return; }
     // Ajout à l'agenda Apple (.ics) — priorité sur le bouton « Fait ».
     const icsBtn = e.target.closest("[data-ics]");
     if (icsBtn){
