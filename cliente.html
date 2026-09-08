@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e48">
+<link rel="stylesheet" href="css/app.css?v=e49">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e48"></script>
-<script src="js/supabaseClient.js?v=e48"></script>
-<script src="js/auth.js?v=e48"></script>
-<script src="js/db.js?v=e48"></script>
-<script src="js/calc.js?v=e48"></script>
-<script src="js/ui/modal.js?v=e48"></script>
-<script src="js/ui/progress.js?v=e48"></script>
+<script src="js/config.js?v=e49"></script>
+<script src="js/supabaseClient.js?v=e49"></script>
+<script src="js/auth.js?v=e49"></script>
+<script src="js/db.js?v=e49"></script>
+<script src="js/calc.js?v=e49"></script>
+<script src="js/ui/modal.js?v=e49"></script>
+<script src="js/ui/progress.js?v=e49"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -408,7 +408,19 @@ function sectionMensurations(){
             <button class="icon-btn" data-act="del" data-entity="mensuration" data-id="${m.id}">🗑</button>
           </span></div>`).join("")}
     </div>`).join("") + `</div>` : "";
-  return block("Mensurations & évolution", (D.mensurations||[]).length, body+listing, false);
+  // Barre d'actions EN HAUT de la section : saisir des mensurations sans remonter la page,
+  // + réglage de la taille (hauteur) via un bouton dédié clair.
+  const t = D.cliente && D.cliente.taille_cm;
+  const tailleCtl = t
+    ? `<div class="cl-line" style="padding:6px 0"><span>📏 Taille (hauteur)</span>
+        <span style="display:flex;align-items:center;gap:8px"><strong>${esc(t)} cm</strong>
+        <button class="link" data-act="edit-taille">Modifier</button></span></div>`
+    : `<button class="btn-accent btn-sm" data-act="edit-taille" style="align-self:flex-start">📏 Renseigner sa taille (hauteur)</button>`;
+  const actions = `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+      <button class="btn-accent btn-sm" data-act="add-mensu" style="align-self:flex-start">➕ Saisir des mensurations</button>
+      ${tailleCtl}
+    </div>`;
+  return block("Mensurations & évolution", (D.mensurations||[]).length, actions+body+listing, false);
 }
 
 function sectionPhotos(){
@@ -640,22 +652,37 @@ const MENSU_HINTS = {
   tour_bras:     "Milieu du bras, relâché. Toujours le même bras.",
   tour_mollet:   "Partie la plus large du mollet. Toujours le même mollet.",
 };
+// Saisie de la TAILLE (hauteur) — formulaire à UN SEUL champ, aucune confusion avec le tour
+// de taille. Enregistrée sur la fiche (clientes.taille_cm) puis recalcule les masses grasses.
+async function editTaille(){
+  const cur = (D.cliente && D.cliente.taille_cm) || "";
+  const v = await UI.form({ title:"Taille (hauteur)", submit:"Enregistrer", fields:[
+    { name:"taille_cm", label:"📏 Combien mesure-t-elle ? (cm)", type:"number", value:cur, required:true,
+      hint:"Sa HAUTEUR debout, ex. 165. (Rien à voir avec le tour de taille.) Sert à calculer la masse grasse." },
+  ]});
+  if (!v) return;
+  const t = Number(v.taille_cm);
+  if (!t){ UI.toast("Taille invalide","err"); return; }
+  try{
+    await DB.update("clientes", CID, { taille_cm:t });
+    D.cliente.taille_cm = t;
+    // Rattrape les masses grasses des relevés qui ont déjà tour de taille + hanches + cou.
+    let done = 0;
+    for (const d of [...new Set((D.mensurations||[]).map(m=>m.date))]){
+      const mg = await recalcMasseGrasse(d); if (mg != null) done++;
+    }
+    UI.toast("Taille enregistrée ✓" + (done ? ` · ${done} masse grasse calculée` : ""));
+    reload("Mensurations & évolution");
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
+
 async function addMensuSession(){
-  // La TAILLE (hauteur en cm) est une donnée de profil, pas une mensuration récurrente :
-  // on la demande ici UNE SEULE FOIS tant qu'elle manque, car elle est indispensable au
-  // calcul de la masse grasse (IMG). Une fois renseignée, le champ n'apparaît plus.
-  const needTaille = !(D && D.cliente && D.cliente.taille_cm);
+  // La TAILLE (hauteur) n'est PAS ici : c'est une donnée de profil, saisie via le bouton
+  // dédié « 📏 Taille (hauteur) » de la section Mensurations (pas de confusion avec le tour de taille).
   const fields = [{ name:"date", label:"Date", type:"date", value:Calc.today() }]
-    .concat(needTaille ? [{ name:"_taille_cm", label:"⭐ Taille / hauteur (cm)", type:"number", half:true,
-      hint:"À renseigner une seule fois. Indispensable pour calculer la masse grasse (IMG)." }] : [])
     .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true, hint:MENSU_HINTS[p.name]||"" })));
   const v = await UI.form({ title:"Mensurations", submit:"Enregistrer", fields });
   if (!v) return;
-  // Enregistre la taille sur la fiche cliente si elle vient d'être saisie (avant le calcul IMG).
-  if (needTaille && v._taille_cm){
-    const t = Number(v._taille_cm);
-    if (t){ try{ await DB.update("clientes", CID, { taille_cm:t }); D.cliente.taille_cm = t; }catch(_){}}
-  }
   const rows = MENSU_PRESETS
     .filter(p => v[p.name] != null && v[p.name] !== "")
     .map(p => ({ cliente_id:CID, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
@@ -680,17 +707,10 @@ async function addMensuSession(){
 // enregistrés ensemble (un bilan = ressenti + mesures), comme côté cliente.
 async function addBilanCoach(rec){
   const x = rec || {};
-  const needTaille = !(D && D.cliente && D.cliente.taille_cm);
   const fields = bilanFields(x)
-    .concat(needTaille ? [{ name:"_taille_cm", label:"⭐ Taille / hauteur (cm)", type:"number", half:true,
-      hint:"À renseigner une seule fois. Indispensable pour calculer la masse grasse (IMG)." }] : [])
     .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
   const v = await UI.form({ title:(rec?"Modifier ":"")+"Bilan", submit:"Enregistrer", fields });
   if (!v) return;
-  if (needTaille && v._taille_cm){
-    const t = Number(v._taille_cm);
-    if (t){ try{ await DB.update("clientes", CID, { taille_cm:t }); D.cliente.taille_cm = t; }catch(_){}}
-  }
   const BILAN_KEYS = ["date","semaine","poids","ressenti","evolution","objectifs_atteints",
     "difficultes","points_positifs","nouveaux_objectifs","commentaire_coach"];
   const bilanPayload = { cliente_id:CID };
@@ -947,6 +967,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
     return;
   }
   if (act==="toggle-select") return setSelMode(!SELMODE);
+  if (act==="edit-taille") return editTaille();
   if (act==="edit-cliente") return editCliente();
   if (act==="edit-accomp") return editAccomp();
   if (act==="renouveler-accomp") return renouvelerAccomp();
