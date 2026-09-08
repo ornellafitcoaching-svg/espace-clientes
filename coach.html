@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e51">
+<link rel="stylesheet" href="css/app.css?v=e52">
 </head>
 <body>
 <header class="topbar">
@@ -33,8 +33,15 @@
   <div id="bilansDemarrage"></div>
   <div id="sansSeance"></div>
 
-  <div class="toolbar">
-    <div class="search"><input id="q" placeholder="Rechercher (prénom, nom, objectif…)"></div>
+  <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <div class="search" style="flex:1 1 200px"><input id="q" placeholder="Rechercher (prénom, nom, objectif…)"></div>
+    <select id="sort" title="Trier la liste" style="padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--white);font-family:inherit;font-size:.85rem;color:var(--text)">
+      <option value="">Tri : plus récentes</option>
+      <option value="nom">Tri : nom (A→Z)</option>
+      <option value="bilan">Tri : bilan le plus urgent</option>
+      <option value="fin">Tri : fin de suivi proche</option>
+      <option value="restantes">Tri : séances restantes ↓</option>
+    </select>
   </div>
   <div class="chips" id="filters"></div>
 
@@ -42,15 +49,15 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e51"></script>
-<script src="js/supabaseClient.js?v=e51"></script>
-<script src="js/auth.js?v=e51"></script>
-<script src="js/db.js?v=e51"></script>
-<script src="js/calc.js?v=e51"></script>
-<script src="js/ui/modal.js?v=e51"></script>
-<script src="js/ui/progress.js?v=e51"></script>
+<script src="js/config.js?v=e52"></script>
+<script src="js/supabaseClient.js?v=e52"></script>
+<script src="js/auth.js?v=e52"></script>
+<script src="js/db.js?v=e52"></script>
+<script src="js/calc.js?v=e52"></script>
+<script src="js/ui/modal.js?v=e52"></script>
+<script src="js/ui/progress.js?v=e52"></script>
 <script>
-let STATE = { clientes: [], byId: {}, filter: null, q: "" };
+let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "" };
 
 const FILTERS = [
   { key: "presentiel",  label: "Présentiel",  test: c => c.cliente.type === "presentiel" },
@@ -95,36 +102,48 @@ function renderAgenda(){
         et dans l'espace de ta cliente.</p></div></details>`;
     return;
   }
-  const nAvenir = items.filter(i=>i.statut==="prevue").length;
-  const nFaites = items.filter(i=>i.statut==="realisee").length;
-  const byDate = {};
-  items.forEach(it => (byDate[it.date] ||= []).push(it));
-  // Trier les séances d'une même date par HEURE (sans heure → à la fin).
-  Object.values(byDate).forEach(arr => arr.sort((a,b)=> (a.heure||"99")<(b.heure||"99")?-1:((a.heure||"99")>(b.heure||"99")?1:0)));
-  const dates = Object.keys(byDate).sort((a,b)=> a<b?-1:1);
-  box.innerHTML = `<details class="section-block" style="margin:14px 0">
-    <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${nAvenir}</span>${nFaites?`<span class="count" style="background:var(--ok);color:#fff">✅ ${nFaites}</span>`:""}</summary>
-    <div class="section-body">` + dates.map(d=>`
+  // Rendu d'UNE séance (ligne).
+  const line = (it) => {
+    const hh = Calc.fmtHeure(it.heure);
+    const nom = `<a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;flex:1 1 100%;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>`;
+    if (it.statut==="realisee"){
+      return `<div class="cl-line" style="padding:5px 0;opacity:.6">${nom}
+        <span class="tag tag-done" style="cursor:default">✅ Fait</span></div>`;
+    }
+    const wa = Calc.waHref(it.cl.telephone, Calc.seanceRappelMsg(it.cl, it.date, it.type, it.heure));
+    return `<div class="cl-line" style="padding:5px 0;flex-wrap:wrap">${nom}
+      <span style="display:flex;gap:6px;align-items:center;flex:1 1 100%;flex-wrap:wrap;justify-content:flex-start;margin-top:4px">
+        <button class="tag tag-done" data-done="${it.id}" title="Marquer cette séance comme faite">✅ Fait</button>
+        <button class="tag" data-ics="${it.id}" data-cl="${it.cl.id}" title="Ajouter à mon agenda Apple (avec rappels)">📅 Agenda</button>
+        ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
+        <a class="tag" href="cliente.html?id=${it.cl.id}&editSeance=${it.id}" title="Modifier cette séance">✏️ Modifier</a>
+      </span></div>`;
+  };
+  // Rendu d'une liste de séances GROUPÉES PAR DATE (triées par heure dans chaque jour).
+  const groups = (arr) => {
+    const byDate = {};
+    arr.forEach(it => (byDate[it.date] ||= []).push(it));
+    Object.values(byDate).forEach(a => a.sort((x,y)=> (x.heure||"99")<(y.heure||"99")?-1:((x.heure||"99")>(y.heure||"99")?1:0)));
+    return Object.keys(byDate).sort((a,b)=> a<b?-1:1).map(d=>`
       <div class="card" style="margin-top:8px;padding:10px 12px">
         <div class="idate" style="font-weight:700;margin-bottom:6px;text-transform:capitalize">${Calc.fmtJour(d)}</div>
-        ${byDate[d].map(it=>{
-          const hh = Calc.fmtHeure(it.heure);
-          const nom = `<a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;flex:1 1 100%;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>`;
-          if (it.statut==="realisee"){
-            // Séance faite : reste visible, grisée, marquée ✅ (ne disparaît pas).
-            return `<div class="cl-line" style="padding:5px 0;opacity:.6">${nom}
-              <span class="tag tag-done" style="cursor:default">✅ Fait</span></div>`;
-          }
-          const wa = Calc.waHref(it.cl.telephone, Calc.seanceRappelMsg(it.cl, it.date, it.type, it.heure));
-          return `<div class="cl-line" style="padding:5px 0;flex-wrap:wrap">${nom}
-            <span style="display:flex;gap:6px;align-items:center;flex:1 1 100%;flex-wrap:wrap;justify-content:flex-start;margin-top:4px">
-              <button class="tag tag-done" data-done="${it.id}" title="Marquer cette séance comme faite">✅ Fait</button>
-              <button class="tag" data-ics="${it.id}" data-cl="${it.cl.id}" title="Ajouter à mon agenda Apple (avec rappels)">📅 Agenda</button>
-              ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
-              <a class="tag" href="cliente.html?id=${it.cl.id}&editSeance=${it.id}" title="Modifier cette séance">✏️ Modifier</a>
-            </span></div>`;
-        }).join("")}
-      </div>`).join("") + `</div></details>`;
+        ${byDate[d].map(line).join("")}
+      </div>`).join("");
+  };
+  // P2 — « Aujourd'hui » épinglé et OUVERT (ce que la coach doit faire dans la journée),
+  // le reste des séances futures en dessous, replié.
+  const todayItems  = items.filter(i => i.date === today);
+  const futureItems = items.filter(i => i.date > today);
+  const nToday = todayItems.filter(i=>i.statut==="prevue").length;
+  const doneToday = todayItems.filter(i=>i.statut==="realisee").length;
+  const nFut = futureItems.filter(i=>i.statut==="prevue").length;
+  const todayBlock = todayItems.length ? `<details class="section-block" open style="margin:14px 0">
+      <summary><span class="chev">▸</span>📅 Aujourd'hui<span class="count" style="background:var(--accent);color:#fff">${nToday}</span>${doneToday?`<span class="count" style="background:var(--ok);color:#fff">✅ ${doneToday}</span>`:""}</summary>
+      <div class="section-body">${groups(todayItems)}</div></details>` : "";
+  const futureBlock = futureItems.length ? `<details class="section-block" style="margin:14px 0">
+      <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">${nFut}</span></summary>
+      <div class="section-body">${groups(futureItems)}</div></details>` : "";
+  box.innerHTML = todayBlock + futureBlock;
 }
 
 // ---- Suivi des bilans : qui a rempli, quand, et qui doit le faire ----
@@ -393,6 +412,20 @@ function renderList() {
     const f = FILTERS.find(x=>x.key===STATE.filter);
     list = list.filter(f.test);
   }
+  // Tri (P3) — par défaut : ordre de chargement (plus récentes). On copie avant de trier
+  // pour ne pas réordonner STATE.clientes lui-même.
+  if (STATE.sort) {
+    const jbilan = c => { const j = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut).joursAvant; return j==null ? 99999 : j; };
+    const jfin   = c => { const j = Calc.suiviStats(c.accompagnement).joursRestants; return j==null ? 99999 : j; };
+    const rest   = c => Calc.seancesStats(c.accompagnement, c.seances).restantes;
+    const cmp = {
+      nom:       (a,b)=> (a.cliente.prenom||"").localeCompare(b.cliente.prenom||""),
+      bilan:     (a,b)=> jbilan(a)-jbilan(b),
+      fin:       (a,b)=> jfin(a)-jfin(b),
+      restantes: (a,b)=> rest(b)-rest(a),
+    }[STATE.sort];
+    if (cmp) list = [...list].sort(cmp);
+  }
   // Raccourci global : total des séances restantes sur l'ensemble des clientes affichées.
   const totRestantes = list.reduce((n,c)=> n + Calc.seancesStats(c.accompagnement, c.seances).restantes, 0);
   document.getElementById("sub").textContent =
@@ -502,6 +535,7 @@ document.getElementById("newCliente").onclick = async () => {
   document.getElementById("who").textContent = (p.prenom||"Coach");
   document.getElementById("logout").onclick = () => Auth.signOut();
   document.getElementById("q").addEventListener("input", e => { STATE.q = e.target.value.trim(); renderList(); });
+  document.getElementById("sort").addEventListener("change", e => { STATE.sort = e.target.value; renderList(); });
   // Clic sur une pastille de bilan dans une carte → WhatsApp (sans naviguer vers la fiche).
   document.getElementById("content").addEventListener("click", (e) => {
     const w = e.target.closest(".dot-wa");
@@ -520,12 +554,26 @@ document.getElementById("newCliente").onclick = async () => {
     }
     const btn = e.target.closest("[data-done]"); if (!btn) return;
     e.preventDefault(); btn.disabled = true;
+    // Mise à jour LOCALE immédiate (pas de rechargement complet) : on retrouve la séance
+    // dans STATE, on la passe en "realisee", et on ne redessine que les blocs concernés.
+    // Rapide et fluide même avec beaucoup de clientes. Rollback si l'écriture échoue.
+    let target = null;
+    for (const c of STATE.clientes){
+      const s = (c.seances||[]).find(x => String(x.id) === String(btn.dataset.done));
+      if (s){ target = s; break; }
+    }
+    const prev = target ? target.statut : null;
+    if (target) target.statut = "realisee";
+    renderAlerts(); renderAgenda(); renderBilansDemarrage(); renderSansSeance(); renderList();
     try {
       const { error } = await sb.from("seances").update({ statut:"realisee" }).eq("id", btn.dataset.done);
       if (error) throw error;
       UI.toast("Séance marquée faite ✓");
-      await loadAll(); renderAlerts(); renderAgenda(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderList();
-    } catch(err){ console.error(err); UI.toast("Erreur : "+(err.message||err),"err"); btn.disabled = false; }
+    } catch(err){
+      console.error(err); UI.toast("Erreur : "+(err.message||err),"err");
+      if (target) target.statut = prev; // rollback visuel
+      renderAlerts(); renderAgenda(); renderBilansDemarrage(); renderSansSeance(); renderList();
+    }
   });
   try {
     await loadAll();
