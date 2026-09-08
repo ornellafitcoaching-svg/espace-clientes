@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e49">
+<link rel="stylesheet" href="css/app.css?v=e50">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e49"></script>
-<script src="js/supabaseClient.js?v=e49"></script>
-<script src="js/auth.js?v=e49"></script>
-<script src="js/db.js?v=e49"></script>
-<script src="js/calc.js?v=e49"></script>
-<script src="js/ui/modal.js?v=e49"></script>
-<script src="js/ui/progress.js?v=e49"></script>
+<script src="js/config.js?v=e50"></script>
+<script src="js/supabaseClient.js?v=e50"></script>
+<script src="js/auth.js?v=e50"></script>
+<script src="js/db.js?v=e50"></script>
+<script src="js/calc.js?v=e50"></script>
+<script src="js/ui/modal.js?v=e50"></script>
+<script src="js/ui/progress.js?v=e50"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -280,7 +280,8 @@ function sectionSeances(){
     ${st.prevues?`<div class="cl-line"><span>⏳ Restantes (forfait)</span><strong>${st.restantes}</strong></div>`:""}
     <div class="cl-line"><span>📅 Programmées à venir</span><strong>${aVenir}</strong></div>
   </div>`;
-  const body = decompte + (show.length ? show.map(x=>`
+  const addBtn = `<button class="btn-accent btn-sm" data-act="add-seance" style="margin-bottom:12px">➕ Ajouter une séance</button>`;
+  const body = addBtn + decompte + (show.length ? show.map(x=>`
     <div class="item seance-card" data-act="edit-seance" data-id="${x.id}" style="cursor:pointer">
       <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}${x.heure?`<small style="display:block;font-weight:600;color:var(--text-light)">${Calc.fmtHeure(x.heure)}</small>`:""}</div>
       <div class="ibody">
@@ -325,7 +326,8 @@ function sectionBilans(){
   const askBtn = wa
     ? `<div style="margin-bottom:12px"><a class="btn-accent btn-sm" href="${wa}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px">📲 Demander son bilan</a></div>`
     : `<p class="isub" style="margin-bottom:12px">Ajoute son numéro de téléphone (bouton « Modifier ») pour lui demander son bilan en un clic sur WhatsApp.</p>`;
-  const body = askBtn + (list.length ? list.map(x=>`
+  const addB = `<button class="btn-accent btn-sm" data-act="add-bilan" style="margin-bottom:12px">＋ Saisir un bilan</button>`;
+  const body = askBtn + addB + (list.length ? list.map(x=>`
     <div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div>
       <div class="ibody">
         <div class="ititle">Bilan ${x.semaine!=null?"semaine "+x.semaine:""} ${x.poids?`<span class="tag">${x.poids} kg</span>`:""}</div>
@@ -400,7 +402,8 @@ function sectionMensurations(){
   const dates = Object.keys(byDate).sort((a,b)=> a<b?1:-1);
   const listing = dates.length ? `<div style="margin-top:14px">` + dates.map(d=>`
     <div class="card" style="margin-top:8px;padding:10px 12px">
-      <div class="idate" style="font-weight:700;margin-bottom:6px">${Calc.fmtShort(d)}</div>
+      <div class="cl-line" style="margin-bottom:6px"><span class="idate" style="font-weight:700">${Calc.fmtShort(d)}</span>
+        <button class="link" data-act="edit-mensu-date" data-date="${d}">✏️ Modifier la date</button></div>
       ${byDate[d].map(m=>`<div class="cl-line" style="padding:3px 0">
           <span>${esc(m.type.replace(/_/g," "))}</span>
           <span style="display:flex;align-items:center;gap:8px"><strong>${m.valeur}${esc(m.unite||"")}</strong>
@@ -425,7 +428,8 @@ function sectionMensurations(){
 
 function sectionPhotos(){
   const list = D.photos||[];
-  const body = list.length ? `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
+  const addBtn = `<button class="btn-accent btn-sm" data-act="add-photo" style="margin-bottom:12px">➕ Ajouter une photo</button>`;
+  const body = addBtn + (list.length ? `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
     <div class="mensu-card">
       <div class="cl-line"><strong>${Calc.fmt(p.date)}</strong>
         <span class="tag">${p.visibilite==="cliente"?"👁 Visible cliente":"🔒 Privé"}</span></div>
@@ -433,19 +437,20 @@ function sectionPhotos(){
       ${p.legende?`<div class="isub">${esc(p.legende)}</div>`:""}
       <div style="margin-top:6px">${selBox("photo",p.id,p.storage_path)} <button class="link" data-act="toggle-photo" data-id="${p.id}" data-vis="${p.visibilite}">${p.visibilite==="cliente"?"Rendre privé":"Rendre visible"}</button>
       &nbsp;·&nbsp;<button class="link" data-act="del" data-entity="photo" data-id="${p.id}" data-path="${esc(p.storage_path)}">Supprimer</button></div>
-    </div>`).join("") + `</div>` : `<p class="empty">Aucune photo.</p>`;
+    </div>`).join("") + `</div>` : `<p class="empty">Aucune photo.</p>`);
   return block("Photos de progression", list.length, body, false);
 }
 
 function sectionObjectifs(){
   const list = D.objectifs||[];
   const icon = st => ({en_cours:"⏳",atteint:"✅",abandonne:"⛔"}[st]||"");
-  const body = list.length ? list.map(o=>`
+  const addBtn = `<button class="btn-accent btn-sm" data-act="add-objectif" style="margin-bottom:12px">➕ Ajouter un objectif</button>`;
+  const body = addBtn + (list.length ? list.map(o=>`
     <div class="item"><div class="idate">${icon(o.statut)}</div>
       <div class="ibody"><div class="ititle">${esc(o.titre)}</div>
         ${o.description?`<div class="isub">${esc(o.description)}</div>`:""}
         <div class="isub">${o.statut.replace("_"," ")} · créé le ${Calc.fmt(o.date_creation)}${o.date_atteinte?" · atteint le "+Calc.fmt(o.date_atteinte):""}</div>
-      </div>${delEdit("objectif",o.id)}</div>`).join("") : `<p class="empty">Aucun objectif.</p>`;
+      </div>${delEdit("objectif",o.id)}</div>`).join("") : `<p class="empty">Aucun objectif.</p>`);
   return block("Objectifs", list.length, body, false);
 }
 
@@ -468,6 +473,7 @@ function sectionTimeline(){
 function sectionNotes(){
   const list = D.notes||[];
   const body = `<p class="isub" style="color:var(--text-light);margin-bottom:8px">🔒 Visible uniquement par toi. Jamais côté cliente.</p>` +
+    `<button class="btn-accent btn-sm" data-act="add-note" style="margin-bottom:12px">➕ Ajouter une note</button>` +
     (list.length ? list.map(n=>`
     <div class="item"><div class="idate">${Calc.fmtShort(n.date)}</div>
       <div class="ibody"><div class="isub">${esc(n.contenu)}</div></div>${delEdit("note",n.id)}</div>`).join("")
@@ -646,7 +652,7 @@ const MENSU_HINTS = {
   sous_poitrine: "Juste sous la poitrine, ligne du soutien-gorge.",
   tour_dos:      "Le tour du buste au niveau du dos : sous les aisselles, à l'endroit le plus large du dos, bras le long du corps.",
   tour_taille:   "Partie la plus fine du ventre (souvent au-dessus du nombril), ventre non rentré.",
-  tour_hanches:  "Partie la plus large des hanches et des fesses.",
+  tour_hanches:  "À l'endroit LE PLUS LARGE des hanches / fessiers.",
   tour_fessiers: "Partie la plus rebondie des fesses, pieds joints.",
   tour_cuisse:   "Haut de la cuisse, partie la plus large. Toujours la même jambe.",
   tour_bras:     "Milieu du bras, relâché. Toujours le même bras.",
@@ -968,6 +974,20 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   }
   if (act==="toggle-select") return setSelMode(!SELMODE);
   if (act==="edit-taille") return editTaille();
+  if (act==="edit-mensu-date"){
+    const oldDate = el.dataset.date;
+    const v = await UI.form({ title:"Modifier la date du relevé", submit:"Enregistrer", fields:[
+      { name:"date", label:"Date de la prise de mensurations", type:"date", value:oldDate, required:true },
+    ]});
+    if (!v || !v.date || v.date===oldDate) return;
+    try{
+      // Décale TOUTES les mesures de ce jour (y compris la masse grasse) vers la nouvelle date.
+      const { error } = await window.sb.from("mensurations").update({ date:v.date }).eq("cliente_id", CID).eq("date", oldDate);
+      if (error) throw error;
+      UI.toast("Date du relevé modifiée ✓"); reload("Mensurations & évolution");
+    }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    return;
+  }
   if (act==="edit-cliente") return editCliente();
   if (act==="edit-accomp") return editAccomp();
   if (act==="renouveler-accomp") return renouvelerAccomp();
