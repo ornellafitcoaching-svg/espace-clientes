@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e45">
+<link rel="stylesheet" href="css/app.css?v=e46">
 </head>
 <body>
 <header class="topbar">
@@ -42,13 +42,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e45"></script>
-<script src="js/supabaseClient.js?v=e45"></script>
-<script src="js/auth.js?v=e45"></script>
-<script src="js/db.js?v=e45"></script>
-<script src="js/calc.js?v=e45"></script>
-<script src="js/ui/modal.js?v=e45"></script>
-<script src="js/ui/progress.js?v=e45"></script>
+<script src="js/config.js?v=e46"></script>
+<script src="js/supabaseClient.js?v=e46"></script>
+<script src="js/auth.js?v=e46"></script>
+<script src="js/db.js?v=e46"></script>
+<script src="js/calc.js?v=e46"></script>
+<script src="js/ui/modal.js?v=e46"></script>
+<script src="js/ui/progress.js?v=e46"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "" };
 
@@ -117,8 +117,9 @@ function renderAgenda(){
           }
           const wa = Calc.waHref(it.cl.telephone, Calc.seanceRappelMsg(it.cl, it.date, it.type, it.heure));
           return `<div class="cl-line" style="padding:5px 0">${nom}
-            <span style="display:flex;gap:8px;align-items:center;flex:none">
+            <span style="display:flex;gap:8px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end">
               <button class="tag tag-done" data-done="${it.id}" title="Marquer cette séance comme faite">✅ Fait</button>
+              <button class="tag" data-ics="${it.id}" data-cl="${it.cl.id}" title="Ajouter à mon agenda Apple (avec rappels)">📅 Agenda</button>
               ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
               <a class="tag" href="cliente.html?id=${it.cl.id}&editSeance=${it.id}" title="Modifier cette séance">✏️ Modifier</a>
             </span></div>`;
@@ -145,11 +146,12 @@ function renderBilans(){
     const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut);
     const demarree = !!(c.accompagnement && c.accompagnement.date_debut);
     const aRempli = bilans.length > 0;
+    // Une cliente démarrée SANS bilan saisi n'est PAS « jamais rempli » : son bilan
+    // initial a été fait au démarrage (hors appli). On la traite comme les autres, le
+    // prochain bilan tombant à date_debut + 28 j (calculé dans bilanStats).
     let prio, chip, col;
-    if (!aRempli){
-      if (demarree){ prio=0; chip="❌ Jamais rempli"; col=COL.red; }
-      else { prio=4; chip="Pas encore démarré"; col=COL.grey; }
-    } else if (b.joursAvant!==null && b.joursAvant<0){ prio=1; chip=`🟠 En retard de ${Math.abs(b.joursAvant)} j`; col=COL.orange; }
+    if (!demarree){ prio=4; chip="Pas encore démarré"; col=COL.grey; }
+    else if (b.joursAvant!==null && b.joursAvant<0){ prio=1; chip=`🟠 En retard de ${Math.abs(b.joursAvant)} j`; col=COL.orange; }
     else if (b.joursAvant!==null && b.joursAvant<=7){ prio=2; chip=`🟡 Prochain dans ${b.joursAvant} j`; col=COL.yellow; }
     else { prio=3; chip="✅ À jour"; col=COL.green; }
     return { cl, bilans, dernier, b, prio, chip, col, aRempli, demarree };
@@ -161,11 +163,10 @@ function renderBilans(){
     let detail, prochain = "";
     if (!r.aRempli){
       if (!r.demarree){ detail = `pas encore démarrée`; }
-      else if (r.b.joursAvant!==null && r.b.joursAvant<0){
-        detail = `<span style="color:#c0564b">1er bilan en retard de ${Math.abs(r.b.joursAvant)} j</span>`;
-      } else {
-        detail = `<span style="color:#c0564b">aucun bilan pour l'instant</span>`;
-        prochain = r.b.prochain ? ` · 1er bilan prévu le ${Calc.fmt(r.b.prochain)}` : "";
+      else {
+        // Bilan initial fait au démarrage → on affiche juste le prochain (démarrage + 4 sem.).
+        detail = `bilan initial au démarrage`;
+        prochain = r.b.prochain ? ` · prochain le ${Calc.fmt(r.b.prochain)}` : "";
       }
     } else {
       const d = r.dernier;
@@ -187,11 +188,17 @@ function renderBilans(){
     </div>`;
   };
 
-  // Bloc 1 : PAS rempli (jamais + pas encore démarrées en gris tout en bas).
-  const pasRempli = rows.filter(r=>!r.aRempli && r.demarree).sort((a,b)=>(a.cl.prenom||"").localeCompare(b.cl.prenom||""));
-  const pasDemarree = rows.filter(r=>!r.aRempli && !r.demarree).sort((a,b)=>(a.cl.prenom||"").localeCompare(b.cl.prenom||""));
-  // Bloc 2 : ONT rempli (les plus urgents d'abord : en retard, puis bientôt, puis à jour ; date récente d'abord).
-  const ontRempli = rows.filter(r=>r.aRempli).sort((a,b)=> a.prio-b.prio || (a.dernier.date<b.dernier.date?1:-1));
+  // On classe désormais par ÉCHÉANCE du prochain bilan (démarrage + 4 sem. si aucun
+  // bilan saisi), plus par « jamais rempli ». Les démarrées qui n'ont pas encore de
+  // bilan saisi ne sont donc plus en rouge : leur bilan initial a eu lieu au démarrage.
+  // Bloc 1 : à faire — en retard ou dans les 7 jours (prio 1 ou 2), plus urgent d'abord.
+  const aFaire = rows.filter(r=>r.demarree && r.prio<=2)
+    .sort((a,b)=> a.prio-b.prio || ((a.b.joursAvant??0)-(b.b.joursAvant??0)));
+  // Bloc 2 : à jour (prio 3), bilan le plus récent d'abord.
+  const aJour = rows.filter(r=>r.demarree && r.prio===3)
+    .sort((a,b)=> (a.dernier?a.dernier.date:"")<(b.dernier?b.dernier.date:"")?1:-1);
+  // Bloc 3 : pas encore démarrées (gris, tout en bas).
+  const pasDemarree = rows.filter(r=>!r.demarree).sort((a,b)=>(a.cl.prenom||"").localeCompare(b.cl.prenom||""));
 
   const sub = (titre, arr, couleur) => arr.length
     ? `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:${couleur};margin:10px 2px 2px">${titre} (${arr.length})</div>`
@@ -199,10 +206,10 @@ function renderBilans(){
     : "";
 
   box.innerHTML = `<details class="section-block" open style="margin:14px 0">
-    <summary><span class="chev">▸</span>📋 Suivi des bilans<span class="count">${rows.length}</span>${pasRempli.length?`<span class="count" style="background:var(--danger,#c0564b);color:#fff">❌ ${pasRempli.length}</span>`:""}</summary>
+    <summary><span class="chev">▸</span>📋 Suivi des bilans<span class="count">${rows.length}</span>${aFaire.length?`<span class="count" style="background:#b87316;color:#fff">🔔 ${aFaire.length}</span>`:""}</summary>
     <div class="section-body">
-      ${sub("❌ Pas encore rempli", pasRempli, "#c0564b")}
-      ${sub("✅ Ont rempli leur bilan", ontRempli, "#2f8f5b")}
+      ${sub("🔔 Bilan à faire (retard ou ≤ 7 j)", aFaire, "#b87316")}
+      ${sub("✅ À jour", aJour, "#2f8f5b")}
       ${sub("· Pas encore démarrées", pasDemarree, "#8a8a8a")}
       ${!rows.length?`<p class="empty">Aucune cliente à suivre.</p>`:""}
     </div></details>`;
@@ -253,6 +260,8 @@ function renderSansSeance(){
   const today = Calc.today();
   const sans = STATE.clientes.filter(c => {
     if (c.cliente.statut !== "active") return false;
+    // Les distancielles n'ont pas de séances programmées en personne → normal, on les ignore ici.
+    if (c.cliente.type === "distanciel") return false;
     return !(c.seances||[]).some(s => s.statut==="prevue" && s.date && s.date>=today);
   }).sort((a,b)=>(a.cliente.prenom||"").localeCompare(b.cliente.prenom||""));
   if (!sans.length){ box.innerHTML = ""; return; }
@@ -315,7 +324,7 @@ function renderAlerts() {
   const all = [];
   STATE.clientes.forEach(c => Calc.alertes(c).forEach(a => all.push({ ...a, c })));
   if (!all.length) { box.innerHTML = ""; return; }
-  const order = { nouveau_bilan:0, bilan:1, bilan_demarrage:2, programme:3, nutrition_mensuelle:3, fin:4, seances:5, renouveler:6 };
+  const order = { nouveau_bilan:0, bilan:1, bilan_demarrage:2, programme:3, nutrition_mensuelle:3, fin:4, prevoir_seances:5, seances:6, renouveler:7 };
   all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
   box.innerHTML = all.slice(0,8).map(a => {
     const cl = a.c.cliente;
@@ -494,6 +503,15 @@ document.getElementById("newCliente").onclick = async () => {
   });
   // Bouton « ✅ Fait » dans l'agenda → passe la séance en réalisée + rafraîchit.
   document.getElementById("agenda").addEventListener("click", async (e) => {
+    // Ajout à l'agenda Apple (.ics) — priorité sur le bouton « Fait ».
+    const icsBtn = e.target.closest("[data-ics]");
+    if (icsBtn){
+      e.preventDefault();
+      const c = STATE.clientes.find(x => String(x.cliente.id) === String(icsBtn.dataset.cl));
+      const s = c && (c.seances||[]).find(x => String(x.id) === String(icsBtn.dataset.ics));
+      if (c && s){ Calc.downloadSeanceICS(c.cliente, s); UI.toast("Séance ajoutée à ton agenda 📅"); }
+      return;
+    }
     const btn = e.target.closest("[data-done]"); if (!btn) return;
     e.preventDefault(); btn.disabled = true;
     try {

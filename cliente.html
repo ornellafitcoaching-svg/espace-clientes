@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e45">
+<link rel="stylesheet" href="css/app.css?v=e46">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e45"></script>
-<script src="js/supabaseClient.js?v=e45"></script>
-<script src="js/auth.js?v=e45"></script>
-<script src="js/db.js?v=e45"></script>
-<script src="js/calc.js?v=e45"></script>
-<script src="js/ui/modal.js?v=e45"></script>
-<script src="js/ui/progress.js?v=e45"></script>
+<script src="js/config.js?v=e46"></script>
+<script src="js/supabaseClient.js?v=e46"></script>
+<script src="js/auth.js?v=e46"></script>
+<script src="js/db.js?v=e46"></script>
+<script src="js/calc.js?v=e46"></script>
+<script src="js/ui/modal.js?v=e46"></script>
+<script src="js/ui/progress.js?v=e46"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -264,7 +264,17 @@ function sectionSeances(){
   const aVenir = list.filter(x=>x.statut==="prevue" && x.date>=Calc.today()).length;
   // …mais on MASQUE de la liste les séances "faites" fictives du CRM (datées 31/08/2026),
   // sans les supprimer : le compteur reste juste, les fausses dates ne s'affichent plus.
+  const _today = Calc.today();
   const show = list.filter(x=>!(x.statut==="realisee" && x.date==="2026-08-31"));
+  // Tri : séances À VENIR d'abord (la plus proche en haut), puis les passées (la plus récente en haut).
+  const _rank = x => (x.statut==="prevue" && x.date>=_today) ? 0 : 1;
+  const _cmpH = (a,b) => (a.heure||"99")<(b.heure||"99") ? -1 : ((a.heure||"99")>(b.heure||"99") ? 1 : 0);
+  show.sort((a,b)=>{
+    const ra=_rank(a), rb=_rank(b);
+    if (ra!==rb) return ra-rb;
+    if (a.date!==b.date) return ra===0 ? (a.date<b.date?-1:1) : (a.date<b.date?1:-1);
+    return ra===0 ? _cmpH(a,b) : -_cmpH(a,b);
+  });
   const decompte = `<div class="mensu-card" style="margin-bottom:10px">
     <div class="cl-line"><span>✅ Réalisées</span><strong style="color:var(--ok)">${st.realisees}${st.prevues?` / ${st.prevues}`:""}</strong></div>
     ${st.prevues?`<div class="cl-line"><span>⏳ Restantes (forfait)</span><strong>${st.restantes}</strong></div>`:""}
@@ -278,7 +288,10 @@ function sectionSeances(){
         <div class="isub">${[x.objectif&&esc(x.objectif),x.intensite&&("Intensité "+esc(x.intensite)),x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
         ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
         ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}
-        ${x.statut==="prevue"?`<button class="btn-accent btn-sm" data-act="seance-done" data-id="${x.id}" style="margin-top:8px">✅ Marquer faite</button>`:""}
+        ${x.statut==="prevue"?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn-accent btn-sm" data-act="seance-done" data-id="${x.id}">✅ Marquer faite</button>
+          <button class="btn-ghost btn-sm" data-act="ics-seance" data-id="${x.id}" title="Ajouter à mon agenda Apple (avec rappels)">📅 Mon agenda</button>
+        </div>`:""}
       </div>${delEdit("seance",x.id)}
     </div>`).join("") : `<p class="empty">Aucune séance à afficher.</p>`);
   return block("Séances", show.length, body, false);
@@ -628,10 +641,21 @@ const MENSU_HINTS = {
   tour_mollet:   "Partie la plus large du mollet. Toujours le même mollet.",
 };
 async function addMensuSession(){
+  // La TAILLE (hauteur en cm) est une donnée de profil, pas une mensuration récurrente :
+  // on la demande ici UNE SEULE FOIS tant qu'elle manque, car elle est indispensable au
+  // calcul de la masse grasse (IMG). Une fois renseignée, le champ n'apparaît plus.
+  const needTaille = !(D && D.cliente && D.cliente.taille_cm);
   const fields = [{ name:"date", label:"Date", type:"date", value:Calc.today() }]
+    .concat(needTaille ? [{ name:"_taille_cm", label:"⭐ Taille / hauteur (cm)", type:"number", half:true,
+      hint:"À renseigner une seule fois. Indispensable pour calculer la masse grasse (IMG)." }] : [])
     .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true, hint:MENSU_HINTS[p.name]||"" })));
   const v = await UI.form({ title:"Mensurations", submit:"Enregistrer", fields });
   if (!v) return;
+  // Enregistre la taille sur la fiche cliente si elle vient d'être saisie (avant le calcul IMG).
+  if (needTaille && v._taille_cm){
+    const t = Number(v._taille_cm);
+    if (t){ try{ await DB.update("clientes", CID, { taille_cm:t }); D.cliente.taille_cm = t; }catch(_){}}
+  }
   const rows = MENSU_PRESETS
     .filter(p => v[p.name] != null && v[p.name] !== "")
     .map(p => ({ cliente_id:CID, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
@@ -656,9 +680,17 @@ async function addMensuSession(){
 // enregistrés ensemble (un bilan = ressenti + mesures), comme côté cliente.
 async function addBilanCoach(rec){
   const x = rec || {};
-  const fields = bilanFields(x).concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
+  const needTaille = !(D && D.cliente && D.cliente.taille_cm);
+  const fields = bilanFields(x)
+    .concat(needTaille ? [{ name:"_taille_cm", label:"⭐ Taille / hauteur (cm)", type:"number", half:true,
+      hint:"À renseigner une seule fois. Indispensable pour calculer la masse grasse (IMG)." }] : [])
+    .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
   const v = await UI.form({ title:(rec?"Modifier ":"")+"Bilan", submit:"Enregistrer", fields });
   if (!v) return;
+  if (needTaille && v._taille_cm){
+    const t = Number(v._taille_cm);
+    if (t){ try{ await DB.update("clientes", CID, { taille_cm:t }); D.cliente.taille_cm = t; }catch(_){}}
+  }
   const BILAN_KEYS = ["date","semaine","poids","ressenti","evolution","objectifs_atteints",
     "difficultes","points_positifs","nouveaux_objectifs","commentaire_coach"];
   const bilanPayload = { cliente_id:CID };
@@ -907,6 +939,11 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="seance-done"){
     try{ await DB.update("seances", id, { statut:"realisee" }); UI.toast("Séance marquée faite ✓"); reload(); }
     catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    return;
+  }
+  if (act==="ics-seance"){
+    const s = findRec("seance", id);
+    if (s){ Calc.downloadSeanceICS(D.cliente, s); UI.toast("Séance ajoutée à ton agenda 📅"); }
     return;
   }
   if (act==="toggle-select") return setSelMode(!SELMODE);

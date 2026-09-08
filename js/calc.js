@@ -148,6 +148,18 @@ window.Calc = {
     if (s.prevues > 0 && s.restantes <= 2) {
       out.push({ type: "seances", label: "Séances presque finies", icon: "🏋️" });
     }
+    // Point 7 — « prévoir des séances » : il reste beaucoup de séances au forfait
+    // (> 2) mais très peu sont réellement programmées à venir (≤ 2). Uniquement pour
+    // les accompagnements avec RDV en personne (présentiel / hybride) ; les distancielles
+    // n'ont pas de séances programmées (cf. bloc « Sans séance programmée »).
+    if (c.cliente && c.cliente.statut === "active") {
+      const avecRdv = c.cliente.type === "presentiel" || c.cliente.type === "hybride";
+      const today = this.today();
+      const programmees = (c.seances || []).filter(x => x.statut === "prevue" && x.date && x.date >= today).length;
+      if (avecRdv && s.restantes > 2 && programmees <= 2) {
+        out.push({ type: "prevoir_seances", label: "Prévoir des séances", icon: "🗓️" });
+      }
+    }
     // NB : le bilan de démarrage n'est PAS une alerte automatique — c'est Ornella
     // qui choisit de l'envoyer via le bouton sur la fiche (pas de notif imposée).
     const suivi = this.suiviStats(c.accompagnement);
@@ -284,10 +296,86 @@ window.Calc = {
       + "\n\nN'hésitez pas si vous avez la moindre question. Belle journée ! 💪";
   },
 
+  // ---- Agenda Apple (.ics) ------------------------------------------------
+  // Génère un événement iCalendar pour UNE séance, avec deux rappels :
+  //   • 1 h avant la séance (pour ne pas l'oublier) ;
+  //   • ~2 h après le début (« pense à la marquer faite »).
+  // Séance sans heure → événement « journée entière » avec rappels le matin (9 h)
+  // et en fin de journée (20 h). Ouvre l'app Calendrier sur iPhone/Mac.
+  icsEsc(s) {
+    return String(s == null ? "" : s)
+      .replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  },
+  _pad2(n) { return String(n).padStart(2, "0"); },
+  // "2026-09-08" → "20260908"
+  icsDay(dateStr) { return String(dateStr || "").replace(/-/g, ""); },
+  // "2026-09-08" + "09:30" → "20260908T093000" (heure locale flottante)
+  icsDateTime(dateStr, heure) {
+    const day = this.icsDay(dateStr);
+    const m = String(heure || "").match(/^(\d{1,2}):(\d{2})/);
+    const hh = m ? this._pad2(m[1]) : "09";
+    const mm = m ? m[2] : "00";
+    return `${day}T${hh}${mm}00`;
+  },
+  // Décale "20260908T093000" de +minutes → même format.
+  icsAddMinutes(dt, minutes) {
+    const y = +dt.slice(0, 4), mo = +dt.slice(4, 6) - 1, d = +dt.slice(6, 8);
+    const h = +dt.slice(9, 11), mi = +dt.slice(11, 13);
+    const date = new Date(y, mo, d, h, mi + Number(minutes || 0), 0);
+    return `${date.getFullYear()}${this._pad2(date.getMonth() + 1)}${this._pad2(date.getDate())}`
+      + `T${this._pad2(date.getHours())}${this._pad2(date.getMinutes())}00`;
+  },
+  // Texte iCalendar complet pour une séance d'une cliente.
+  seanceICS(cl, s) {
+    const nom = [cl.prenom, cl.nom].filter(Boolean).join(" ").trim() || "Cliente";
+    const type = s.type ? " — " + s.type : "";
+    const summary = this.icsEsc("🏋️ " + nom + type);
+    const rappelFaite = this.icsEsc("Séance " + (cl.prenom || "") + " : pense à la marquer faite dans ton espace coach.");
+    const loc = cl.adresse ? "LOCATION:" + this.icsEsc(cl.adresse) + "\r\n" : "";
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const uid = "seance-" + (s.id || Math.random().toString(36).slice(2)) + "@ornellafitcoaching";
+    let dtLines, alarms;
+    if (s.heure) {
+      const start = this.icsDateTime(s.date, s.heure);
+      const end = this.icsAddMinutes(start, s.duree ? Number(s.duree) : 60);
+      dtLines = `DTSTART:${start}\r\nDTEND:${end}`;
+      alarms =
+        `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT1H\r\nDESCRIPTION:${summary}\r\nEND:VALARM\r\n`
+        + `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:PT2H\r\nDESCRIPTION:${rappelFaite}\r\nEND:VALARM\r\n`;
+    } else {
+      const day = this.icsDay(s.date);
+      const dt = new Date(this.parse(s.date)); dt.setDate(dt.getDate() + 1);
+      const next = `${dt.getFullYear()}${this._pad2(dt.getMonth() + 1)}${this._pad2(dt.getDate())}`;
+      dtLines = `DTSTART;VALUE=DATE:${day}\r\nDTEND;VALUE=DATE:${next}`;
+      alarms =
+        `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:PT9H\r\nDESCRIPTION:${summary}\r\nEND:VALARM\r\n`
+        + `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:PT20H\r\nDESCRIPTION:${rappelFaite}\r\nEND:VALARM\r\n`;
+    }
+    return [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Ornella Fit Coaching//Espace Coach//FR",
+      "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+      "UID:" + uid, "DTSTAMP:" + stamp, dtLines,
+      "SUMMARY:" + summary, loc.replace(/\r\n$/, ""),
+      "DESCRIPTION:" + summary, alarms.replace(/\r\n$/, ""), "END:VEVENT", "END:VCALENDAR",
+    ].filter(Boolean).join("\r\n");
+  },
+  // Déclenche le téléchargement/ouverture du .ics (iOS ouvre l'app Calendrier).
+  downloadSeanceICS(cl, s) {
+    const text = this.seanceICS(cl, s);
+    const nom = (cl.prenom || "seance").normalize("NFD").replace(/[^A-Za-z0-9]/g, "") || "seance";
+    const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "seance-" + nom + "-" + (s.date || "") + ".ics";
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+  },
+
   // ---- Bilan de démarrage (ressenti des premières séances) ----------------
   // Seuil : proposé à la coach dès que la cliente atteint ce nb de séances réalisées.
-  SEUIL_BILAN_DEMARRAGE: 5,
-  // À demander ? (>= 5 séances réalisées ET aucun bilan de démarrage déjà rempli)
+  // 1 = dès la 1re séance faite (le ressenti des tout débuts est le plus utile).
+  SEUIL_BILAN_DEMARRAGE: 1,
+  // À demander ? (>= seuil séances réalisées ET aucun bilan de démarrage déjà rempli)
   bilanDemarrageDue(accompagnement, seances, bilansDemarrage) {
     if (bilansDemarrage && bilansDemarrage.length) return false;
     const s = this.seancesStats(accompagnement, seances);
