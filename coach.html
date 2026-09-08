@@ -326,7 +326,7 @@ function renderAlerts() {
   if (!all.length) { box.innerHTML = ""; return; }
   const order = { nouveau_bilan:0, bilan:1, bilan_demarrage:2, programme:3, nutrition_mensuelle:3, fin:4, prevoir_seances:5, seances:6, renouveler:7 };
   all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
-  box.innerHTML = all.slice(0,8).map(a => {
+  const alertsHtml = all.slice(0,8).map(a => {
     const cl = a.c.cliente;
     // Rappel de bilan → cliquer envoie la demande à la cliente sur WhatsApp.
     if (a.type === "bilan") {
@@ -359,6 +359,12 @@ function renderAlerts() {
        <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
      </a>`;
   }).join("");
+  // Regroupées dans un bandeau REPLIABLE (fermé par défaut) pour ne plus empiler
+  // 8 cartes en haut de l'écran et éviter le scroll forcé.
+  box.innerHTML = `<details class="section-block" style="margin:14px 0">
+    <summary><span class="chev">▸</span>🔔 À traiter<span class="count" style="background:var(--accent);color:#fff">${all.length}</span></summary>
+    <div class="section-body" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${alertsHtml}</div>
+  </details>`;
 }
 
 // ---- Filtres ----
