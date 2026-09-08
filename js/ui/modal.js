@@ -55,8 +55,17 @@ UI.form = function (opts) {
 
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add("open"));
-    const first = form.querySelector("input,textarea,select");
-    if (first) setTimeout(() => first.focus(), 60);
+    // NE PAS auto-focus le 1er champ : sur iPhone ça faisait monter le clavier d'emblée
+    // et masquait le formulaire. La coach/cliente tape elle-même dans le champ voulu.
+    // Quand un champ prend le focus (clavier iOS qui monte), on le recentre AU-DESSUS du
+    // clavier pour qu'il reste visible et que la saisie soit fluide.
+    form.addEventListener("focusin", (e) => {
+      if (e.target.matches("input,textarea,select")) {
+        setTimeout(() => {
+          try { e.target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (_) {}
+        }, 300);
+      }
+    });
 
     function close(result) {
       overlay.classList.remove("open");
