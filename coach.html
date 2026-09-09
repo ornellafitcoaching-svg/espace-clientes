@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e61">
+<link rel="stylesheet" href="css/app.css?v=e62">
 </head>
 <body>
 <header class="topbar">
@@ -49,13 +49,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e61"></script>
-<script src="js/supabaseClient.js?v=e61"></script>
-<script src="js/auth.js?v=e61"></script>
-<script src="js/db.js?v=e61"></script>
-<script src="js/calc.js?v=e61"></script>
-<script src="js/ui/modal.js?v=e61"></script>
-<script src="js/ui/progress.js?v=e61"></script>
+<script src="js/config.js?v=e62"></script>
+<script src="js/supabaseClient.js?v=e62"></script>
+<script src="js/auth.js?v=e62"></script>
+<script src="js/db.js?v=e62"></script>
+<script src="js/calc.js?v=e62"></script>
+<script src="js/ui/modal.js?v=e62"></script>
+<script src="js/ui/progress.js?v=e62"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -380,7 +380,8 @@ function renderAlerts() {
   if (!all.length) { box.innerHTML = ""; return; }
   const order = { nouveau_bilan:0, bilan:1, bilan_demarrage:2, programme:3, nutrition_mensuelle:3, fin:4, prevoir_seances:5, seances:6, renouveler:7 };
   all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
-  const alertsHtml = all.slice(0,8).map(a => {
+  // Rendu d'UNE alerte (lien vers la fiche ou action WhatsApp selon le type).
+  const alertHtml = (a) => {
     const cl = a.c.cliente;
     // Rappel de bilan → cliquer envoie la demande à la cliente sur WhatsApp.
     if (a.type === "bilan") {
@@ -412,13 +413,22 @@ function renderAlerts() {
     return `<a class="alert" href="cliente.html?id=${cl.id}">
        <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
      </a>`;
-  }).join("");
-  // Regroupées dans un bandeau REPLIABLE (fermé par défaut) pour ne plus empiler
-  // 8 cartes en haut de l'écran et éviter le scroll forcé.
-  box.innerHTML = `<details class="section-block" style="margin:14px 0">
-    <summary><span class="chev">▸</span>🔔 À traiter<span class="count" style="background:var(--accent);color:#fff">${all.length}</span></summary>
-    <div class="section-body" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${alertsHtml}</div>
-  </details>`;
+  };
+  // Les « 🆕 Nouveau bilan rempli » (par une cliente) restent TOUJOURS VISIBLES en haut —
+  // c'est une notif importante, on ne la cache pas dans le bandeau repliable.
+  const nouveaux = all.filter(a => a.type === "nouveau_bilan");
+  const reste    = all.filter(a => a.type !== "nouveau_bilan").slice(0, 8);
+  const nouveauxHtml = nouveaux.length
+    ? `<div style="display:flex;flex-direction:column;gap:8px;margin:14px 0">${nouveaux.map(alertHtml).join("")}</div>`
+    : "";
+  // Le reste, regroupé dans un bandeau REPLIABLE (fermé) pour éviter le scroll forcé.
+  const resteHtml = reste.length
+    ? `<details class="section-block" style="margin:14px 0">
+        <summary><span class="chev">▸</span>🔔 À traiter<span class="count" style="background:var(--accent);color:#fff">${reste.length}</span></summary>
+        <div class="section-body" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${reste.map(alertHtml).join("")}</div>
+      </details>`
+    : "";
+  box.innerHTML = nouveauxHtml + resteHtml;
 }
 
 // ---- Filtres ----
