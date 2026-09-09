@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e57">
+<link rel="stylesheet" href="css/app.css?v=e58">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e57"></script>
-<script src="js/supabaseClient.js?v=e57"></script>
-<script src="js/auth.js?v=e57"></script>
-<script src="js/db.js?v=e57"></script>
-<script src="js/calc.js?v=e57"></script>
-<script src="js/ui/modal.js?v=e57"></script>
-<script src="js/ui/progress.js?v=e57"></script>
+<script src="js/config.js?v=e58"></script>
+<script src="js/supabaseClient.js?v=e58"></script>
+<script src="js/auth.js?v=e58"></script>
+<script src="js/db.js?v=e58"></script>
+<script src="js/calc.js?v=e58"></script>
+<script src="js/ui/modal.js?v=e58"></script>
+<script src="js/ui/progress.js?v=e58"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -242,11 +242,25 @@ function viewAccueil(){
     </div>
     ${ac&&ac.seances_prevues ? `<div class="card" style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>` : ""}
     <div class="card" style="margin-top:16px">
-      <p class="isub" style="color:var(--text-mid)">Utilise le menu ci-dessus pour parcourir tes séances, mensurations, bilans, photos et programmes. Tout est mis à jour au fil de ton accompagnement 💪</p>
+      <p class="isub" style="color:var(--text-mid)">${adr("Utilise le menu ci-dessus pour parcourir tes séances, mensurations, bilans, photos et programmes.","Utilisez le menu ci-dessus pour parcourir vos séances, mensurations, bilans, photos et programmes.")} 💪</p>
+      <p class="isub" style="color:var(--text-mid);margin-top:8px">💡 ${adr("Saisis tes mensurations et tes bilans <strong>directement ici, dans l'app</strong> — c'est plus simple pour tout garder au même endroit. Le WhatsApp, garde-le surtout pour organiser tes séances avec Ornella.","Saisissez vos mensurations et vos bilans <strong>directement ici, dans l'app</strong> — c'est plus simple pour tout garder au même endroit. Le WhatsApp, gardez-le surtout pour organiser vos séances avec Ornella.")}</p>
     </div>
     <div class="card" style="margin-top:16px;border-left:4px solid var(--ok)">
       <p class="isub" style="color:var(--text-mid)">🔒 <strong>${adr("Ton espace est 100% privé.","Votre espace est 100% privé.")}</strong> ${adr("Il n'y a qu'Ornella et toi qui y avez accès. Tes photos, mensurations et bilans ne sont visibles que par vous deux 💛","Il n'y a qu'Ornella et vous qui y avez accès. Vos photos, mensurations et bilans ne sont visibles que par vous deux 💛")}</p>
-    </div>`;
+    </div>
+    ${installAppCard()}`;
+}
+
+// Encart discret et repliable : comment ajouter l'espace à l'écran d'accueil (comme une appli).
+function installAppCard(){
+  return `<details class="card" style="margin-top:16px">
+    <summary style="cursor:pointer;font-weight:700;color:var(--text-mid)">📲 ${adr("Ajoute ton espace à ton écran d'accueil","Ajoutez votre espace à votre écran d'accueil")}</summary>
+    <div class="isub" style="color:var(--text-mid);margin-top:10px;line-height:1.6">
+      ${adr("Pour l'ouvrir en 1 tap comme une appli :","Pour l'ouvrir en 1 tap comme une appli :")}
+      <div style="margin-top:8px">📱 <strong>iPhone (Safari)</strong> : bouton <strong>Partager</strong> ⬆️ → « <strong>Sur l'écran d'accueil</strong> » → Ajouter.</div>
+      <div style="margin-top:6px">🤖 <strong>Android (Chrome)</strong> : menu <strong>⋮</strong> → « <strong>Ajouter à l'écran d'accueil</strong> ».</div>
+    </div>
+  </details>`;
 }
 
 // Rendu du corps commun d'une séance (objectif/intensité/durée/commentaire/exos).
