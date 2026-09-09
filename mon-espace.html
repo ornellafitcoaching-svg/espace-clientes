@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e54">
+<link rel="stylesheet" href="css/app.css?v=e55">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e54"></script>
-<script src="js/supabaseClient.js?v=e54"></script>
-<script src="js/auth.js?v=e54"></script>
-<script src="js/db.js?v=e54"></script>
-<script src="js/calc.js?v=e54"></script>
-<script src="js/ui/modal.js?v=e54"></script>
-<script src="js/ui/progress.js?v=e54"></script>
+<script src="js/config.js?v=e55"></script>
+<script src="js/supabaseClient.js?v=e55"></script>
+<script src="js/auth.js?v=e55"></script>
+<script src="js/db.js?v=e55"></script>
+<script src="js/calc.js?v=e55"></script>
+<script src="js/ui/modal.js?v=e55"></script>
+<script src="js/ui/progress.js?v=e55"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -181,12 +181,23 @@ function nouveautesCard(){
   const type = D.cliente && D.cliente.type;
   const recoitProg = type === "distanciel" || type === "hybride";
   const lignes = [];
+  // Nouveau programme (distanciel / hybride uniquement).
   if (recoitProg){
     if ((D.programmes||[]).some(p=>p.kind==="sportif"   && p.envoye && after(p.date_envoi||p.created_at)))
       lignes.push("📤 " + adr("Ton nouveau programme sportif est disponible","Votre nouveau programme sportif est disponible"));
     if ((D.programmes||[]).some(p=>p.kind==="nutrition" && p.envoye && after(p.date_envoi||p.created_at)))
       lignes.push("🥗 " + adr("Ton nouveau programme nutrition est disponible","Votre nouveau programme nutrition est disponible"));
   }
+  // Nouveau bilan rempli par Ornella (pas ceux que la cliente a remplis elle-même).
+  if ((D.bilans||[]).some(b=>b.saisi_par!=="cliente" && after(b.created_at||b.date)))
+    lignes.push("📋 Ornella a rempli un nouveau bilan");
+  // Nouvelles mensurations prises par Ornella (présentiel / hybride : c'est elle qui mesure).
+  if (type!=="distanciel" && (D.mensurations||[]).some(m=>after(m.created_at)))
+    lignes.push("📏 " + adr("Tes mensurations ont été mises à jour","Vos mensurations ont été mises à jour"));
+  // Nouvel objectif fixé.
+  if ((D.objectifs||[]).some(o=>after(o.created_at||o.date_creation)))
+    lignes.push("🎯 " + adr("Un nouvel objectif a été ajouté","Un nouvel objectif a été ajouté"));
+  // Nouvelles photos.
   const nPhotos = (D.photos||[]).filter(p=>after(p.created_at||p.date)).length;
   if (nPhotos) lignes.push("📸 " + nPhotos + " nouvelle" + (nPhotos>1?"s":"") + " photo" + (nPhotos>1?"s":"") + " ajoutée" + (nPhotos>1?"s":"") + " par Ornella");
   if (!lignes.length) return "";
@@ -445,7 +456,7 @@ function viewMensurations(){
   if (!types.length) return addBtn + empty("Aucune mensuration pour l'instant. Ajoute tes mesures avec le bouton ci-dessus 👆");
   const grid = `<div class="mensu-grid">` + types.map(t=>{
     const ev = Calc.mensuEvolution(D.mensurations, t);
-    const dir = ev.diff<0?"down":(ev.diff>0?"up":"");
+    const dir = Calc.mensuTone(t, ev.diff);
     const sign = ev.diff>0?"+":"";
     return `<div class="mensu-card">
       <h4>${esc(t.replace(/_/g," "))}</h4>
@@ -510,7 +521,7 @@ function viewEvolution(){
   if (w.length){
     const depart=w[0].valeur, actuel=w[w.length-1].valeur, diff=Math.round((actuel-depart)*10)/10, sign=diff>0?"+":"";
     out += `<div class="card"><h4 class="view-title" style="margin-top:0">Poids</h4>
-      <div class="mensu-delta ${diff<0?"down":(diff>0?"up":"")}" style="font-size:1rem">${sign}${diff} kg</div>
+      <div class="mensu-delta ${Calc.mensuTone("poids",diff)}" style="font-size:1rem">${sign}${diff} kg</div>
       <div class="isub" style="margin-bottom:8px">${depart} kg → ${actuel} kg</div>
       ${UI.lineChart(w,{unite:" kg"})}</div>`;
   }
@@ -518,7 +529,7 @@ function viewEvolution(){
     const ev = Calc.mensuEvolution(D.mensurations, t);
     const sign = ev.diff>0?"+":"";
     out += `<div class="card" style="margin-top:16px"><h4 class="view-title" style="margin-top:0">${esc(t.replace(/_/g," "))}</h4>
-      <div class="mensu-delta ${ev.diff<0?"down":(ev.diff>0?"up":"")}" style="font-size:1rem">${sign}${ev.diff} ${esc(ev.unite)}</div>
+      <div class="mensu-delta ${Calc.mensuTone(t,ev.diff)}" style="font-size:1rem">${sign}${ev.diff} ${esc(ev.unite)}</div>
       <div class="isub" style="margin-bottom:8px">${ev.depart}${esc(ev.unite)} → ${ev.derniere}${esc(ev.unite)}</div>
       ${UI.lineChart(ev.points,{unite:ev.unite})}</div>`;
   });
@@ -771,15 +782,22 @@ function viewObjectifs(){
 function empty(msg){ return `<div class="card"><p class="empty">${esc(msg)}</p></div>`; }
 function line(k,v){ return v ? `<div class="cl-line" style="padding:4px 0"><span>${k}</span><strong style="text-align:right;max-width:60%">${esc(v)}</strong></div>` : ""; }
 function progItems(list){
-  return `<div class="card">` + list.map(p=>`
-    <div class="item">
+  return `<div class="card">` + list.map(p=>{
+    // Si Ornella a collé un lien (programme HTML) dans le commentaire, on l'affiche en
+    // BOUTON « Voir mon programme » ; le reste du commentaire reste en texte.
+    const m = (p.commentaire||"").match(/https?:\/\/[^\s]+/);
+    const lien = m ? m[0] : null;
+    const texte = lien ? (p.commentaire||"").replace(lien,"").trim() : (p.commentaire||"");
+    return `<div class="item">
       <div class="idate">${Calc.fmtShort(p.date_envoi||p.date_debut)}</div>
       <div class="ibody">
         <div class="ititle">${p.envoye?"Envoyé":"À venir"} ${p.version?`<span class="tag">v${esc(p.version)}</span>`:""}</div>
         <div class="isub">${[p.date_debut&&("du "+Calc.fmt(p.date_debut)), p.date_fin&&("au "+Calc.fmt(p.date_fin))].filter(Boolean).join(" ")||"&nbsp;"}</div>
-        ${p.commentaire?`<div class="isub">${esc(p.commentaire)}</div>`:""}
+        ${texte?`<div class="isub">${esc(texte)}</div>`:""}
+        ${lien?`<a class="btn-accent btn-sm" href="${esc(lien)}" target="_blank" rel="noopener" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px">📄 ${adr("Voir mon programme","Voir mon programme")}</a>`:""}
       </div>
-    </div>`).join("") + `</div>`;
+    </div>`;
+  }).join("") + `</div>`;
 }
 
 const VIEWS = { accueil:viewAccueil, seances:viewSeances, mensurations:viewMensurations,
@@ -793,8 +811,17 @@ function hasNutrition(){
   return !!(ac.nutrition_active || ac.nut_calories!=null || ac.nut_proteines!=null || ac.nut_glucides!=null
     || ac.nut_lipides!=null || ac.nut_conseils || (D.programmes||[]).some(p=>p.kind==="nutrition"));
 }
+// Les programmes ne concernent QUE le distanciel / hybride (les présentiel sont coachées
+// en personne). On masque donc l'onglet aux présentiel — sauf si un programme existe déjà
+// (pour ne jamais cacher de données réelles).
+function hasProgrammes(){
+  const t = D.cliente && D.cliente.type;
+  return t==="distanciel" || t==="hybride" || (D.programmes||[]).length>0;
+}
 function render(){
-  const menu = NAV.filter(n => n.k!=="nutrition" || hasNutrition());
+  const menu = NAV.filter(n =>
+    (n.k!=="nutrition"   || hasNutrition()) &&
+    (n.k!=="programmes"  || hasProgrammes()));
   if (!menu.some(n=>n.k===VIEW)) VIEW = "accueil";
   const nav = `<nav class="cl-nav">` + menu.map(n=>
     `<button class="navbtn ${n.k===VIEW?"on":""}" data-view="${n.k}"><span class="i">${n.i}</span>${n.label}</button>`).join("") + `</nav>`;

@@ -130,6 +130,23 @@ window.Calc = {
   mensuTypes(mensurations) {
     return [...new Set((mensurations || []).map((m) => m.type))];
   },
+  // Sens FAVORABLE d'une mesure (pour colorer les variations) :
+  //   "moins" = perdre est positif (poids, masse grasse, taille…) → baisse en vert, hausse en rouge
+  //   "plus"  = gagner est positif (muscles : bras, cuisse, mollet, fessiers) → hausse en vert
+  //   absent  = neutre (poitrine, dos, cou, hanches : dépend de l'objectif) → gris, sans jugement
+  MESURE_SENS: {
+    poids: "moins", masse_grasse: "moins", tour_taille: "moins", sous_poitrine: "moins",
+    tour_bras: "plus", tour_cuisse: "plus", tour_mollet: "plus", tour_fessiers: "plus",
+  },
+  // Classe couleur d'une variation : "good" (vert), "bad" (rouge) ou "neutral" (gris).
+  // Une hausse de muscle n'est donc plus affichée en rouge. cf. retour Ornella 08/09.
+  mensuTone(type, diff) {
+    if (!diff) return "neutral";
+    const sens = this.MESURE_SENS[type];
+    if (!sens) return "neutral";
+    const favorable = (sens === "moins" && diff < 0) || (sens === "plus" && diff > 0);
+    return favorable ? "good" : "bad";
+  },
 
   // ---- Alertes (dashboard) ------------------------------------------------
   // Renvoie la liste d'alertes pour une cliente { dossier léger }.

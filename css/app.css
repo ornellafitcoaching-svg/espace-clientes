@@ -211,6 +211,8 @@ button{font-family:inherit;cursor:pointer}
 .mensu-card h4{font-size:1rem;margin-bottom:4px;text-transform:capitalize}
 .mensu-delta{font-size:.8rem;font-weight:700}
 .mensu-delta.down{color:var(--ok)} .mensu-delta.up{color:var(--danger)}
+/* Couleurs par SENS de la mesure (perte vs prise de muscle) — cf. Calc.mensuTone */
+.mensu-delta.good{color:var(--ok)} .mensu-delta.bad{color:var(--danger)} .mensu-delta.neutral{color:var(--text-light)}
 
 /* ---- Timeline ------------------------------------------------------------- */
 .tl{position:relative;padding-left:26px}

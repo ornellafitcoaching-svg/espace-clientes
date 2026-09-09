@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e54">
+<link rel="stylesheet" href="css/app.css?v=e55">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e54"></script>
-<script src="js/supabaseClient.js?v=e54"></script>
-<script src="js/auth.js?v=e54"></script>
-<script src="js/db.js?v=e54"></script>
-<script src="js/calc.js?v=e54"></script>
-<script src="js/ui/modal.js?v=e54"></script>
-<script src="js/ui/progress.js?v=e54"></script>
+<script src="js/config.js?v=e55"></script>
+<script src="js/supabaseClient.js?v=e55"></script>
+<script src="js/auth.js?v=e55"></script>
+<script src="js/db.js?v=e55"></script>
+<script src="js/calc.js?v=e55"></script>
+<script src="js/ui/modal.js?v=e55"></script>
+<script src="js/ui/progress.js?v=e55"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -386,7 +386,7 @@ function sectionMensurations(){
   const types = Calc.mensuTypes(D.mensurations);
   const body = types.length ? `<div class="mensu-grid">` + types.map(t=>{
     const ev = Calc.mensuEvolution(D.mensurations, t);
-    const dir = ev.diff<0?"down":(ev.diff>0?"up":"");
+    const dir = Calc.mensuTone(t, ev.diff);
     const sign = ev.diff>0?"+":"";
     return `<div class="mensu-card">
       <h4>${esc(t.replace(/_/g," "))}</h4>
@@ -610,7 +610,8 @@ function progFields(kind,x){ x=x||{}; return [
   { name:"version", label:"Version", half:true, value:x.version, placeholder:"1, 2…" },
   { name:"date_debut", label:"Début du programme", type:"date", half:true, value:x.date_debut },
   { name:"date_fin", label:"Fin du programme", type:"date", half:true, value:x.date_fin },
-  { name:"commentaire", label:"Commentaire", type:"textarea", value:x.commentaire },
+  { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:x.commentaire,
+    hint:"Colle ici le LIEN (URL) de son programme HTML : un bouton « 📄 Voir mon programme » apparaîtra dans son espace." },
 ];}
 
 // mapping entité → { table, fields, payload }
