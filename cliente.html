@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e60">
+<link rel="stylesheet" href="css/app.css?v=e61">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e60"></script>
-<script src="js/supabaseClient.js?v=e60"></script>
-<script src="js/auth.js?v=e60"></script>
-<script src="js/db.js?v=e60"></script>
-<script src="js/calc.js?v=e60"></script>
-<script src="js/ui/modal.js?v=e60"></script>
-<script src="js/ui/progress.js?v=e60"></script>
+<script src="js/config.js?v=e61"></script>
+<script src="js/supabaseClient.js?v=e61"></script>
+<script src="js/auth.js?v=e61"></script>
+<script src="js/db.js?v=e61"></script>
+<script src="js/calc.js?v=e61"></script>
+<script src="js/ui/modal.js?v=e61"></script>
+<script src="js/ui/progress.js?v=e61"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -617,12 +617,16 @@ function progFields(kind,x){ x=x||{};
   if (kind==="nutrition"){
     // Abonnement nutrition : échéance de renouvellement + paiement du mois (crée un paiement auto).
     const echeance = x.date_fin || Calc.dateFin(x.date_envoi||Calc.today(), 1);
+    // Moyen de paiement pré-sélectionné = celui déjà utilisé par cette cliente (ex. Monya → GoCardless).
+    const dernierPaie = (typeof D!=="undefined" && D && D.paiements ? D.paiements.slice() : [])
+      .sort((a,b)=> a.date<b.date?1:-1)[0];
+    const modeDefaut = x._mode || (dernierPaie && dernierPaie.mode) || "Virement";
     return base.concat([
       { name:"date_fin", label:"🔁 Prochaine échéance (renouvellement)", type:"date", half:true, value:echeance,
         hint:"Date où relancer le renouvellement (souvent +1 mois). Tu seras alertée à cette date sur ton tableau de bord." },
       { name:"_montant", label:"💶 Paiement reçu (€)", type:"number", half:true, placeholder:"40",
-        hint:"Laisse vide si déjà enregistré. Sinon un paiement est créé automatiquement à la date ci-dessus." },
-      { name:"_mode", label:"Moyen de paiement", type:"select", half:true, value:x._mode||"Virement", options:[
+        hint:"Prélèvement auto (GoCardless/Stripe) → laisse VIDE, c'est déjà encaissé. Sinon saisis le montant : un paiement sera créé." },
+      { name:"_mode", label:"Moyen de paiement", type:"select", half:true, value:modeDefaut, options:[
         {value:"Virement",label:"Virement"},{value:"Stripe",label:"Stripe"},{value:"GoCardless",label:"GoCardless"},
         {value:"Espèces",label:"Espèces"},{value:"Chèque",label:"Chèque"},{value:"Autre",label:"Autre"}]},
       { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:x.commentaire, hint:lienHint },
