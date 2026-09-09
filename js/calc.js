@@ -330,6 +330,39 @@ window.Calc = {
       + "\n\nMerci à vous 💛";
   },
 
+  // Récap mensurations pour WhatsApp : pour chaque mesure, départ → dernière + variation
+  // (ex. « Tour de taille : 80 → 79 cm (−1 cm) 👏 »), avec un clin d'œil quand c'est favorable.
+  recapMensurationsMsg(cl, mensurations) {
+    // Ordre lisible : poids/masse grasse d'abord, puis les tours.
+    const ordre = ["poids","masse_grasse","tour_taille","tour_hanches","tour_fessiers","tour_cuisse",
+      "tour_bras","tour_mollet","poitrine","sous_poitrine","tour_dos","tour_cou"];
+    const types = this.mensuTypes(mensurations).sort((a,b)=>{
+      const ia=ordre.indexOf(a), ib=ordre.indexOf(b);
+      return (ia<0?99:ia)-(ib<0?99:ib);
+    });
+    const lignes = [];
+    types.forEach(t => {
+      const ev = this.mensuEvolution(mensurations, t);
+      if (!ev) return;
+      const label = t.replace(/_/g, " ");
+      if (ev.points.length < 2) {
+        lignes.push("• " + label + " : " + ev.derniere + ev.unite);
+      } else {
+        const sign = ev.diff > 0 ? "+" : "";
+        const emo = this.mensuTone(t, ev.diff) === "good" ? " 👏" : "";
+        lignes.push("• " + label + " : " + ev.depart + ev.unite + " → " + ev.derniere + ev.unite
+          + " (" + sign + ev.diff + " " + ev.unite + ")" + emo);
+      }
+    });
+    const corps = lignes.length ? lignes.join("\n") : "(aucune mesure enregistrée pour l'instant)";
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 Voici le récap de tes mensurations 📏\n\n" + corps
+        + "\n\nBravo pour ta progression, on continue comme ça 💪💛";
+    }
+    return "Bonjour " + cl.prenom + " 😊 Voici le récap de vos mensurations 📏\n\n" + corps
+      + "\n\nBravo pour votre progression, on continue comme ça 💪💛";
+  },
+
   // ---- Agenda Apple (.ics) ------------------------------------------------
   // Génère un événement iCalendar pour UNE séance, avec deux rappels :
   //   • 1 h avant la séance (pour ne pas l'oublier) ;

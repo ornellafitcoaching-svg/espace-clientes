@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e55">
+<link rel="stylesheet" href="css/app.css?v=e56">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e55"></script>
-<script src="js/supabaseClient.js?v=e55"></script>
-<script src="js/auth.js?v=e55"></script>
-<script src="js/db.js?v=e55"></script>
-<script src="js/calc.js?v=e55"></script>
-<script src="js/ui/modal.js?v=e55"></script>
-<script src="js/ui/progress.js?v=e55"></script>
+<script src="js/config.js?v=e56"></script>
+<script src="js/supabaseClient.js?v=e56"></script>
+<script src="js/auth.js?v=e56"></script>
+<script src="js/db.js?v=e56"></script>
+<script src="js/calc.js?v=e56"></script>
+<script src="js/ui/modal.js?v=e56"></script>
+<script src="js/ui/progress.js?v=e56"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -423,6 +423,7 @@ function sectionMensurations(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-accent btn-sm" data-act="add-mensu">➕ Saisir des mensurations</button>
         <button class="btn-ghost btn-sm" data-act="ask-mesure">📲 Demander une mesure</button>
+        <button class="btn-ghost btn-sm" data-act="recap-mensu">📲 Envoyer le récap</button>
       </div>
       ${tailleCtl}
     </div>`;
@@ -998,6 +999,14 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="toggle-select") return setSelMode(!SELMODE);
   if (act==="edit-taille") return editTaille();
   if (act==="ask-mesure") return askMesure();
+  if (act==="recap-mensu"){
+    const cl = D.cliente;
+    if (!Calc.normalizeFrPhone(cl.telephone)){ UI.toast("Ajoute d'abord son numéro (bouton « Modifier »)","err"); return; }
+    if (!(D.mensurations||[]).length){ UI.toast("Aucune mensuration à envoyer","err"); return; }
+    const wa = Calc.waHref(cl.telephone, Calc.recapMensurationsMsg(cl, D.mensurations));
+    if (wa) window.open(wa, "_blank");
+    return;
+  }
   if (act==="edit-mensu-date"){
     const oldDate = el.dataset.date;
     const v = await UI.form({ title:"Modifier la date du relevé", submit:"Enregistrer", fields:[
