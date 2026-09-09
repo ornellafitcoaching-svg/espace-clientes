@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e56">
+<link rel="stylesheet" href="css/app.css?v=e57">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e56"></script>
-<script src="js/supabaseClient.js?v=e56"></script>
-<script src="js/auth.js?v=e56"></script>
-<script src="js/db.js?v=e56"></script>
-<script src="js/calc.js?v=e56"></script>
-<script src="js/ui/modal.js?v=e56"></script>
-<script src="js/ui/progress.js?v=e56"></script>
+<script src="js/config.js?v=e57"></script>
+<script src="js/supabaseClient.js?v=e57"></script>
+<script src="js/auth.js?v=e57"></script>
+<script src="js/db.js?v=e57"></script>
+<script src="js/calc.js?v=e57"></script>
+<script src="js/ui/modal.js?v=e57"></script>
+<script src="js/ui/progress.js?v=e57"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -181,13 +181,12 @@ function nouveautesCard(){
   const type = D.cliente && D.cliente.type;
   const recoitProg = type === "distanciel" || type === "hybride";
   const lignes = [];
-  // Nouveau programme (distanciel / hybride uniquement).
-  if (recoitProg){
-    if ((D.programmes||[]).some(p=>p.kind==="sportif"   && p.envoye && after(p.date_envoi||p.created_at)))
-      lignes.push("📤 " + adr("Ton nouveau programme sportif est disponible","Votre nouveau programme sportif est disponible"));
-    if ((D.programmes||[]).some(p=>p.kind==="nutrition" && p.envoye && after(p.date_envoi||p.created_at)))
-      lignes.push("🥗 " + adr("Ton nouveau programme nutrition est disponible","Votre nouveau programme nutrition est disponible"));
-  }
+  // Nouveau programme SPORTIF = distanciel / hybride uniquement.
+  if (recoitProg && (D.programmes||[]).some(p=>p.kind==="sportif" && p.envoye && after(p.date_envoi||p.created_at)))
+    lignes.push("📤 " + adr("Ton nouveau programme sportif est disponible","Votre nouveau programme sportif est disponible"));
+  // Nouveau programme NUTRITION = pour toute cliente avec suivi nutrition (présentiel inclus).
+  if (hasNutrition() && (D.programmes||[]).some(p=>p.kind==="nutrition" && p.envoye && after(p.date_envoi||p.created_at)))
+    lignes.push("🥗 " + adr("Ton nouveau programme nutrition est disponible","Votre nouveau programme nutrition est disponible"));
   // Nouveau bilan rempli par Ornella (pas ceux que la cliente a remplis elle-même).
   if ((D.bilans||[]).some(b=>b.saisi_par!=="cliente" && after(b.created_at||b.date)))
     lignes.push("📋 Ornella a rempli un nouveau bilan");
@@ -811,12 +810,12 @@ function hasNutrition(){
   return !!(ac.nutrition_active || ac.nut_calories!=null || ac.nut_proteines!=null || ac.nut_glucides!=null
     || ac.nut_lipides!=null || ac.nut_conseils || (D.programmes||[]).some(p=>p.kind==="nutrition"));
 }
-// Les programmes ne concernent QUE le distanciel / hybride (les présentiel sont coachées
-// en personne). On masque donc l'onglet aux présentiel — sauf si un programme existe déjà
-// (pour ne jamais cacher de données réelles).
+// Programme SPORTIF = distanciel / hybride uniquement. Mais un présentiel PEUT avoir un
+// programme ALIMENTAIRE (nutrition). On montre donc l'onglet aux distanciel/hybride, OU à
+// toute cliente avec un suivi nutrition, OU si un programme existe déjà (jamais cacher de data).
 function hasProgrammes(){
   const t = D.cliente && D.cliente.type;
-  return t==="distanciel" || t==="hybride" || (D.programmes||[]).length>0;
+  return t==="distanciel" || t==="hybride" || hasNutrition() || (D.programmes||[]).length>0;
 }
 function render(){
   const menu = NAV.filter(n =>
