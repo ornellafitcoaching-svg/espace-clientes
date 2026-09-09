@@ -153,10 +153,15 @@ window.Calc = {
   alertes(c) {
     const out = [];
     // Bilan rempli par la cliente récemment (≤ 10 j) → à consulter.
-    const nouveauBilan = (c.bilans || []).some((x) =>
+    // Bilans remplis par la cliente récemment (≤ 10 j) → notif qui reste affichée avec la DATE.
+    const bilansCliente = (c.bilans || []).filter((x) =>
       x.saisi_par === "cliente" && x.created_at &&
       this.daysFromToday(String(x.created_at).slice(0, 10)) >= -10);
-    if (nouveauBilan) out.push({ type: "nouveau_bilan", label: "Nouveau bilan rempli", icon: "🆕" });
+    if (bilansCliente.length) {
+      const dernier = bilansCliente.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+      const jour = String(dernier.created_at).slice(0, 10);
+      out.push({ type: "nouveau_bilan", label: "Nouveau bilan rempli", icon: "🆕", date: jour });
+    }
     const b = this.bilanStats(c.bilans);
     if (b.joursAvant !== null && b.joursAvant <= 3) {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });

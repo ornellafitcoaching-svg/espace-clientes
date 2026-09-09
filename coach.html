@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e62">
+<link rel="stylesheet" href="css/app.css?v=e63">
 </head>
 <body>
 <header class="topbar">
@@ -49,13 +49,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e62"></script>
-<script src="js/supabaseClient.js?v=e62"></script>
-<script src="js/auth.js?v=e62"></script>
-<script src="js/db.js?v=e62"></script>
-<script src="js/calc.js?v=e62"></script>
-<script src="js/ui/modal.js?v=e62"></script>
-<script src="js/ui/progress.js?v=e62"></script>
+<script src="js/config.js?v=e63"></script>
+<script src="js/supabaseClient.js?v=e63"></script>
+<script src="js/auth.js?v=e63"></script>
+<script src="js/db.js?v=e63"></script>
+<script src="js/calc.js?v=e63"></script>
+<script src="js/ui/modal.js?v=e63"></script>
+<script src="js/ui/progress.js?v=e63"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -409,6 +409,13 @@ function renderAlerts() {
       return `<a class="alert" href="cliente.html?id=${cl.id}" title="Ajoute son numéro de téléphone dans sa fiche pour demander en un clic">
            <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
            <span class="alert-cta muted">☎️ n° manquant</span></a>`;
+    }
+    // Nouveau bilan rempli par la cliente → mis en avant avec la DATE, reste visible ~10 j.
+    if (a.type === "nouveau_bilan") {
+      const quand = a.date ? Calc.fmt(a.date) : "";
+      return `<a class="alert alert-action" href="cliente.html?id=${cl.id}" style="border-left:4px solid var(--ok)">
+         <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span>${quand?` · <span style="color:var(--text-light)">le ${quand}</span>`:""}</span>
+         <span class="alert-cta">Voir 👀</span></a>`;
     }
     return `<a class="alert" href="cliente.html?id=${cl.id}">
        <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
