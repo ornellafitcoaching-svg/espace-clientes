@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e64">
+<link rel="stylesheet" href="css/app.css?v=e65">
 </head>
 <body>
 <header class="topbar">
@@ -29,6 +29,7 @@
 
   <div class="alerts" id="alerts"></div>
   <div id="agenda"></div>
+  <div id="comptes"></div>
   <div id="bilansSuivi"></div>
   <div id="bilansDemarrage"></div>
   <div id="sansSeance"></div>
@@ -49,13 +50,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e64"></script>
-<script src="js/supabaseClient.js?v=e64"></script>
-<script src="js/auth.js?v=e64"></script>
-<script src="js/db.js?v=e64"></script>
-<script src="js/calc.js?v=e64"></script>
-<script src="js/ui/modal.js?v=e64"></script>
-<script src="js/ui/progress.js?v=e64"></script>
+<script src="js/config.js?v=e65"></script>
+<script src="js/supabaseClient.js?v=e65"></script>
+<script src="js/auth.js?v=e65"></script>
+<script src="js/db.js?v=e65"></script>
+<script src="js/calc.js?v=e65"></script>
+<script src="js/ui/modal.js?v=e65"></script>
+<script src="js/ui/progress.js?v=e65"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -331,14 +332,15 @@ function renderSansSeance(){
 
 // ---- Chargement groupé (peu de requêtes, quel que soit le nb de clientes) ----
 async function loadAll() {
-  const [clientes, accomp, seances, bilans, bilansDem, programmes, mensu] = await Promise.all([
+  const [clientes, accomp, seances, bilans, bilansDem, programmes, mensu, paiements] = await Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
-    sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois"),
+    sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois,prix"),
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("bilans_demarrage").select("cliente_id,date"),
     sb.from("programmes").select("cliente_id,kind,envoye,date_envoi,date_fin,created_at"),
     sb.from("mensurations").select("cliente_id,type"),
+    sb.from("paiements").select("cliente_id,montant,date,mode"),
   ]);
   const group = (rows, key="cliente_id") => {
     const m = {}; (rows.data||[]).forEach(r => { (m[r[key]] ||= []).push(r); }); return m;
@@ -348,6 +350,7 @@ async function loadAll() {
   const bilMap = group(bilans.data ? bilans : {data:[]});
   const bilDemMap = group(bilansDem.data ? bilansDem : {data:[]});
   const proMap = group(programmes.data ? programmes : {data:[]});
+  const payMap = group(paiements.data ? paiements : {data:[]});
   // Types de mensurations par cliente → sert au repère « cou manquant pour l'IMG ».
   const mensTypes = {}; (mensu.data||[]).forEach(m => { (mensTypes[m.cliente_id] ||= new Set()).add(m.type); });
 
@@ -366,10 +369,54 @@ async function loadAll() {
       bilans: bilMap[cl.id]||[],
       bilansDemarrage: bilDemMap[cl.id]||[],
       programmes: proMap[cl.id]||[],
+      paiements: payMap[cl.id]||[],
       imgCouManquant,
       imgTailleManquante,
     };
   });
+}
+
+// ---- 💰 Comptes : revenus encaissés + reste à encaisser (à partir des paiements) ----
+function renderComptes(){
+  const box = document.getElementById("comptes");
+  const today = Calc.today();
+  const ym = today.slice(0,7);
+  const prev = Calc.parse(today); prev.setMonth(prev.getMonth()-1);
+  const ymPrev = Calc.ymd(prev).slice(0,7);
+  let moisCourant=0, moisPrec=0, total=0;
+  const restes=[];
+  STATE.clientes.forEach(c=>{
+    let enc=0;
+    (c.paiements||[]).forEach(p=>{
+      const m = Number(p.montant)||0; total+=m; enc+=m;
+      const mo = String(p.date||"").slice(0,7);
+      if (mo===ym) moisCourant+=m; else if (mo===ymPrev) moisPrec+=m;
+    });
+    const prix = c.accompagnement && c.accompagnement.prix!=null ? Number(c.accompagnement.prix) : null;
+    if (prix!=null){
+      const reste = Math.round((prix-enc)*100)/100;
+      if (reste>0.009) restes.push({ cl:c.cliente, reste });
+    }
+  });
+  restes.sort((a,b)=>b.reste-a.reste);
+  const totalReste = Math.round(restes.reduce((s,r)=>s+r.reste,0)*100)/100;
+  const euro = Calc.euro;
+  if (!total && !restes.length){ box.innerHTML = ""; return; }
+  const tuiles = `<div class="summary" style="margin-top:8px">
+    <div class="sum-item"><div class="k">Encaissé ce mois</div><div class="v">${euro(moisCourant)}</div></div>
+    <div class="sum-item"><div class="k">Mois dernier</div><div class="v">${euro(moisPrec)}</div></div>
+    <div class="sum-item"><div class="k">Total encaissé</div><div class="v">${euro(total)}</div></div>
+    ${totalReste>0?`<div class="sum-item"><div class="k">Reste à encaisser</div><div class="v" style="color:var(--accent)">${euro(totalReste)}</div></div>`:""}
+  </div>`;
+  const listeReste = restes.length ? `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent);margin:12px 2px 2px">💳 Reste à encaisser (${restes.length})</div>
+    <div class="card" style="margin-top:4px;padding:6px 12px">${restes.map(r=>`<div class="cl-line" style="padding:6px 0">
+      <a href="cliente.html?id=${r.cl.id}" style="text-decoration:none;color:inherit"><strong>${esc(r.cl.prenom)} ${esc(r.cl.nom||"")}</strong></a>
+      <strong style="color:var(--accent)">${euro(r.reste)}</strong></div>`).join("")}</div>` : "";
+  box.innerHTML = `<details class="section-block" style="margin:14px 0">
+    <summary><span class="chev">▸</span>💰 Comptes${totalReste>0?`<span class="count" style="background:var(--accent);color:#fff">${euro(totalReste)} dû</span>`:""}</summary>
+    <div class="section-body">${tuiles}${listeReste}
+      <p class="isub" style="color:var(--text-light);margin-top:10px">« Reste à encaisser » = prix du forfait − paiements reçus. Renseigne le prix via « Modifier l'accompagnement » sur la fiche. Pour une séance à la carte non réglée, ajoute son montant au prix du forfait.</p>
+    </div></details>`;
 }
 
 // ---- Alertes globales ----
@@ -637,7 +684,7 @@ document.getElementById("newCliente").onclick = async () => {
   });
   try {
     await loadAll();
-    renderAlerts(); renderAgenda(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
+    renderAlerts(); renderAgenda(); renderComptes(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
   } catch(e){
     console.error(e);
     document.getElementById("content").innerHTML =
