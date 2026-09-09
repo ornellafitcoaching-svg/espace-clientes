@@ -69,6 +69,33 @@ window.Calc = {
     return { prevues, realisees, restantes, pct };
   },
 
+  // Fin ESTIMÉE d'un pack présentiel : au rythme actuel, quand les séances restantes
+  // seront-elles écoulées ? fin ≈ aujourd'hui + (restantes ÷ rythme/semaine).
+  // Rythme déduit : 1) des séances réalisées depuis le début, 2) sinon des séances
+  // programmées à venir (écart moyen), 3) sinon 1/semaine par défaut. null si rien à estimer.
+  finEstimeeSeances(accompagnement, seances) {
+    const st = this.seancesStats(accompagnement, seances);
+    if (!st.prevues || st.restantes <= 0) return null;
+    let rythme = null; // séances par semaine
+    const deb = accompagnement && accompagnement.date_debut;
+    if (deb && st.realisees > 0) {
+      const jours = this.daysBetween(deb, this.today());
+      if (jours && jours >= 7) rythme = st.realisees / (jours / 7);
+    }
+    if (!rythme || rythme <= 0) {
+      const up = (seances || []).filter((s) => s.statut === "prevue" && s.date && s.date >= this.today())
+        .map((s) => s.date).sort();
+      if (up.length >= 2) {
+        const span = this.daysBetween(up[0], up[up.length - 1]);
+        if (span > 0) rythme = (up.length - 1) / (span / 7);
+      }
+    }
+    if (!rythme || rythme <= 0) rythme = 1;
+    const d = this.parse(this.today());
+    d.setDate(d.getDate() + Math.ceil((st.restantes / rythme) * 7));
+    return this.ymd(d);
+  },
+
   // ---- Bilans -------------------------------------------------------------
   // dernier bilan = date la plus récente ; prochain = dernier + 28 jours.
   // dernier bilan = date la plus récente ; prochain = dernier + 28 j.
