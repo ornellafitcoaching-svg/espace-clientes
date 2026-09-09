@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e59">
+<link rel="stylesheet" href="css/app.css?v=e60">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e59"></script>
-<script src="js/supabaseClient.js?v=e59"></script>
-<script src="js/auth.js?v=e59"></script>
-<script src="js/db.js?v=e59"></script>
-<script src="js/calc.js?v=e59"></script>
-<script src="js/ui/modal.js?v=e59"></script>
-<script src="js/ui/progress.js?v=e59"></script>
+<script src="js/config.js?v=e60"></script>
+<script src="js/supabaseClient.js?v=e60"></script>
+<script src="js/auth.js?v=e60"></script>
+<script src="js/db.js?v=e60"></script>
+<script src="js/calc.js?v=e60"></script>
+<script src="js/ui/modal.js?v=e60"></script>
+<script src="js/ui/progress.js?v=e60"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -606,15 +606,33 @@ function paiementFields(x){ x=x||{}; return [
     {value:"Espèces",label:"Espèces"},{value:"Chèque",label:"Chèque"},{value:"Klarna",label:"Klarna"},{value:"Autre",label:"Autre"}]},
   { name:"note", label:"Note (facultatif)", half:true, value:x.note },
 ];}
-function progFields(kind,x){ x=x||{}; return [
-  { name:"envoye", label:"Programme envoyé", type:"checkbox", half:true, value:x.envoye!=null?x.envoye:true },
-  { name:"date_envoi", label:"Date d'envoi", type:"date", half:true, value:x.date_envoi||Calc.today() },
-  { name:"version", label:"Version", half:true, value:x.version, placeholder:"1, 2…" },
-  { name:"date_debut", label:"Début du programme", type:"date", half:true, value:x.date_debut },
-  { name:"date_fin", label:"Fin du programme", type:"date", half:true, value:x.date_fin },
-  { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:x.commentaire,
-    hint:"Colle ici le LIEN (URL) de son programme HTML : un bouton « 📄 Voir mon programme » apparaîtra dans son espace." },
-];}
+function progFields(kind,x){ x=x||{};
+  const lienHint = "Colle ici le LIEN (URL) de son programme HTML : un bouton « 📄 Voir mon programme » apparaîtra dans son espace.";
+  const base = [
+    { name:"envoye", label:"Programme envoyé", type:"checkbox", half:true, value:x.envoye!=null?x.envoye:true },
+    { name:"date_envoi", label:(kind==="nutrition"?"Date d'envoi / paiement":"Date d'envoi"), type:"date", half:true, value:x.date_envoi||Calc.today() },
+    { name:"version", label:"Version", half:true, value:x.version, placeholder:"1, 2…" },
+    { name:"date_debut", label:"Début du programme", type:"date", half:true, value:x.date_debut },
+  ];
+  if (kind==="nutrition"){
+    // Abonnement nutrition : échéance de renouvellement + paiement du mois (crée un paiement auto).
+    const echeance = x.date_fin || Calc.dateFin(x.date_envoi||Calc.today(), 1);
+    return base.concat([
+      { name:"date_fin", label:"🔁 Prochaine échéance (renouvellement)", type:"date", half:true, value:echeance,
+        hint:"Date où relancer le renouvellement (souvent +1 mois). Tu seras alertée à cette date sur ton tableau de bord." },
+      { name:"_montant", label:"💶 Paiement reçu (€)", type:"number", half:true, placeholder:"40",
+        hint:"Laisse vide si déjà enregistré. Sinon un paiement est créé automatiquement à la date ci-dessus." },
+      { name:"_mode", label:"Moyen de paiement", type:"select", half:true, value:x._mode||"Virement", options:[
+        {value:"Virement",label:"Virement"},{value:"Stripe",label:"Stripe"},{value:"GoCardless",label:"GoCardless"},
+        {value:"Espèces",label:"Espèces"},{value:"Chèque",label:"Chèque"},{value:"Autre",label:"Autre"}]},
+      { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:x.commentaire, hint:lienHint },
+    ]);
+  }
+  return base.concat([
+    { name:"date_fin", label:"Fin du programme", type:"date", half:true, value:x.date_fin },
+    { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:x.commentaire, hint:lienHint },
+  ]);
+}
 
 // mapping entité → { table, fields, payload }
 const ENT = {
@@ -809,7 +827,17 @@ async function progEnvoye(kind){
   try{
     if (existing) await DB.update("programmes", existing.id, patch);
     else await DB.insert("programmes", patch);
-    UI.toast("Programme "+kind+(patch.envoye?" marqué envoyé ✓":" décoché ✓")); reload("Programmes");
+    // Abonnement nutrition : si un montant est saisi, on crée le paiement automatiquement.
+    let extra = "";
+    if (kind==="nutrition" && v._montant){
+      const montant = Number(v._montant);
+      if (montant){
+        await DB.insert("paiements", { cliente_id:CID, montant, date:v.date_envoi||Calc.today(),
+          mode:v._mode||"Virement", note:"Programme nutrition" });
+        extra = " · paiement "+Calc.euro(montant)+" enregistré 💶";
+      }
+    }
+    UI.toast("Programme "+kind+(patch.envoye?" marqué envoyé ✓":" décoché ✓")+extra); reload("Programmes");
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }
 

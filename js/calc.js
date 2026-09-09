@@ -209,10 +209,15 @@ window.Calc = {
       if (!dates.length) {
         out.push({ type: "programme", label: "1er programme nutrition à envoyer", icon: "🥗" });
       } else {
-        const prochain = this.dateFin(dates[dates.length - 1], 1); // dernier envoi + 1 mois
+        // Échéance de renouvellement = date_fin saisie sur le dernier prog nutrition (l'abonnement),
+        // sinon repli sur « dernier envoi + 1 mois ».
+        const dernier = (c.programmes || [])
+          .filter((p) => p.kind === "nutrition")
+          .sort((a, b) => ((a.date_envoi || a.created_at || "") < (b.date_envoi || b.created_at || "") ? 1 : -1))[0];
+        const prochain = (dernier && dernier.date_fin) ? dernier.date_fin : this.dateFin(dates[dates.length - 1], 1);
         const jr = this.daysFromToday(prochain);
         if (jr !== null && jr <= 3) {
-          out.push({ type: "nutrition_mensuelle", label: "Programme nutrition du mois à renvoyer", icon: "🥗" });
+          out.push({ type: "nutrition_mensuelle", label: "Programme nutrition à renouveler", icon: "🥗" });
         }
       }
     }

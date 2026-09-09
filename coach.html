@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e59">
+<link rel="stylesheet" href="css/app.css?v=e60">
 </head>
 <body>
 <header class="topbar">
@@ -49,13 +49,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e59"></script>
-<script src="js/supabaseClient.js?v=e59"></script>
-<script src="js/auth.js?v=e59"></script>
-<script src="js/db.js?v=e59"></script>
-<script src="js/calc.js?v=e59"></script>
-<script src="js/ui/modal.js?v=e59"></script>
-<script src="js/ui/progress.js?v=e59"></script>
+<script src="js/config.js?v=e60"></script>
+<script src="js/supabaseClient.js?v=e60"></script>
+<script src="js/auth.js?v=e60"></script>
+<script src="js/db.js?v=e60"></script>
+<script src="js/calc.js?v=e60"></script>
+<script src="js/ui/modal.js?v=e60"></script>
+<script src="js/ui/progress.js?v=e60"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -64,6 +64,15 @@ const FILTERS = [
   { key: "distanciel",  label: "Distanciel",  test: c => c.cliente.type === "distanciel" },
   { key: "hybride",     label: "Hybride",     test: c => c.cliente.type === "hybride" },
   { key: "nutrition",   label: "Suivi nutrition", test: c => c.accompagnement && c.accompagnement.nutrition_active },
+  { key: "nutri_renouv", label: "Nutrition à renouveler", test: c => {
+      if (!(c.accompagnement && c.accompagnement.nutrition_active)) return false;
+      const dernier = (c.programmes||[]).filter(p=>p.kind==="nutrition")
+        .sort((a,b)=> (a.date_envoi||a.created_at||"") < (b.date_envoi||b.created_at||"") ? 1 : -1)[0];
+      if (!dernier) return true; // nutrition active mais aucun programme encore → à faire
+      const ech = dernier.date_fin || Calc.dateFin(dernier.date_envoi || (dernier.created_at?String(dernier.created_at).slice(0,10):null), 1);
+      const jr = Calc.daysFromToday(ech);
+      return jr !== null && jr <= 7;
+    } },
   { key: "bilan_du",    label: "Bilan à venir",   test: c => { const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut); return b.joursAvant !== null && b.joursAvant >= 0 && b.joursAvant <= 7; } },
   { key: "bilan_retard",label: "Bilan en retard", test: c => { const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut); return b.joursAvant !== null && b.joursAvant < 0; } },
   { key: "echeance",    label: "Suivi bientôt fini", test: c => { const s = Calc.suiviStats(c.accompagnement); return s.joursRestants !== null && s.joursRestants >= 0 && s.joursRestants <= 14; } },
@@ -328,7 +337,7 @@ async function loadAll() {
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("bilans_demarrage").select("cliente_id,date"),
-    sb.from("programmes").select("cliente_id,kind,envoye,date_envoi,created_at"),
+    sb.from("programmes").select("cliente_id,kind,envoye,date_envoi,date_fin,created_at"),
     sb.from("mensurations").select("cliente_id,type"),
   ]);
   const group = (rows, key="cliente_id") => {
