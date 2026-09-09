@@ -363,6 +363,23 @@ window.Calc = {
       + "\n\nBravo pour votre progression, on continue comme ça 💪💛";
   },
 
+  // Message « demander un relevé COMPLET de mensurations » (toutes les mesures), tu/vous.
+  demandeReleveCompletMsg(cl) {
+    const lien = this.espaceLink(cl.access_code);
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 C'est le moment de refaire tes mensurations complètes 📏 "
+        + "(poids, tour de taille, hanches, cuisses, bras… tout ce que tu suis).\n\n"
+        + "Prends-les tranquillement et entre-les directement dans ton espace — les repères « où placer le mètre » "
+        + "sont dans l'app (bouton « Comment bien me mesurer ? ») : " + lien
+        + "\n\nÇa me permet de suivre ta progression et d'ajuster ton programme 💪💛";
+    }
+    return "Bonjour " + cl.prenom + " 😊 C'est le moment de refaire vos mensurations complètes 📏 "
+      + "(poids, tour de taille, hanches, cuisses, bras… tout ce que vous suivez).\n\n"
+      + "Prenez-les tranquillement et entrez-les directement dans votre espace — les repères « où placer le mètre » "
+      + "sont dans l'app (bouton « Comment bien me mesurer ? ») : " + lien
+      + "\n\nCela me permet de suivre votre progression et d'ajuster votre programme 💪💛";
+  },
+
   // ---- Agenda Apple (.ics) ------------------------------------------------
   // Génère un événement iCalendar pour UNE séance, avec deux rappels :
   //   • 1 h avant la séance (pour ne pas l'oublier) ;
