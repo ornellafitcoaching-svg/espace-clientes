@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e65">
+<link rel="stylesheet" href="css/app.css?v=e66">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e65"></script>
-<script src="js/supabaseClient.js?v=e65"></script>
-<script src="js/auth.js?v=e65"></script>
-<script src="js/db.js?v=e65"></script>
-<script src="js/calc.js?v=e65"></script>
-<script src="js/ui/modal.js?v=e65"></script>
-<script src="js/ui/progress.js?v=e65"></script>
+<script src="js/config.js?v=e66"></script>
+<script src="js/supabaseClient.js?v=e66"></script>
+<script src="js/auth.js?v=e66"></script>
+<script src="js/db.js?v=e66"></script>
+<script src="js/calc.js?v=e66"></script>
+<script src="js/ui/modal.js?v=e66"></script>
+<script src="js/ui/progress.js?v=e66"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -280,8 +280,7 @@ function sectionSeances(){
     ${st.prevues?`<div class="cl-line"><span>⏳ Restantes (forfait)</span><strong>${st.restantes}</strong></div>`:""}
     <div class="cl-line"><span>📅 Programmées à venir</span><strong>${aVenir}</strong></div>
   </div>`;
-  const addBtn = `<button class="btn-accent btn-sm" data-act="add-seance" style="margin-bottom:12px">➕ Ajouter une séance</button>`;
-  const body = addBtn + decompte + (show.length ? show.map(x=>`
+  const body = decompte + (show.length ? show.map(x=>`
     <div class="item seance-card" data-act="edit-seance" data-id="${x.id}" style="cursor:pointer">
       <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}${x.heure?`<small style="display:block;font-weight:600;color:var(--text-light)">${Calc.fmtHeure(x.heure)}</small>`:""}</div>
       <div class="ibody">
@@ -326,8 +325,7 @@ function sectionBilans(){
   const askBtn = wa
     ? `<div style="margin-bottom:12px"><a class="btn-accent btn-sm" href="${wa}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px">📲 Demander son bilan</a></div>`
     : `<p class="isub" style="margin-bottom:12px">Ajoute son numéro de téléphone (bouton « Modifier ») pour lui demander son bilan en un clic sur WhatsApp.</p>`;
-  const addB = `<button class="btn-accent btn-sm" data-act="add-bilan" style="margin-bottom:12px">＋ Saisir un bilan</button>`;
-  const body = askBtn + addB + (list.length ? list.map(x=>`
+  const body = askBtn + (list.length ? list.map(x=>`
     <div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div>
       <div class="ibody">
         <div class="ititle">Bilan ${x.semaine!=null?"semaine "+x.semaine:""} ${x.poids?`<span class="tag">${x.poids} kg</span>`:""}</div>
@@ -420,21 +418,18 @@ function sectionMensurations(){
         <button class="link" data-act="edit-taille">Modifier</button></span></div>`
     : `<button class="btn-accent btn-sm" data-act="edit-taille" style="align-self:flex-start">📏 Renseigner sa taille (hauteur)</button>`;
   const actions = `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+      ${tailleCtl}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-accent btn-sm" data-act="add-mensu">➕ Saisir des mensurations</button>
         <button class="btn-ghost btn-sm" data-act="ask-mesure">📲 Demander une mesure</button>
-        <button class="btn-ghost btn-sm" data-act="ask-releve">📲 Demander un relevé complet</button>
         <button class="btn-ghost btn-sm" data-act="recap-mensu">📲 Envoyer le récap</button>
       </div>
-      ${tailleCtl}
     </div>`;
   return block("Mensurations & évolution", (D.mensurations||[]).length, actions+body+listing, false);
 }
 
 function sectionPhotos(){
   const list = D.photos||[];
-  const addBtn = `<button class="btn-accent btn-sm" data-act="add-photo" style="margin-bottom:12px">➕ Ajouter une photo</button>`;
-  const body = addBtn + (list.length ? `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
+  const body = (list.length ? `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
     <div class="mensu-card">
       <div class="cl-line"><strong>${Calc.fmt(p.date)}</strong>
         <span class="tag">${p.visibilite==="cliente"?"👁 Visible cliente":"🔒 Privé"}</span></div>
@@ -449,8 +444,7 @@ function sectionPhotos(){
 function sectionObjectifs(){
   const list = D.objectifs||[];
   const icon = st => ({en_cours:"⏳",atteint:"✅",abandonne:"⛔"}[st]||"");
-  const addBtn = `<button class="btn-accent btn-sm" data-act="add-objectif" style="margin-bottom:12px">➕ Ajouter un objectif</button>`;
-  const body = addBtn + (list.length ? list.map(o=>`
+  const body = (list.length ? list.map(o=>`
     <div class="item"><div class="idate">${icon(o.statut)}</div>
       <div class="ibody"><div class="ititle">${esc(o.titre)}</div>
         ${o.description?`<div class="isub">${esc(o.description)}</div>`:""}
@@ -478,7 +472,6 @@ function sectionTimeline(){
 function sectionNotes(){
   const list = D.notes||[];
   const body = `<p class="isub" style="color:var(--text-light);margin-bottom:8px">🔒 Visible uniquement par toi. Jamais côté cliente.</p>` +
-    `<button class="btn-accent btn-sm" data-act="add-note" style="margin-bottom:12px">➕ Ajouter une note</button>` +
     (list.length ? list.map(n=>`
     <div class="item"><div class="idate">${Calc.fmtShort(n.date)}</div>
       <div class="ibody"><div class="isub">${esc(n.contenu)}</div></div>${delEdit("note",n.id)}</div>`).join("")
