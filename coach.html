@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e66">
+<link rel="stylesheet" href="css/app.css?v=e67">
 </head>
 <body>
 <header class="topbar">
@@ -30,6 +30,7 @@
   <div class="alerts" id="alerts"></div>
   <div id="agenda"></div>
   <div id="comptes"></div>
+  <div id="programmes"></div>
   <div id="bilansSuivi"></div>
   <div id="bilansDemarrage"></div>
   <div id="sansSeance"></div>
@@ -50,13 +51,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e66"></script>
-<script src="js/supabaseClient.js?v=e66"></script>
-<script src="js/auth.js?v=e66"></script>
-<script src="js/db.js?v=e66"></script>
-<script src="js/calc.js?v=e66"></script>
-<script src="js/ui/modal.js?v=e66"></script>
-<script src="js/ui/progress.js?v=e66"></script>
+<script src="js/config.js?v=e67"></script>
+<script src="js/supabaseClient.js?v=e67"></script>
+<script src="js/auth.js?v=e67"></script>
+<script src="js/db.js?v=e67"></script>
+<script src="js/calc.js?v=e67"></script>
+<script src="js/ui/modal.js?v=e67"></script>
+<script src="js/ui/progress.js?v=e67"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -79,11 +80,9 @@ const FILTERS = [
   { key: "echeance",    label: "Suivi bientôt fini", test: c => { const s = Calc.suiviStats(c.accompagnement); return s.joursRestants !== null && s.joursRestants >= 0 && s.joursRestants <= 14; } },
   { key: "prog_env",    label: "Programme à envoyer", test: c => {
       if (c.cliente.statut !== "active") return false;
-      const besoinSport = c.cliente.type === "distanciel" || c.cliente.type === "hybride";
-      const nutritionActive = c.accompagnement && c.accompagnement.nutrition_active;
-      const sportEnvoye = (c.programmes||[]).some(p => p.kind==="sportif" && p.envoye);
-      const nutEnvoye   = (c.programmes||[]).some(p => p.kind==="nutrition" && p.envoye);
-      return (besoinSport && !sportEnvoye) || (nutritionActive && !nutEnvoye);
+      // À traiter = jamais envoyé OU échéance atteinte/dépassée (logique récurrente, cf. Calc.programmeStatus).
+      const aTraiter = st => st && (st.jamais || st.statut === "retard" || st.statut === "bientot");
+      return aTraiter(Calc.programmeStatus(c, "sportif")) || aTraiter(Calc.programmeStatus(c, "nutrition"));
     } },
   { key: "relancer",    label: "À relancer",  test: c => c.cliente.statut === "a_renouveler" },
 ];
@@ -183,6 +182,62 @@ function renderAgenda(){
 }
 
 // ---- Suivi des bilans : qui a rempli, quand, et qui doit le faire ----
+// ---- Programmes à envoyer / renouveler (séances distanciel·hybride + nutrition) ----
+function renderProgrammes(){
+  const box = document.getElementById("programmes");
+  // On ne suit que les accompagnements actifs.
+  const actives = STATE.clientes.filter(c => c.cliente.statut === "active");
+  const COL = {
+    retard: "background:#fdecea;color:#c0564b",
+    bientot:"background:#fbe6d6;color:#b87316",
+    jamais: "background:#f8f2d6;color:#977f14",
+    ajour:  "background:#e7f4ec;color:#2f8f5b",
+  };
+  // Construit la liste { cl, st } pour un type de programme donné.
+  const build = (kind) => actives
+    .map(c => { const st = Calc.programmeStatus(c, kind); return st ? { cl:c.cliente, st } : null; })
+    .filter(Boolean);
+  const chipText = (st) => {
+    if (st.jamais) return "🟡 Jamais envoyé";
+    if (st.statut === "retard") return `🔴 En retard de ${Math.abs(st.joursAvant)} j`;
+    if (st.statut === "bientot") return st.joursAvant <= 0 ? "🟠 À renvoyer" : `🟠 Dans ${st.joursAvant} j`;
+    return "✅ À jour";
+  };
+  // Priorité de tri : retard d'abord, puis jamais / bientôt, puis à jour.
+  const prio = (st) => st.statut === "retard" ? 1 : (st.jamais || st.statut === "bientot") ? 2 : 3;
+  const aTraiter = (st) => st.jamais || st.statut === "retard" || st.statut === "bientot";
+  const rowHtml = (r) => {
+    const st = r.st, cl = r.cl;
+    const detail = st.jamais
+      ? "aucun programme envoyé pour l'instant"
+      : `envoyé le <strong>${Calc.fmt(st.dernier)}</strong>${st.prochain ? ` · prochain le ${Calc.fmt(st.prochain)}` : ""}`;
+    const col = st.jamais ? COL.jamais : COL[st.statut];
+    return `<div class="cl-line" style="padding:7px 0;gap:8px;flex-wrap:wrap">
+      <a href="cliente.html?id=${cl.id}" style="text-decoration:none;color:inherit;min-width:0;flex:1 1 55%">
+        <strong>${esc(cl.prenom)} ${esc(cl.nom||"")}</strong>
+        <span style="display:block;font-size:.8rem;color:var(--text-light)">${detail}</span>
+      </a>
+      <span class="dot-alert" style="${col};flex:none">${chipText(st)}</span>
+    </div>`;
+  };
+  const groupHtml = (titre, couleur, arr) => {
+    if (!arr.length) return "";
+    const sorted = arr.slice().sort((a,b)=> prio(a.st)-prio(b.st) || ((a.st.joursAvant??9999)-(b.st.joursAvant??9999)));
+    return `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:${couleur};margin:10px 2px 2px">${titre} (${arr.length})</div>`
+      + `<div class="card" style="margin-top:4px;padding:6px 12px">${sorted.map(rowHtml).join("")}</div>`;
+  };
+  const sport = build("sportif"), nut = build("nutrition");
+  if (!sport.length && !nut.length){ box.innerHTML = ""; return; }
+  const nb = [...sport, ...nut].filter(r => aTraiter(r.st)).length;
+  box.innerHTML = `<details class="section-block" style="margin:14px 0">
+    <summary><span class="chev">▸</span>📤 Programmes à envoyer<span class="count">${sport.length+nut.length}</span>${nb?`<span class="count" style="background:var(--accent);color:#fff">📤 ${nb}</span>`:""}</summary>
+    <div class="section-body">
+      ${groupHtml("🏋️ Séances (distanciel & hybride)", "#b87316", sport)}
+      ${groupHtml("🥗 Nutrition", "#2f8f5b", nut)}
+      <p class="isub" style="color:var(--text-light);margin-top:10px">« Prochain » = la date de fin que tu as saisie sur le dernier programme, sinon 1 mois après le dernier envoi. Marque un programme envoyé (avec sa date de fin) depuis la fiche : bouton « 📤 Prog. sportif envoyé » ou « 🥗 Prog. nutrition envoyé ».</p>
+    </div></details>`;
+}
+
 function renderBilans(){
   const box = document.getElementById("bilansSuivi");
   // On suit les clientes en cours (on n'affiche pas les accompagnements terminés).
@@ -684,7 +739,7 @@ document.getElementById("newCliente").onclick = async () => {
   });
   try {
     await loadAll();
-    renderAlerts(); renderAgenda(); renderComptes(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
+    renderAlerts(); renderAgenda(); renderComptes(); renderProgrammes(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
   } catch(e){
     console.error(e);
     document.getElementById("content").innerHTML =

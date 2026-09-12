@@ -175,6 +175,37 @@ window.Calc = {
     return favorable ? "good" : "bad";
   },
 
+  // ---- Programmes envoyés (sportif / nutrition) ---------------------------
+  // État d'envoi d'un type de programme pour une cliente. Mutualisé entre les
+  // alertes du dashboard et la section « Programmes à envoyer ».
+  //   kind = "sportif"  → concerne les distanciel / hybride (séances à faire seule).
+  //   kind = "nutrition" → concerne les clientes avec suivi nutrition actif.
+  // Renvoie null si la cliente n'est pas concernée par ce type de programme, sinon :
+  //   { kind, jamais, dernier, prochain, joursAvant, statut }
+  //   statut = "jamais" | "retard" | "bientot" (échéance ≤ 3 j) | "ajour".
+  // L'échéance = date_fin saisie sur le dernier programme (« Fin du programme » /
+  // « prochaine échéance »), sinon repli sur « dernier envoi + 1 mois ».
+  programmeStatus(c, kind) {
+    const cl = c.cliente, ac = c.accompagnement;
+    const concerne = kind === "sportif"
+      ? !!(cl && (cl.type === "distanciel" || cl.type === "hybride"))
+      : !!(ac && ac.nutrition_active);
+    if (!concerne) return null;
+    const progs = (c.programmes || []).filter((p) => p.kind === kind && p.envoye);
+    if (!progs.length) {
+      return { kind, jamais: true, dernier: null, prochain: null, joursAvant: null, statut: "jamais" };
+    }
+    const d = progs.slice().sort((a, b) =>
+      ((a.date_envoi || a.created_at || "") < (b.date_envoi || b.created_at || "") ? 1 : -1))[0];
+    const dernier = d.date_envoi || (d.created_at ? String(d.created_at).slice(0, 10) : null);
+    const prochain = d.date_fin || this.dateFin(dernier, 1);
+    const joursAvant = prochain ? this.daysFromToday(prochain) : null;
+    let statut = "ajour";
+    if (joursAvant !== null && joursAvant < 0) statut = "retard";
+    else if (joursAvant !== null && joursAvant <= 3) statut = "bientot";
+    return { kind, jamais: false, dernier, prochain, joursAvant, statut };
+  },
+
   // ---- Alertes (dashboard) ------------------------------------------------
   // Renvoie la liste d'alertes pour une cliente { dossier léger }.
   alertes(c) {
@@ -218,39 +249,26 @@ window.Calc = {
     if (c.cliente && c.cliente.statut === "a_renouveler") {
       out.push({ type: "renouveler", label: "À renouveler", icon: "🔁" });
     }
-    // Programme à envoyer — UNIQUEMENT pour les clientes qui en reçoivent un :
-    //   • distanciel / hybride  → programme sportif à envoyer
-    //   • nutrition active       → programme nutrition à envoyer
-    // Une cliente présentiel (sans nutrition) est coachée en personne : rien à envoyer.
-    const type = c.cliente && c.cliente.type;
-    const nutritionActive = c.accompagnement && c.accompagnement.nutrition_active;
+    // Programmes à envoyer / renouveler — UNIQUEMENT pour les clientes concernées :
+    //   • distanciel / hybride  → programme de SÉANCE (celles à faire entre les présentiels
+    //                              pour les hybrides, ou à distance pour les distancielles) ;
+    //   • nutrition active       → programme NUTRITION.
+    // Désormais RÉCURRENT (pas seulement le 1er) : dès qu'un programme arrive à échéance
+    // (date_fin saisie, sinon dernier envoi + 1 mois), on rappelle de renvoyer le suivant.
+    // Une cliente présentiel sans nutrition est coachée en personne : rien à envoyer.
     const active = c.cliente && c.cliente.statut === "active";
-    const besoinSport = type === "distanciel" || type === "hybride";
-    const sportEnvoye = (c.programmes || []).some((p) => p.kind === "sportif" && p.envoye);
-    if (active && besoinSport && !sportEnvoye) {
-      out.push({ type: "programme", label: "Programme sportif à envoyer", icon: "📤" });
-    }
-    // Nutrition MENSUELLE : rappel ~1 mois après le dernier programme nutrition envoyé
-    // (ex. Monya). S'il n'y en a jamais eu → rappel d'envoyer le 1er.
-    if (active && nutritionActive) {
-      const dates = (c.programmes || [])
-        .filter((p) => p.kind === "nutrition")
-        .map((p) => p.date_envoi || (p.created_at ? String(p.created_at).slice(0, 10) : null))
-        .filter(Boolean)
-        .sort();
-      if (!dates.length) {
-        out.push({ type: "programme", label: "1er programme nutrition à envoyer", icon: "🥗" });
-      } else {
-        // Échéance de renouvellement = date_fin saisie sur le dernier prog nutrition (l'abonnement),
-        // sinon repli sur « dernier envoi + 1 mois ».
-        const dernier = (c.programmes || [])
-          .filter((p) => p.kind === "nutrition")
-          .sort((a, b) => ((a.date_envoi || a.created_at || "") < (b.date_envoi || b.created_at || "") ? 1 : -1))[0];
-        const prochain = (dernier && dernier.date_fin) ? dernier.date_fin : this.dateFin(dates[dates.length - 1], 1);
-        const jr = this.daysFromToday(prochain);
-        if (jr !== null && jr <= 3) {
+    if (active) {
+      const ps = this.programmeStatus(c, "sportif");
+      if (ps) {
+        if (ps.jamais) out.push({ type: "programme", label: "Programme de séance à envoyer", icon: "📤" });
+        else if (ps.statut === "retard" || ps.statut === "bientot")
+          out.push({ type: "programme", label: "Programme de séance à renvoyer", icon: "📤" });
+      }
+      const pn = this.programmeStatus(c, "nutrition");
+      if (pn) {
+        if (pn.jamais) out.push({ type: "nutrition_mensuelle", label: "1er programme nutrition à envoyer", icon: "🥗" });
+        else if (pn.statut === "retard" || pn.statut === "bientot")
           out.push({ type: "nutrition_mensuelle", label: "Programme nutrition à renouveler", icon: "🥗" });
-        }
       }
     }
     return out;
