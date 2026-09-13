@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e71">
+<link rel="stylesheet" href="css/app.css?v=e72">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e71"></script>
-<script src="js/supabaseClient.js?v=e71"></script>
-<script src="js/auth.js?v=e71"></script>
-<script src="js/db.js?v=e71"></script>
-<script src="js/calc.js?v=e71"></script>
-<script src="js/ui/modal.js?v=e71"></script>
-<script src="js/ui/progress.js?v=e71"></script>
+<script src="js/config.js?v=e72"></script>
+<script src="js/supabaseClient.js?v=e72"></script>
+<script src="js/auth.js?v=e72"></script>
+<script src="js/db.js?v=e72"></script>
+<script src="js/calc.js?v=e72"></script>
+<script src="js/ui/modal.js?v=e72"></script>
+<script src="js/ui/progress.js?v=e72"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -91,6 +91,7 @@ function render(focusTitle){
       <button class="qbtn" data-act="add-photo"><span class="i">📸</span> Photo</button>
       <button class="qbtn" data-act="add-objectif"><span class="i">🎯</span> Objectif</button>
       <button class="qbtn" data-act="add-paiement"><span class="i">💶</span> Paiement</button>
+      <button class="qbtn" data-act="montant-du"><span class="i">💳</span> Montant dû</button>
       <button class="qbtn" data-act="add-note"><span class="i">🔒</span> Note privée</button>
       <button class="qbtn" data-act="prog-sportif"><span class="i">📤</span> Prog. sportif envoyé</button>
       ${(ac&&ac.nutrition_active)?`<button class="qbtn" data-act="prog-nutrition"><span class="i">🥗</span> Prog. nutrition envoyé</button>`:''}
@@ -876,6 +877,28 @@ async function regenAccess(){
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e), "err"); }
 }
 
+// Saisie RAPIDE de ce que la cliente doit (un seul champ) → accompagnements.montant_du.
+async function editMontantDu(){
+  const ac = D.accompagnement || {};
+  const cur = (ac.montant_du!=null && ac.montant_du!=="") ? ac.montant_du : "";
+  const v = await UI.form({ title:"💳 Montant dû", submit:"Enregistrer", fields:[
+    { name:"montant_du", label:"Combien te doit-elle ? (€)", type:"number", value:cur,
+      hint:"Ce qu'elle te doit encore. Mets 0 (ou laisse vide) quand c'est réglé." },
+  ]});
+  if (!v) return;
+  const montant = (v.montant_du==null || v.montant_du==="") ? null : Number(v.montant_du);
+  try{
+    try{ await DB.saveAccompagnement(CID, { montant_du: montant }); }
+    catch(e){
+      if (/montant_du/.test(e.message||"")) { UI.toast("La base n'est pas encore à jour pour ce champ — préviens le support.","err"); return; }
+      throw e;
+    }
+    if (D.accompagnement) D.accompagnement.montant_du = montant; else D.accompagnement = { montant_du: montant };
+    UI.toast(montant ? `Montant dû : ${Calc.euro(montant)} ✓` : "Montant dû effacé ✓");
+    reload();
+  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+}
+
 async function editCliente(){
   const cl = D.cliente;
   const ac = D.accompagnement || {};
@@ -1023,6 +1046,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="add-mensu") return addMensuSession();
   if (act==="add-objectif") return addOrEdit("objectif");
   if (act==="add-paiement") return addOrEdit("paiement");
+  if (act==="montant-du") return editMontantDu();
   if (act==="add-note") return addOrEdit("note");
   if (act==="add-photo") return addPhoto();
   if (act==="prog-sportif") return progEnvoye("sportif");
