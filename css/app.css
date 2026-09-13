@@ -104,6 +104,9 @@ button{font-family:inherit;cursor:pointer}
 .ctab-badge[hidden]{display:none}
 .ctab.on .ctab-badge{background:#fff;color:var(--dark)}
 .panel[hidden]{display:none}
+.coach-stats{margin:8px 0 2px}
+.coach-stats .stat-tile{transition:transform .15s,border-color .15s,box-shadow .15s}
+.coach-stats .stat-tile[onclick]:hover{border-color:var(--rose-deep);transform:translateY(-2px);box-shadow:var(--shadow)}
 
 /* ---- Alertes -------------------------------------------------------------- */
 .alerts{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}

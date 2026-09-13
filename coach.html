@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e69">
+<link rel="stylesheet" href="css/app.css?v=e70">
 </head>
 <body>
 <header class="topbar">
@@ -26,6 +26,9 @@
     </div>
     <button class="btn-accent" id="newCliente">＋ Nouvelle cliente</button>
   </div>
+
+  <!-- Aperçu chiffré (calculé sur les vraies données, jamais de chiffre fictif) -->
+  <div class="stat-grid coach-stats" id="coachStats" aria-label="Aperçu de mon activité"></div>
 
   <!-- Notifs importantes (🆕) toujours visibles, quel que soit l'onglet -->
   <div id="pinnedNotifs"></div>
@@ -76,17 +79,25 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e69"></script>
-<script src="js/supabaseClient.js?v=e69"></script>
-<script src="js/auth.js?v=e69"></script>
-<script src="js/db.js?v=e69"></script>
-<script src="js/calc.js?v=e69"></script>
-<script src="js/ui/modal.js?v=e69"></script>
-<script src="js/ui/progress.js?v=e69"></script>
+<script src="js/config.js?v=e70"></script>
+<script src="js/supabaseClient.js?v=e70"></script>
+<script src="js/auth.js?v=e70"></script>
+<script src="js/db.js?v=e70"></script>
+<script src="js/calc.js?v=e70"></script>
+<script src="js/ui/modal.js?v=e70"></script>
+<script src="js/ui/progress.js?v=e70"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
 const FILTERS = [
+  { key: "active",      label: "Actives",     test: c => c.cliente.statut === "active" },
+  { key: "a_demarrer",  label: "À démarrer",  test: c => c.cliente.statut === "a_demarrer" },
+  { key: "en_pause",    label: "En pause",    test: c => c.cliente.statut === "en_pause" },
+  { key: "nouvelles",   label: "Nouvelles · 30 j", test: c => {
+      try { const x = Calc.parse(Calc.today()); x.setDate(x.getDate()-30);
+        return !!(c.cliente.created_at && String(c.cliente.created_at).slice(0,10) >= Calc.ymd(x)); }
+      catch(e){ return false; }
+    } },
   { key: "presentiel",  label: "Présentiel",  test: c => c.cliente.type === "presentiel" },
   { key: "distanciel",  label: "Distanciel",  test: c => c.cliente.type === "distanciel" },
   { key: "hybride",     label: "Hybride",     test: c => c.cliente.type === "hybride" },
@@ -218,10 +229,6 @@ function renderProgrammes(){
     jamais: "background:#f8f2d6;color:#977f14",
     ajour:  "background:#e7f4ec;color:#2f8f5b",
   };
-  // Construit la liste { cl, st } pour un type de programme donné.
-  const build = (kind) => actives
-    .map(c => { const st = Calc.programmeStatus(c, kind); return st ? { cl:c.cliente, st } : null; })
-    .filter(Boolean);
   const chipText = (st) => {
     if (st.jamais) return "🟡 Jamais envoyé";
     if (st.statut === "retard") return `🔴 En retard de ${Math.abs(st.joursAvant)} j`;
@@ -231,35 +238,44 @@ function renderProgrammes(){
   // Priorité de tri : retard d'abord, puis jamais / bientôt, puis à jour.
   const prio = (st) => st.statut === "retard" ? 1 : (st.jamais || st.statut === "bientot") ? 2 : 3;
   const aTraiter = (st) => st.jamais || st.statut === "retard" || st.statut === "bientot";
-  const rowHtml = (r) => {
-    const st = r.st, cl = r.cl;
-    const detail = st.jamais
-      ? "aucun programme envoyé pour l'instant"
-      : `envoyé le <strong>${Calc.fmt(st.dernier)}</strong>${st.prochain ? ` · prochain le ${Calc.fmt(st.prochain)}` : ""}`;
+  // UNE CARTE PAR CLIENTE : on affiche côte à côte l'état du programme
+  // d'ENTRAÎNEMENT et de la NUTRITION (ou « non incluse » si la cliente ne l'a pas)
+  // → pour chaque hybride / distanciel, on voit d'un coup ce qui reste à (r)envoyer
+  //   sur le cycle des 4 semaines (aligné sur les bilans).
+  const entries = actives.map(c => {
+    const sport = Calc.programmeStatus(c, "sportif");    // null si présentiel
+    const nut   = Calc.programmeStatus(c, "nutrition");   // null si nutrition non incluse
+    return (sport || nut) ? { cl: c.cliente, sport, nut } : null;
+  }).filter(Boolean);
+  if (!entries.length){ box.innerHTML = ""; return; }
+
+  const detailTxt = (st) => st.jamais
+    ? "jamais envoyé"
+    : `envoyé le <strong>${Calc.fmt(st.dernier)}</strong>${st.prochain ? ` → prochain le ${Calc.fmt(st.prochain)}` : ""}`;
+  const ligne = (label, st) => {
+    if (!st) return "";
     const col = st.jamais ? COL.jamais : COL[st.statut];
-    return `<div class="cl-line" style="padding:7px 0;gap:8px;flex-wrap:wrap">
-      <a href="cliente.html?id=${cl.id}" style="text-decoration:none;color:inherit;min-width:0;flex:1 1 55%">
-        <strong>${esc(cl.prenom)} ${esc(cl.nom||"")}</strong>
-        <span style="display:block;font-size:.8rem;color:var(--text-light)">${detail}</span>
-      </a>
-      <span class="dot-alert" style="${col};flex:none">${chipText(st)}</span>
+    return `<div class="cl-line" style="padding:5px 0;gap:8px;flex-wrap:wrap">
+        <span style="min-width:0;flex:1 1 55%"><strong>${label}</strong> <span style="font-size:.8rem;color:var(--text-light)">${detailTxt(st)}</span></span>
+        <span class="dot-alert" style="${col};flex:none">${chipText(st)}</span></div>`;
+  };
+  const entryPrio  = (e) => Math.min(e.sport ? prio(e.sport) : 9, e.nut ? prio(e.nut) : 9);
+  const entryJours = (e) => Math.min(e.sport ? (e.sport.joursAvant ?? 9999) : 9999, e.nut ? (e.nut.joursAvant ?? 9999) : 9999);
+  entries.sort((a,b)=> entryPrio(a)-entryPrio(b) || entryJours(a)-entryJours(b));
+
+  const cardHtml = (e) => `<div class="card" style="margin-top:8px;padding:9px 12px">
+      <a href="cliente.html?id=${e.cl.id}" style="text-decoration:none;color:inherit;font-weight:700;display:block;margin-bottom:2px">${esc(e.cl.prenom)} ${esc(e.cl.nom||"")} <span class="badge badge-type" style="vertical-align:middle">${Calc.labelType(e.cl.type)}</span></a>
+      ${ligne("🏋️ Entraînement", e.sport)}
+      ${e.nut ? ligne("🥗 Nutrition", e.nut)
+              : (e.sport ? `<div class="cl-line" style="padding:5px 0"><span style="font-size:.8rem;color:var(--text-light)">🥗 Nutrition : non incluse</span></div>` : "")}
     </div>`;
-  };
-  const groupHtml = (titre, couleur, arr) => {
-    if (!arr.length) return "";
-    const sorted = arr.slice().sort((a,b)=> prio(a.st)-prio(b.st) || ((a.st.joursAvant??9999)-(b.st.joursAvant??9999)));
-    return `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:${couleur};margin:10px 2px 2px">${titre} (${arr.length})</div>`
-      + `<div class="card" style="margin-top:4px;padding:6px 12px">${sorted.map(rowHtml).join("")}</div>`;
-  };
-  const sport = build("sportif"), nut = build("nutrition");
-  if (!sport.length && !nut.length){ box.innerHTML = ""; return; }
-  const nb = [...sport, ...nut].filter(r => aTraiter(r.st)).length;
+
+  const nb = entries.filter(e => (e.sport && aTraiter(e.sport)) || (e.nut && aTraiter(e.nut))).length;
   box.innerHTML = `<details class="section-block" style="margin:14px 0">
-    <summary><span class="chev">▸</span>📤 Programmes à envoyer<span class="count">${sport.length+nut.length}</span>${nb?`<span class="count" style="background:var(--accent);color:#fff">📤 ${nb}</span>`:""}</summary>
+    <summary><span class="chev">▸</span>📤 Programmes à envoyer<span class="count">${entries.length}</span>${nb?`<span class="count" style="background:var(--accent);color:#fff">📤 ${nb}</span>`:""}</summary>
     <div class="section-body">
-      ${groupHtml("🏋️ Séances (distanciel & hybride)", "#b87316", sport)}
-      ${groupHtml("🥗 Nutrition", "#2f8f5b", nut)}
-      <p class="isub" style="color:var(--text-light);margin-top:10px">« Prochain » = la date de fin que tu as saisie sur le dernier programme, sinon 1 mois après le dernier envoi. Marque un programme envoyé (avec sa date de fin) depuis la fiche : bouton « 📤 Prog. sportif envoyé » ou « 🥗 Prog. nutrition envoyé ».</p>
+      ${entries.map(cardHtml).join("")}
+      <p class="isub" style="color:var(--text-light);margin-top:10px">Pour chaque cliente <strong>à distance ou hybride</strong> : l'état de son programme d'<strong>entraînement</strong> et de sa <strong>nutrition</strong> (si elle l'a prise). « Prochain » = la date de fin saisie sur le dernier programme, sinon 1 mois après le dernier envoi — cale-la sur le <strong>bilan des 4 semaines</strong>. Marque un programme envoyé (avec sa date de fin) depuis la fiche.</p>
     </div></details>`;
 }
 
@@ -503,6 +519,30 @@ function renderComptes(){
 }
 
 // ---- Alertes globales ----
+// ---- Aperçu chiffré (en-tête) : uniquement des vraies données ----
+function renderStats() {
+  const box = document.getElementById("coachStats");
+  if (!box) return;
+  const cs = STATE.clientes;
+  const total    = cs.length;
+  const actives  = cs.filter(c => c.cliente.statut === "active").length;
+  const aTraiter = cs.filter(c => Calc.alertes(c).length > 0).length;
+  // « Nouvelles » = fiches créées dans les 30 derniers jours (donnée réelle created_at).
+  let nouvelles = 0;
+  try {
+    const x = Calc.parse(Calc.today()); x.setDate(x.getDate() - 30);
+    const seuil = Calc.ymd(x);
+    nouvelles = cs.filter(c => c.cliente.created_at && String(c.cliente.created_at).slice(0, 10) >= seuil).length;
+  } catch (e) {}
+  const goto = (tab) => `onclick="document.querySelector('.ctab[data-tab=&quot;${tab}&quot;]')?.click()" style="cursor:pointer"`;
+  const tile = (k, v, attrs = "") => `<div class="stat-tile" ${attrs}><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  box.innerHTML =
+    tile("Clientes", total, goto("clientes")) +
+    tile("Actives", actives, goto("clientes")) +
+    tile("À traiter", aTraiter, aTraiter ? goto("traiter") : "") +
+    tile("Nouvelles · 30 j", nouvelles, goto("clientes"));
+}
+
 function renderAlerts() {
   const box = document.getElementById("alerts");
   const all = [];
@@ -583,10 +623,12 @@ function renderAlerts() {
 
 // ---- Filtres ----
 function renderFilters() {
-  document.getElementById("filters").innerHTML = FILTERS.map(f =>
+  const toutes = `<button class="chip ${!STATE.filter?'on':''}" data-k="">Toutes</button>`;
+  document.getElementById("filters").innerHTML = toutes + FILTERS.map(f =>
     `<button class="chip ${STATE.filter===f.key?'on':''}" data-k="${f.key}">${f.label}</button>`).join("");
   document.querySelectorAll("#filters .chip").forEach(ch => ch.onclick = () => {
-    STATE.filter = STATE.filter === ch.dataset.k ? null : ch.dataset.k;
+    const k = ch.dataset.k;
+    STATE.filter = (!k || STATE.filter === k) ? null : k; // « Toutes » ou re-clic → tout afficher
     renderFilters(); renderList();
   });
 }
@@ -597,10 +639,15 @@ function renderList() {
   let list = STATE.clientes;
   if (STATE.q) {
     const q = STATE.q.toLowerCase();
+    const qDigits = q.replace(/\D/g, ""); // recherche par téléphone tolérante au format
     list = list.filter(c => {
       const cl = c.cliente;
-      return [cl.prenom,cl.nom,cl.objectif_principal,Calc.labelType(cl.type),Calc.labelStatut(cl.statut)]
-        .filter(Boolean).some(v => v.toLowerCase().includes(q));
+      const texte = [cl.prenom, cl.nom, cl.objectif_principal, cl.objectifs_secondaires, cl.email_perso,
+        Calc.labelType(cl.type), Calc.labelStatut(cl.statut)]
+        .filter(Boolean).some(v => String(v).toLowerCase().includes(q));
+      const tel = qDigits.length >= 3 && cl.telephone &&
+        String(cl.telephone).replace(/\D/g, "").includes(qDigits);
+      return texte || tel;
     });
   }
   if (STATE.filter) {
@@ -629,7 +676,20 @@ function renderList() {
     (totRestantes ? ` · ⏳ ${totRestantes} séance${totRestantes>1?'s':''} restante${totRestantes>1?'s':''} au total` : "");
 
   if (!list.length) {
-    cont.innerHTML = `<div class="card"><p class="empty">Aucune cliente ne correspond.</p></div>`;
+    if (!STATE.clientes.length) {
+      // Aucune cliente en base → accueil chaleureux + création.
+      cont.innerHTML = `<div class="card" style="text-align:center;padding:34px 20px">
+        <p style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--accent-deep);margin-bottom:6px">Aucune cliente pour l'instant</p>
+        <p class="empty" style="font-style:normal;margin-bottom:14px">Crée ta première fiche pour démarrer ton suivi.</p>
+        <button class="btn-accent" onclick="document.getElementById('newCliente').click()">＋ Nouvelle cliente</button>
+      </div>`;
+    } else {
+      // Recherche/filtre sans résultat → message clair + réinitialisation.
+      cont.innerHTML = `<div class="card" style="text-align:center;padding:28px 20px">
+        <p class="empty" style="font-style:normal;margin-bottom:12px">Aucune cliente ne correspond${STATE.q?` à «&nbsp;${esc(STATE.q)}&nbsp;»`:""}${STATE.filter?" avec ce filtre":""}.</p>
+        <button class="link" onclick="STATE.q='';STATE.filter=null;var _q=document.getElementById('q');if(_q)_q.value='';renderFilters();renderList();">↺ Réinitialiser la recherche et les filtres</button>
+      </div>`;
+    }
     return;
   }
   cont.innerHTML = `<div class="clientes-grid">` + list.map(c => {
@@ -790,7 +850,7 @@ function setupTabs(){
     }
     const prev = target ? target.statut : null;
     if (target) target.statut = "realisee";
-    renderAlerts(); renderAgenda(); renderBilansDemarrage(); renderSansSeance(); renderList();
+    renderStats(); renderAlerts(); renderAgenda(); renderBilansDemarrage(); renderSansSeance(); renderList();
     try {
       const { error } = await sb.from("seances").update({ statut:"realisee" }).eq("id", btn.dataset.done);
       if (error) throw error;
@@ -798,17 +858,20 @@ function setupTabs(){
     } catch(err){
       console.error(err); UI.toast("Erreur : "+(err.message||err),"err");
       if (target) target.statut = prev; // rollback visuel
-      renderAlerts(); renderAgenda(); renderBilansDemarrage(); renderSansSeance(); renderList();
+      renderStats(); renderAlerts(); renderAgenda(); renderBilansDemarrage(); renderSansSeance(); renderList();
     }
   });
   try {
     await loadAll();
-    renderAlerts(); renderAgenda(); renderComptes(); renderProgrammes(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
+    renderStats(); renderAlerts(); renderAgenda(); renderComptes(); renderProgrammes(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
     setupTabs();
   } catch(e){
     console.error(e);
     document.getElementById("content").innerHTML =
-      `<div class="card"><p class="empty">Erreur de chargement. Vérifie la config Supabase (js/config.js) et le SQL.</p></div>`;
+      `<div class="card" style="text-align:center;padding:28px 20px">
+        <p class="empty" style="font-style:normal;margin-bottom:12px">Impossible de charger tes données pour le moment. Vérifie ta connexion et réessaie.</p>
+        <button class="btn-accent" onclick="location.reload()">↻ Réessayer</button>
+      </div>`;
   }
 })();
 </script>
