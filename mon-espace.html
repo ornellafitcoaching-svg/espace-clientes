@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e73">
+<link rel="stylesheet" href="css/app.css?v=e74">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e73"></script>
-<script src="js/supabaseClient.js?v=e73"></script>
-<script src="js/auth.js?v=e73"></script>
-<script src="js/db.js?v=e73"></script>
-<script src="js/calc.js?v=e73"></script>
-<script src="js/ui/modal.js?v=e73"></script>
-<script src="js/ui/progress.js?v=e73"></script>
+<script src="js/config.js?v=e74"></script>
+<script src="js/supabaseClient.js?v=e74"></script>
+<script src="js/auth.js?v=e74"></script>
+<script src="js/db.js?v=e74"></script>
+<script src="js/calc.js?v=e74"></script>
+<script src="js/ui/modal.js?v=e74"></script>
+<script src="js/ui/progress.js?v=e74"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -581,25 +581,35 @@ async function delMyMensu(id){
 }
 
 function viewEvolution(){
+  const blocks = [];
+  const bloc = (label, ev) => {
+    if (!ev) return;
+    const mt = blocks.length ? ' style="margin-top:16px"' : "";
+    // Une seule mesure → on montre le point de départ, PAS de graphe (fausse tendance).
+    if (ev.points.length < 2){
+      blocks.push(`<div class="card"${mt}><h4 class="view-title" style="margin-top:0">${esc(label)}</h4>
+        <div class="isub"><strong>${ev.derniere}${esc(ev.unite)}</strong> · ${adr("ton point de départ","votre point de départ")}</div>
+        <p class="chart-empty">${adr("Le graphique s'affichera dès ton 2ᵉ relevé 💪","Le graphique s'affichera dès votre 2ᵉ relevé 💪")}</p></div>`);
+      return;
+    }
+    const sign = ev.diff > 0 ? "+" : "";
+    const pct = ev.pct != null ? ` (${sign}${ev.pct}%)` : "";
+    blocks.push(`<div class="card"${mt}><h4 class="view-title" style="margin-top:0">${esc(label)}</h4>
+      <div class="isub" style="margin-bottom:2px">${ev.depart}${esc(ev.unite)} → <strong>${ev.derniere}${esc(ev.unite)}</strong></div>
+      <div class="mensu-delta ${Calc.mensuTone(ev.type,ev.diff)}" style="font-size:1rem;margin-bottom:8px">${sign}${ev.diff} ${esc(ev.unite)}${pct}</div>
+      ${UI.lineChart(ev.points,{unite:ev.unite})}</div>`);
+  };
+  // Poids : série mêlant bilans + mensurations (weightSeries).
   const w = weightSeries();
-  const types = Calc.mensuTypes(D.mensurations).filter(t=>t!=="poids");
-  let out = "";
   if (w.length){
-    const depart=w[0].valeur, actuel=w[w.length-1].valeur, diff=Math.round((actuel-depart)*10)/10, sign=diff>0?"+":"";
-    out += `<div class="card"><h4 class="view-title" style="margin-top:0">Poids</h4>
-      <div class="mensu-delta ${Calc.mensuTone("poids",diff)}" style="font-size:1rem">${sign}${diff} kg</div>
-      <div class="isub" style="margin-bottom:8px">${depart} kg → ${actuel} kg</div>
-      ${UI.lineChart(w,{unite:" kg"})}</div>`;
+    const d = w[0].valeur, a = w[w.length-1].valeur;
+    bloc("Poids", { type:"poids", unite:" kg", depart:d, derniere:a,
+      diff: Math.round((a-d)*10)/10, pct: d ? Math.round(((a-d)/d)*1000)/10 : null, points:w });
   }
-  types.forEach(t=>{
-    const ev = Calc.mensuEvolution(D.mensurations, t);
-    const sign = ev.diff>0?"+":"";
-    out += `<div class="card" style="margin-top:16px"><h4 class="view-title" style="margin-top:0">${esc(t.replace(/_/g," "))}</h4>
-      <div class="mensu-delta ${Calc.mensuTone(t,ev.diff)}" style="font-size:1rem">${sign}${ev.diff} ${esc(ev.unite)}</div>
-      <div class="isub" style="margin-bottom:8px">${ev.depart}${esc(ev.unite)} → ${ev.derniere}${esc(ev.unite)}</div>
-      ${UI.lineChart(ev.points,{unite:ev.unite})}</div>`;
+  Calc.mensuTypes(D.mensurations).filter(t=>t!=="poids").forEach(t=>{
+    bloc(t.replace(/_/g," "), Calc.mensuEvolution(D.mensurations, t));
   });
-  return out || empty("Ton évolution s'affichera ici dès les premières mesures.");
+  return blocks.join("") || empty(adr("Ton évolution s'affichera ici dès tes premières mesures.","Votre évolution s'affichera ici dès vos premières mesures."));
 }
 
 // Mensurations reprises autour de la date d'un bilan (± 7 jours).
@@ -743,7 +753,10 @@ function viewBilans(){
       <div class="isub" style="color:rgba(255,255,255,.7);margin-top:2px">On refait le point + les mensurations à chaque bilan.${b.prochain?` Prochain : <strong style="color:#fff">${Calc.fmt(b.prochain)}</strong>${b.joursAvant!=null&&b.joursAvant>=0?` (dans ${b.joursAvant} j)`:""}.`:""}</div>
       <button id="addBilanBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>➕</span> Faire mon bilan</button>
     </div>`;
-  if (!list.length) return entete + bilanDemarrageCard() + empty("Ton premier bilan apparaîtra ici.");
+  if (!list.length) return entete + bilanDemarrageCard() + `<div class="card" style="margin-top:14px;border-left:4px solid var(--gold)">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:700;color:var(--accent-deep);margin-bottom:4px">${adr("Ton premier bilan t'attend ✨","Votre premier bilan vous attend ✨")}</div>
+      <p class="isub" style="color:var(--text-mid)">${adr("Il sera ton point de départ. Prends 2 minutes pour faire le point sur tes sensations, ton énergie et ta progression — c'est ce qui rendra tes progrès visibles au fil des semaines 💛","Il sera votre point de départ. Prenez 2 minutes pour faire le point sur vos sensations, votre énergie et votre progression — c'est ce qui rendra vos progrès visibles au fil des semaines 💛")}</p>
+    </div>`;
   return entete + bilanDemarrageCard() + list.map(x=>{
     const mesures = mensuAutour(x.date);
     const mensuBlock = mesures.length ? `
