@@ -156,13 +156,17 @@ function calendarSubBtns(){
   const code = D.cliente && D.cliente.access_code;
   if (!code) return "";
   const base = "xvetwfqzkkcfchxxifuu.supabase.co/functions/v1/agenda-ics?code=" + encodeURIComponent(code);
-  const webcal = "webcal://" + base;
+  const webcal = "webcal://" + base;   // abonnement (mise à jour auto) — ne s'ouvre que dans Safari iOS/macOS
+  const https  = "https://"  + base;   // secours : ajout en une fois (marche partout, sans mise à jour auto)
   const google = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(webcal);
   return `<div class="card" style="margin-bottom:16px">
     <div class="isub" style="color:var(--text-mid);margin-bottom:10px">📅 ${adr("Ajoute tes séances à ton calendrier (elles se mettront à jour toutes seules) :","Ajoutez vos séances à votre calendrier (mise à jour automatique) :")}</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       <a class="btn-accent btn-sm" href="${webcal}" style="display:inline-flex;align-items:center;gap:6px"><span>📆</span> Apple / iPhone</a>
       <a class="btn-ghost btn-sm" href="${google}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px"><span>📆</span> Google Agenda</a>
+    </div>
+    <div class="isub" style="color:var(--text-light);margin-top:9px;line-height:1.5">
+      💡 ${adr("Sur iPhone, ouvre ton espace dans <strong>Safari</strong> puis tape « Apple / iPhone » → « S'abonner ». Si rien ne s'ouvre (app installée, lien depuis Insta…), ","Sur iPhone, ouvrez votre espace dans <strong>Safari</strong> puis tapez « Apple / iPhone » → « S'abonner ». Si rien ne s'ouvre (app installée, lien depuis Insta…), ")}<a href="${https}" style="color:var(--accent)">${adr("ajoute-les en une fois ici","ajoutez-les en une fois ici")}</a>.
     </div>
   </div>`;
 }
