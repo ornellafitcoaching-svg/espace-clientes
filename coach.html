@@ -813,6 +813,17 @@ function setupTabs(){
   show(start);
 }
 
+// Rendu complet du tableau de bord (réutilisé au chargement ET au rafraîchissement auto).
+function renderAll(){
+  renderStats(); renderAlerts(); renderAgenda(); renderComptes(); renderProgrammes();
+  renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
+}
+// Rafraîchissement auto : les bilans/mensurations remplis par les clientes apparaissent
+// (badge 🆕) SANS recharger la page — toutes les 2 min et au retour sur l'onglet.
+async function refreshData(){
+  try { await loadAll(); renderAll(); } catch(e){ console.error("refresh", e); }
+}
+
 // ---- Init ----
 (async () => {
   const p = await Auth.requireCoach();
@@ -865,8 +876,11 @@ function setupTabs(){
   });
   try {
     await loadAll();
-    renderStats(); renderAlerts(); renderAgenda(); renderComptes(); renderProgrammes(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
+    renderAll();
     setupTabs();
+    // Rafraîchissement auto (voir refreshData) : notifs sans recharger.
+    setInterval(() => { if (document.visibilityState === "visible") refreshData(); }, 120000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshData(); });
   } catch(e){
     console.error(e);
     document.getElementById("content").innerHTML =
