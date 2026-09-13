@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e67">
+<link rel="stylesheet" href="css/app.css?v=e69">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e67"></script>
-<script src="js/supabaseClient.js?v=e67"></script>
-<script src="js/auth.js?v=e67"></script>
-<script src="js/db.js?v=e67"></script>
-<script src="js/calc.js?v=e67"></script>
-<script src="js/ui/modal.js?v=e67"></script>
-<script src="js/ui/progress.js?v=e67"></script>
+<script src="js/config.js?v=e69"></script>
+<script src="js/supabaseClient.js?v=e69"></script>
+<script src="js/auth.js?v=e69"></script>
+<script src="js/db.js?v=e69"></script>
+<script src="js/calc.js?v=e69"></script>
+<script src="js/ui/modal.js?v=e69"></script>
+<script src="js/ui/progress.js?v=e69"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -435,6 +435,18 @@ function showGuideMesure(){
     fields:[{ name:"_g", type:"static", value:guideMesureHtml() }] });
 }
 
+// Insert de mensurations TOLÉRANT : si la colonne `saisi_par` n'existe pas encore en base
+// (migration_15 pas encore exécutée), on réessaie sans elle → l'enregistrement réussit
+// quand même, rien ne casse pour la cliente. (Garde-fou, cf. incident rpc/colonne manquante.)
+async function insertMensuRows(rows){
+  let res = await sb.from("mensurations").insert(rows);
+  if (res.error && /saisi_par/i.test(res.error.message || "")) {
+    const clean = rows.map(({ saisi_par, ...r }) => r);
+    res = await sb.from("mensurations").insert(clean);
+  }
+  return res;
+}
+
 // La cliente saisit ses mesures -> enregistrées dans SON dossier (RLS: insert limité à
 // my_cliente_id()) -> visibles aussitôt côté coach -> + message WhatsApp récapitulatif à Ornella.
 async function addMyMensu(){
@@ -444,12 +456,12 @@ async function addMyMensu(){
   if (!v) return;
   const entered = MY_MENSU_PRESETS.filter(p => v[p.name] != null && v[p.name] !== "");
   if (!entered.length){ UI.toast("Aucune mesure saisie"); return; }
-  const rows = entered.map(p => ({ cliente_id:D.cliente.id, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
+  const rows = entered.map(p => ({ cliente_id:D.cliente.id, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite, saisi_par:"cliente" }));
   // Masse grasse calculée automatiquement (US Navy) si taille+hanches+cou + taille (hauteur) dispo.
   const mg = Calc.masseGrasseNavy(v.tour_taille, v.tour_hanches, v.tour_cou, D.cliente.taille_cm);
-  if (mg != null) rows.push({ cliente_id:D.cliente.id, date:v.date, type:"masse_grasse", valeur:mg, unite:"%" });
+  if (mg != null) rows.push({ cliente_id:D.cliente.id, date:v.date, type:"masse_grasse", valeur:mg, unite:"%", saisi_par:"cliente" });
   try{
-    const { error } = await sb.from("mensurations").insert(rows);
+    const { error } = await insertMensuRows(rows);
     if (error) throw error;
     D.mensurations = (D.mensurations||[]).concat(rows);
     UI.toast(rows.length+" mesure(s) enregistrée(s)"+(mg!=null?` · masse grasse ${mg}%`:"")+" ✓");
@@ -572,16 +584,16 @@ async function addMyBilan(){
   const v = await UI.form({ title:"Mon bilan", submit:"Envoyer mon bilan à Ornella", fields });
   if (!v) return;
   const entered = MY_MENSU_PRESETS.filter(p => v[p.name] != null && v[p.name] !== "");
-  const mrows = entered.map(p => ({ cliente_id:D.cliente.id, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite }));
+  const mrows = entered.map(p => ({ cliente_id:D.cliente.id, date:v.date, type:p.name, valeur:Number(v[p.name]), unite:p.unite, saisi_par:"cliente" }));
   const mg = Calc.masseGrasseNavy(v.tour_taille, v.tour_hanches, v.tour_cou, D.cliente.taille_cm);
-  if (mg != null) mrows.push({ cliente_id:D.cliente.id, date:v.date, type:"masse_grasse", valeur:mg, unite:"%" });
+  if (mg != null) mrows.push({ cliente_id:D.cliente.id, date:v.date, type:"masse_grasse", valeur:mg, unite:"%", saisi_par:"cliente" });
   const bilan = { cliente_id:D.cliente.id, date:v.date, saisi_par:"cliente",
     ressenti:v.ressenti||null, evolution:v.evolution||null, points_positifs:v.points_positifs||null,
     difficultes:v.difficultes||null, nouveaux_objectifs:v.nouveaux_objectifs||null,
     poids:(v.poids!=null && v.poids!=="")?Number(v.poids):null };
   try{
     const r1 = await sb.from("bilans").insert(bilan); if (r1.error) throw r1.error;
-    if (mrows.length){ const r2 = await sb.from("mensurations").insert(mrows); if (r2.error) throw r2.error; }
+    if (mrows.length){ const r2 = await insertMensuRows(mrows); if (r2.error) throw r2.error; }
     D.bilans = (D.bilans||[]).concat([bilan]);
     D.mensurations = (D.mensurations||[]).concat(mrows);
     UI.toast("Bilan envoyé à Ornella ✓"); render();
