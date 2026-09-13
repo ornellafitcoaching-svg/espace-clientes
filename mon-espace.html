@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e74">
+<link rel="stylesheet" href="css/app.css?v=e75">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e74"></script>
-<script src="js/supabaseClient.js?v=e74"></script>
-<script src="js/auth.js?v=e74"></script>
-<script src="js/db.js?v=e74"></script>
-<script src="js/calc.js?v=e74"></script>
-<script src="js/ui/modal.js?v=e74"></script>
-<script src="js/ui/progress.js?v=e74"></script>
+<script src="js/config.js?v=e75"></script>
+<script src="js/supabaseClient.js?v=e75"></script>
+<script src="js/auth.js?v=e75"></script>
+<script src="js/db.js?v=e75"></script>
+<script src="js/calc.js?v=e75"></script>
+<script src="js/ui/modal.js?v=e75"></script>
+<script src="js/ui/progress.js?v=e75"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -783,9 +783,24 @@ function viewBilans(){
 }
 
 function viewPhotos(){
-  const list = (D.photos||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
-  if (!list.length) return empty("Aucune photo partagée pour l'instant.");
-  return `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
+  const list = (D.photos||[]).slice().sort((a,b)=>a.date<b.date?1:-1); // plus récente en 1er
+  if (!list.length) return empty(adr("Aucune photo partagée pour l'instant.","Aucune photo partagée pour l'instant."));
+  // Comparatif avant / maintenant dès qu'il y a au moins 2 photos (vraies photos, pas de montage).
+  let compare = "";
+  if (list.length >= 2){
+    const apres = list[0], avant = list[list.length-1];
+    const vignette = (p, titre) => `<div>
+        <div class="isub" style="text-align:center;font-weight:700;margin-bottom:4px">${titre} · ${Calc.fmt(p.date)}</div>
+        <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="min-height:170px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem;background:var(--cream);border-radius:12px">chargement…</div>
+      </div>`;
+    compare = `<div class="card" style="margin-bottom:16px">
+      <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700;margin-bottom:2px">📸 ${adr("Avant / Maintenant","Avant / Maintenant")}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+        ${vignette(avant, adr("Avant","Avant"))}
+        ${vignette(apres, adr("Maintenant","Maintenant"))}
+      </div></div>`;
+  }
+  return compare + (list.length>=2?`<h4 class="view-title" style="margin-top:0">${adr("Toutes mes photos","Toutes mes photos")}</h4>`:"") + `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
     <div class="mensu-card photo-card">
       <div class="cl-line" style="margin-bottom:8px"><strong>${Calc.fmt(p.date)}</strong></div>
       <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="min-height:140px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem;background:var(--cream);border-radius:12px">chargement…</div>
