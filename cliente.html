@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e69">
+<link rel="stylesheet" href="css/app.css?v=e71">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e69"></script>
-<script src="js/supabaseClient.js?v=e69"></script>
-<script src="js/auth.js?v=e69"></script>
-<script src="js/db.js?v=e69"></script>
-<script src="js/calc.js?v=e69"></script>
-<script src="js/ui/modal.js?v=e69"></script>
-<script src="js/ui/progress.js?v=e69"></script>
+<script src="js/config.js?v=e71"></script>
+<script src="js/supabaseClient.js?v=e71"></script>
+<script src="js/auth.js?v=e71"></script>
+<script src="js/db.js?v=e71"></script>
+<script src="js/calc.js?v=e71"></script>
+<script src="js/ui/modal.js?v=e71"></script>
+<script src="js/ui/progress.js?v=e71"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -109,6 +109,7 @@ function render(focusTitle){
         <div class="sum-item"><div class="k">Nutrition</div><div class="v">${ac&&ac.nutrition_active?"Oui":"Non"}<small>${nutri&&nutri.envoye?"Prog. "+Calc.fmt(nutri.date_envoi):""}</small></div></div>
         ${age!=null?`<div class="sum-item"><div class="k">Âge</div><div class="v">${age} ans</div></div>`:''}
         <div class="sum-item"><div class="k">Encaissé</div><div class="v">${Calc.euro(pay.total)}<small>${pay.prix!=null?"forfait "+Calc.euro(pay.prix)+(pay.reste>0?" · reste "+Calc.euro(pay.reste):(pay.reste<0?"":" · soldé")):""}</small></div></div>
+        ${(ac&&ac.montant_du!=null&&ac.montant_du!==""&&Number(ac.montant_du)>0.009)?`<div class="sum-item"><div class="k">💳 Montant dû</div><div class="v" style="color:var(--gold)">${Calc.euro(Number(ac.montant_du))}</div></div>`:''}
       </div>
       ${s.prevues?`<div style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>`:''}
     </div>
@@ -808,6 +809,13 @@ async function addOrEdit(entity, rec){
       const mg = await recalcMasseGrasse(payload.date);
       if (mg != null) extra = ` · masse grasse ${mg}% calculée ✓`;
     }
+    // Séance PROGRAMMÉE (prévue) créée ou déplacée → confirmation WhatsApp à la cliente
+    // (message pré-rempli avec la date/heure ; la coach n'a plus qu'à envoyer).
+    if (entity === "seance" && payload.statut === "prevue" && payload.date){
+      const wa = Calc.waHref(D.cliente.telephone, Calc.seanceConfirmMsg(D.cliente, payload));
+      if (wa){ window.open(wa, "_blank"); extra = " · confirmation WhatsApp ouverte 📲"; }
+      else { UI.toast("Séance enregistrée ✓ — ajoute son n° (bouton Modifier) pour envoyer la confirmation","err"); }
+    }
     const FOCUS = { seance:"Séances", objectif:"Objectifs", paiement:"Paiements", note:"Notes privées", mensuration:"Mensurations & évolution" }[entity];
     UI.toast("Enregistré ✓"+extra); reload(FOCUS);
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
@@ -895,6 +903,7 @@ async function editCliente(){
     // --- Forfait / accompagnement (modifiable ici aussi) ---
     { name:"formule", label:"Formule / offre", half:true, value:ac.formule },
     { name:"prix", label:"Prix du forfait (€)", type:"number", half:true, value:ac.prix },
+    { name:"montant_du", label:"💳 Montant dû par la cliente (€)", type:"number", half:true, value:ac.montant_du, hint:"Ce qu'elle te doit encore. Laisse vide si elle est à jour. Remets 0 (ou vide) quand c'est réglé." },
     { name:"seances_prevues", label:"Séances du forfait (total)", type:"number", half:true, value:ac.seances_prevues },
     { name:"seances_faites_init", label:"Séances déjà faites (report CRM, dates inconnues)", type:"number", half:true, value:ac.seances_faites_init },
     { name:"freq_prevue", label:"Fréquence", half:true, value:ac.freq_prevue, placeholder:"2/semaine" },
@@ -908,13 +917,24 @@ async function editCliente(){
   if (v.date_debut && v.nb_mois && !v.date_fin) v.date_fin = Calc.dateFin(v.date_debut, v.nb_mois);
   const CLIENTE_KEYS = ["prenom","nom","type","statut","objectif_principal","objectifs_secondaires",
     "telephone","email_perso","adresse","date_naissance","taille_cm","niveau","disponibilites","tutoiement","sante","allergies"];
-  const ACCOMP_KEYS = ["date_debut","date_fin","nb_mois","formule","prix","seances_prevues","seances_faites_init","freq_prevue","nutrition_active"];
+  const ACCOMP_KEYS = ["date_debut","date_fin","nb_mois","formule","prix","montant_du","seances_prevues","seances_faites_init","freq_prevue","nutrition_active"];
   const cliP = {}, accP = {};
   CLIENTE_KEYS.forEach(k=>{ if (k in v) cliP[k]=v[k]; });
   ACCOMP_KEYS.forEach(k=>{ if (k in v) accP[k]=v[k]; });
+  // Montant dû : vide → null (colonne numérique), sinon nombre.
+  if ("montant_du" in accP) accP.montant_du = (accP.montant_du==null || accP.montant_du==="") ? null : Number(accP.montant_du);
+  const saveAccomp = async (p) => {
+    try { await DB.saveAccompagnement(CID, p); }
+    catch(e){
+      // Garde-fou : si la colonne montant_du n'existe pas encore (migration_16 non passée),
+      // on réenregistre sans elle → rien ne bloque.
+      if (/montant_du/.test(e.message||"") && ("montant_du" in p)){ const { montant_du, ...rest } = p; await DB.saveAccompagnement(CID, rest); }
+      else throw e;
+    }
+  };
   try{
     await DB.update("clientes", cl.id, cliP);
-    await DB.saveAccompagnement(CID, accP);
+    await saveAccomp(accP);
     UI.toast("Enregistré ✓"); reload();
   }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
 }

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e70">
+<link rel="stylesheet" href="css/app.css?v=e71">
 </head>
 <body>
 <header class="topbar">
@@ -79,13 +79,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e70"></script>
-<script src="js/supabaseClient.js?v=e70"></script>
-<script src="js/auth.js?v=e70"></script>
-<script src="js/db.js?v=e70"></script>
-<script src="js/calc.js?v=e70"></script>
-<script src="js/ui/modal.js?v=e70"></script>
-<script src="js/ui/progress.js?v=e70"></script>
+<script src="js/config.js?v=e71"></script>
+<script src="js/supabaseClient.js?v=e71"></script>
+<script src="js/auth.js?v=e71"></script>
+<script src="js/db.js?v=e71"></script>
+<script src="js/calc.js?v=e71"></script>
+<script src="js/ui/modal.js?v=e71"></script>
+<script src="js/ui/progress.js?v=e71"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -430,7 +430,7 @@ function renderSansSeance(){
 async function loadAll() {
   const [clientes, accomp, seances, bilans, bilansDem, programmes, mensu, paiements] = await Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
-    sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois,prix"),
+    sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois,prix,montant_du"),
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("bilans_demarrage").select("cliente_id,date"),
@@ -485,16 +485,16 @@ function renderComptes(){
   let moisCourant=0, moisPrec=0, total=0;
   const restes=[];
   STATE.clientes.forEach(c=>{
-    let enc=0;
     (c.paiements||[]).forEach(p=>{
-      const m = Number(p.montant)||0; total+=m; enc+=m;
+      const m = Number(p.montant)||0; total+=m;
       const mo = String(p.date||"").slice(0,7);
       if (mo===ym) moisCourant+=m; else if (mo===ymPrev) moisPrec+=m;
     });
-    const prix = c.accompagnement && c.accompagnement.prix!=null ? Number(c.accompagnement.prix) : null;
-    if (prix!=null){
-      const reste = Math.round((prix-enc)*100)/100;
-      if (reste>0.009) restes.push({ cl:c.cliente, reste });
+    // Dette = montant dû saisi à la main s'il existe, sinon reste du forfait (prix − paiements).
+    const dette = Calc.detteCliente(c);
+    if (dette>0.009){
+      const manuel = c.accompagnement && c.accompagnement.montant_du!=null && c.accompagnement.montant_du!=="" && Number(c.accompagnement.montant_du)>0.009;
+      restes.push({ cl:c.cliente, reste:dette, manuel });
     }
   });
   restes.sort((a,b)=>b.reste-a.reste);
@@ -507,14 +507,14 @@ function renderComptes(){
     <div class="sum-item"><div class="k">Total encaissé</div><div class="v">${euro(total)}</div></div>
     ${totalReste>0?`<div class="sum-item"><div class="k">Reste à encaisser</div><div class="v" style="color:var(--accent)">${euro(totalReste)}</div></div>`:""}
   </div>`;
-  const listeReste = restes.length ? `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent);margin:12px 2px 2px">💳 Reste à encaisser (${restes.length})</div>
+  const listeReste = restes.length ? `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent);margin:12px 2px 2px">💳 Qui me doit de l'argent (${restes.length})</div>
     <div class="card" style="margin-top:4px;padding:6px 12px">${restes.map(r=>`<div class="cl-line" style="padding:6px 0">
-      <a href="cliente.html?id=${r.cl.id}" style="text-decoration:none;color:inherit"><strong>${esc(r.cl.prenom)} ${esc(r.cl.nom||"")}</strong></a>
+      <a href="cliente.html?id=${r.cl.id}" style="text-decoration:none;color:inherit"><strong>${esc(r.cl.prenom)} ${esc(r.cl.nom||"")}</strong>${r.manuel?` <span class="badge" style="background:rgba(201,99,88,.1);color:var(--accent);border:1px solid rgba(201,99,88,.2)">montant dû</span>`:``}</a>
       <strong style="color:var(--accent)">${euro(r.reste)}</strong></div>`).join("")}</div>` : "";
   box.innerHTML = `<details class="section-block" style="margin:14px 0">
     <summary><span class="chev">▸</span>💰 Comptes${totalReste>0?`<span class="count" style="background:var(--accent);color:#fff">${euro(totalReste)} dû</span>`:""}</summary>
     <div class="section-body">${tuiles}${listeReste}
-      <p class="isub" style="color:var(--text-light);margin-top:10px">« Reste à encaisser » = prix du forfait − paiements reçus. Renseigne le prix via « Modifier l'accompagnement » sur la fiche. Pour une séance à la carte non réglée, ajoute son montant au prix du forfait.</p>
+      <p class="isub" style="color:var(--text-light);margin-top:10px">Deux façons de suivre ce qu'on te doit : soit tu tapes un <strong>« Montant dû »</strong> directement sur la fiche (bouton « Modifier »), soit tu renseignes le <strong>prix du forfait</strong> et l'espace calcule le reste (prix − paiements reçus). Le montant dû saisi à la main est prioritaire. Remets-le à 0 (ou vide) quand c'est réglé.</p>
     </div></details>`;
 }
 
@@ -697,6 +697,7 @@ function renderList() {
     const s = Calc.seancesStats(c.accompagnement, c.seances);
     const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut);
     const al = Calc.alertes(c);
+    const dette = Calc.detteCliente(c);
     const _today = Calc.today();
     const upcoming = (c.seances||[]).filter(x=>x.statut==="prevue" && x.date && x.date>=_today).sort((a,b)=>a.date<b.date?-1:1);
     return `<a class="cl-card" href="cliente.html?id=${cl.id}">
@@ -712,6 +713,7 @@ function renderList() {
       <div class="cl-meta">
         <span class="badge badge-type">${Calc.labelType(cl.type)}</span>
         <span class="st st-${cl.statut}">${Calc.labelStatut(cl.statut)}</span>
+        ${dette>0?`<span class="badge" style="background:rgba(201,99,88,.12);color:var(--accent-deep);border:1px solid rgba(201,99,88,.28);font-weight:700">💳 doit ${Calc.euro(dette)}</span>`:''}
       </div>
       ${s.prevues ? UI.progressBar(s.pct, `${s.realisees} / ${s.prevues} séances`) : ''}
       ${s.prevues ? `<div class="cl-line"><span>Séances</span><strong>${s.realisees}/${s.prevues} faites · <span style="color:var(--accent)">${s.restantes} restantes</span></strong></div>` : ''}

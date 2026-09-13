@@ -206,6 +206,22 @@ window.Calc = {
     return { kind, jamais: false, dernier, prochain, joursAvant, statut };
   },
 
+  // ---- Argent : combien cette cliente doit-elle ? ------------------------
+  // Priorité au « montant dû » saisi à la main (accompagnements.montant_du) ;
+  // sinon on retombe sur le reste du forfait (prix − paiements reçus).
+  // Renvoie 0 si rien n'est dû (ou pas d'info).
+  detteCliente(c) {
+    const ac = c && c.accompagnement; if (!ac) return 0;
+    const du = ac.montant_du;
+    if (du != null && du !== "" && Number(du) > 0.009) return Math.round(Number(du) * 100) / 100;
+    if (ac.prix != null && ac.prix !== "") {
+      const enc = (c.paiements || []).reduce((s, p) => s + (Number(p.montant) || 0), 0);
+      const r = Math.round((Number(ac.prix) - enc) * 100) / 100;
+      return r > 0.009 ? r : 0;
+    }
+    return 0;
+  },
+
   // ---- Alertes (dashboard) ------------------------------------------------
   // Renvoie la liste d'alertes pour une cliente { dossier léger }.
   alertes(c) {
@@ -238,7 +254,9 @@ window.Calc = {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });
     }
     const s = this.seancesStats(c.accompagnement, c.seances);
-    if (s.prevues > 0 && s.restantes <= 2) {
+    // « Presque finies » seulement si elle a DÉJÀ consommé des séances (restantes < forfait).
+    // Sinon un petit forfait à 0 séance faite (ex. 0/2) déclencherait une alerte absurde.
+    if (s.prevues > 0 && s.restantes <= 2 && s.restantes < s.prevues) {
       out.push({ type: "seances", label: "Séances presque finies", icon: "🏋️" });
     }
     // Point 7 — « prévoir des séances » : il reste beaucoup de séances au forfait
@@ -331,6 +349,17 @@ window.Calc = {
     }
     return "Bonjour " + cl.prenom + " 😊 Petit rappel : nous avons séance prévue le " + quand
       + " 💪 Au plaisir de vous voir ! Si vous avez besoin de décaler, dites-le-moi 🙂";
+  },
+  // Confirmation d'une séance programmée / déplacée par la coach → à envoyer à la cliente.
+  seanceConfirmMsg(cl, s) {
+    const h = this.fmtHeure(s && s.heure);
+    const quand = this.fmtJour(s && s.date) + (h ? " à " + h : "") + (s && s.type ? " (" + s.type + ")" : "");
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 C'est noté : ta séance est bien programmée le " + quand
+        + " 💪 On se voit là-bas ! Si tu as un empêchement, préviens-moi 🙂";
+    }
+    return "Bonjour " + cl.prenom + " 😊 C'est noté : votre séance est bien programmée le " + quand
+      + " 💪 On se voit là-bas ! Si vous avez un empêchement, prévenez-moi 🙂";
   },
   // Récap de TOUTES les séances à venir d'une cliente (WhatsApp) + décompte fait/restant + invite à modif.
   recapSeancesMsg(cl, seances, accompagnement) {
