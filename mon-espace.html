@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e71">
+<link rel="stylesheet" href="css/app.css?v=e73">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e71"></script>
-<script src="js/supabaseClient.js?v=e71"></script>
-<script src="js/auth.js?v=e71"></script>
-<script src="js/db.js?v=e71"></script>
-<script src="js/calc.js?v=e71"></script>
-<script src="js/ui/modal.js?v=e71"></script>
-<script src="js/ui/progress.js?v=e71"></script>
+<script src="js/config.js?v=e73"></script>
+<script src="js/supabaseClient.js?v=e73"></script>
+<script src="js/auth.js?v=e73"></script>
+<script src="js/db.js?v=e73"></script>
+<script src="js/calc.js?v=e73"></script>
+<script src="js/ui/modal.js?v=e73"></script>
+<script src="js/ui/progress.js?v=e73"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -206,6 +206,42 @@ function nouveautesCard(){
   </div>`;
 }
 
+// Bloc « Ma progression » : synthèse avant → maintenant sur les vraies données
+// (poids + tours), avec variation et %, couleur selon le SENS de la mesure
+// (perte de tour = vert, prise de muscle = vert, etc. via Calc.mensuTone).
+function maProgressionCard(){
+  const measures = [
+    { type:"poids",        label:adr("Poids","Poids") },
+    { type:"tour_taille",  label:"Tour de taille" },
+    { type:"tour_hanches", label:"Tour de hanches" },
+    { type:"tour_cuisse",  label:"Tour de cuisse" },
+    { type:"tour_bras",    label:"Tour de bras" },
+    { type:"masse_grasse", label:"Masse grasse" },
+  ];
+  const rows = measures.map(m => ({ m, ev: Calc.mensuEvolution(D.mensurations, m.type) })).filter(x => x.ev);
+  if (!rows.length) return "";
+  const withProgress = rows.filter(x => x.ev.points.length >= 2);
+  const s = Calc.seancesStats(D.accompagnement, D.seances);
+  const rowHtml = (x) => {
+    const ev = x.ev;
+    if (ev.points.length < 2)
+      return `<div class="cl-line" style="padding:8px 0"><span>${x.m.label}</span><strong>${ev.derniere} ${ev.unite}<small style="display:block;color:var(--text-light);font-weight:400">${adr("point de départ","point de départ")}</small></strong></div>`;
+    const sign = ev.diff > 0 ? "+" : "";
+    const tone = Calc.mensuTone(x.m.type, ev.diff);
+    const color = tone === "good" ? "var(--ok)" : (tone === "bad" ? "var(--danger)" : "var(--text-mid)");
+    const pct = ev.pct != null ? ` (${sign}${ev.pct}%)` : "";
+    return `<div class="cl-line" style="padding:8px 0">
+      <span>${x.m.label}</span>
+      <strong style="text-align:right">${ev.depart} → ${ev.derniere} ${ev.unite}<small style="display:block;color:${color};font-weight:700">${sign}${ev.diff} ${ev.unite}${pct}</small></strong></div>`;
+  };
+  return `<div class="card" style="margin-top:16px">
+    <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700;margin-bottom:6px">📊 Ma progression</div>
+    ${(D.accompagnement && D.accompagnement.seances_prevues) ? `<div class="cl-line" style="padding:8px 0"><span>Séances réalisées</span><strong>${s.realisees} / ${s.prevues}</strong></div>` : ""}
+    ${rows.map(rowHtml).join("")}
+    ${withProgress.length ? "" : `<p class="isub" style="color:var(--text-light);margin-top:8px">${adr("Ta progression chiffrée s'affichera dès ton 2ᵉ relevé de mesures 💪","Votre progression chiffrée s'affichera dès votre 2ᵉ relevé de mesures 💪")}</p>`}
+  </div>`;
+}
+
 function viewAccueil(){
   const cl = D.cliente, ac = D.accompagnement;
   const s = Calc.seancesStats(ac, D.seances);
@@ -240,6 +276,7 @@ function viewAccueil(){
       ${sport&&sport.envoye ? tile("Programme sportif", "Disponible", "envoyé le "+Calc.fmt(sport.date_envoi)) : ""}
       ${ac&&ac.nutrition_active ? tile("Suivi nutrition", "Actif") : ""}
     </div>
+    ${maProgressionCard()}
     ${ac&&ac.seances_prevues ? `<div class="card" style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>` : ""}
     <div class="card" style="margin-top:16px">
       <p class="isub" style="color:var(--text-mid)">${adr("Utilise le menu ci-dessus pour parcourir tes séances, mensurations, bilans, photos et programmes.","Utilisez le menu ci-dessus pour parcourir vos séances, mensurations, bilans, photos et programmes.")} 💪</p>
@@ -281,11 +318,15 @@ function viewSeances(){
   if (!all.length) return empty("Aucune séance enregistrée pour l'instant.");
   // Décompte : réalisées / forfait + restantes + à venir.
   const st = Calc.seancesStats(D.accompagnement, all);
-  let out = `<div class="stat-grid" style="margin-bottom:16px">
-    ${tile("✅ Réalisées", st.realisees + (st.prevues?` / ${st.prevues}`:""))}
-    ${st.prevues?tile("⏳ Restantes", st.restantes):""}
-    ${tile("📅 À venir", upcoming.length)}
+  let out = `<div class="stat-grid" style="margin-bottom:6px">
+    ${tile("✅ Réalisées", st.realisees + (st.prevues?` / ${st.prevues}`:""), st.prevues?adr("de ton forfait","de votre forfait"):"")}
+    ${st.prevues?tile("⏳ Restantes", st.restantes, adr("encore à faire","encore à faire")):""}
+    ${tile("📅 Déjà planifiées", upcoming.length, adr("dates fixées","dates fixées"))}
   </div>`;
+  // Clarifie que « déjà planifiées » est un sous-ensemble des « restantes » (pas un double compte).
+  if (st.prevues && upcoming.length)
+    out += `<p class="isub" style="color:var(--text-light);margin:0 2px 16px">${adr(`Sur tes ${st.restantes} séance(s) restante(s), ${upcoming.length} ${upcoming.length>1?"sont déjà planifiées":"est déjà planifiée"} dans ton agenda ci-dessous.`,`Sur vos ${st.restantes} séance(s) restante(s), ${upcoming.length} ${upcoming.length>1?"sont déjà planifiées":"est déjà planifiée"} dans votre agenda ci-dessous.`)}</p>`;
+  else out += `<div style="margin-bottom:10px"></div>`;
   out += seanceCarteBtn();
   out += calendarSubBtns();
   if (upcoming.length){
