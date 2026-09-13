@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e67">
+<link rel="stylesheet" href="css/app.css?v=e68">
 </head>
 <body>
 <header class="topbar">
@@ -27,37 +27,62 @@
     <button class="btn-accent" id="newCliente">＋ Nouvelle cliente</button>
   </div>
 
-  <div class="alerts" id="alerts"></div>
-  <div id="agenda"></div>
-  <div id="comptes"></div>
-  <div id="programmes"></div>
-  <div id="bilansSuivi"></div>
-  <div id="bilansDemarrage"></div>
-  <div id="sansSeance"></div>
+  <!-- Notifs importantes (🆕) toujours visibles, quel que soit l'onglet -->
+  <div id="pinnedNotifs"></div>
 
-  <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-    <div class="search" style="flex:1 1 200px"><input id="q" placeholder="Rechercher (prénom, nom, objectif…)"></div>
-    <select id="sort" title="Trier la liste" style="padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--white);font-family:inherit;font-size:.85rem;color:var(--text)">
-      <option value="">Tri : plus récentes</option>
-      <option value="nom">Tri : nom (A→Z)</option>
-      <option value="bilan">Tri : bilan le plus urgent</option>
-      <option value="fin">Tri : fin de suivi proche</option>
-      <option value="restantes">Tri : séances restantes ↓</option>
-    </select>
-  </div>
-  <div class="chips" id="filters"></div>
+  <!-- Navigation par onglets : réorganise le tableau de bord sans toucher à la logique.
+       Chaque onglet ne fait qu'afficher/masquer des blocs déjà existants. -->
+  <nav class="coach-tabs" id="coachTabs" role="tablist" aria-label="Sections de l'espace coach">
+    <button class="ctab on" data-tab="clientes" role="tab" aria-selected="true">👥 Clientes</button>
+    <button class="ctab" data-tab="agenda" role="tab" aria-selected="false">📅 Agenda</button>
+    <button class="ctab" data-tab="traiter" role="tab" aria-selected="false">🔔 À traiter<span class="ctab-badge" id="badgeTraiter" hidden></span></button>
+    <button class="ctab" data-tab="comptes" role="tab" aria-selected="false">💰 Comptes</button>
+  </nav>
 
-  <div id="content"><div class="loader"><div class="spin"></div></div></div>
+  <!-- Onglet CLIENTES (par défaut) : recherche + filtres + cartes -->
+  <section class="panel" data-panel="clientes" role="tabpanel">
+    <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div class="search" style="flex:1 1 200px"><input id="q" placeholder="Rechercher (prénom, nom, objectif…)"></div>
+      <select id="sort" title="Trier la liste" style="padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--white);font-family:inherit;font-size:.85rem;color:var(--text)">
+        <option value="">Tri : plus récentes</option>
+        <option value="nom">Tri : nom (A→Z)</option>
+        <option value="bilan">Tri : bilan le plus urgent</option>
+        <option value="fin">Tri : fin de suivi proche</option>
+        <option value="restantes">Tri : séances restantes ↓</option>
+      </select>
+    </div>
+    <div class="chips" id="filters"></div>
+    <div id="content"><div class="loader"><div class="spin"></div></div></div>
+  </section>
+
+  <!-- Onglet AGENDA -->
+  <section class="panel" data-panel="agenda" role="tabpanel" hidden>
+    <div id="agenda"></div>
+  </section>
+
+  <!-- Onglet À TRAITER : alertes + programmes + bilans + démarrage + sans séance -->
+  <section class="panel" data-panel="traiter" role="tabpanel" hidden>
+    <div class="alerts" id="alerts"></div>
+    <div id="programmes"></div>
+    <div id="bilansSuivi"></div>
+    <div id="bilansDemarrage"></div>
+    <div id="sansSeance"></div>
+  </section>
+
+  <!-- Onglet COMPTES -->
+  <section class="panel" data-panel="comptes" role="tabpanel" hidden>
+    <div id="comptes"></div>
+  </section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e67"></script>
-<script src="js/supabaseClient.js?v=e67"></script>
-<script src="js/auth.js?v=e67"></script>
-<script src="js/db.js?v=e67"></script>
-<script src="js/calc.js?v=e67"></script>
-<script src="js/ui/modal.js?v=e67"></script>
-<script src="js/ui/progress.js?v=e67"></script>
+<script src="js/config.js?v=e68"></script>
+<script src="js/supabaseClient.js?v=e68"></script>
+<script src="js/auth.js?v=e68"></script>
+<script src="js/db.js?v=e68"></script>
+<script src="js/calc.js?v=e68"></script>
+<script src="js/ui/modal.js?v=e68"></script>
+<script src="js/ui/progress.js?v=e68"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -479,7 +504,14 @@ function renderAlerts() {
   const box = document.getElementById("alerts");
   const all = [];
   STATE.clientes.forEach(c => Calc.alertes(c).forEach(a => all.push({ ...a, c })));
-  if (!all.length) { box.innerHTML = ""; return; }
+  const pin = document.getElementById("pinnedNotifs");
+  const badge = document.getElementById("badgeTraiter");
+  if (!all.length) {
+    box.innerHTML = "";
+    if (pin) pin.innerHTML = "";
+    if (badge) badge.hidden = true;
+    return;
+  }
   const order = { nouveau_bilan:0, bilan:1, bilan_demarrage:2, programme:3, nutrition_mensuelle:3, fin:4, prevoir_seances:5, seances:6, renouveler:7 };
   all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
   // Rendu d'UNE alerte (lien vers la fiche ou action WhatsApp selon le type).
@@ -523,21 +555,20 @@ function renderAlerts() {
        <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
      </a>`;
   };
-  // Les « 🆕 Nouveau bilan rempli » (par une cliente) restent TOUJOURS VISIBLES en haut —
-  // c'est une notif importante, on ne la cache pas dans le bandeau repliable.
-  const nouveaux = all.filter(a => a.type === "nouveau_bilan");
-  const reste    = all.filter(a => a.type !== "nouveau_bilan").slice(0, 8);
-  const nouveauxHtml = nouveaux.length
-    ? `<div style="display:flex;flex-direction:column;gap:8px;margin:14px 0">${nouveaux.map(alertHtml).join("")}</div>`
+  // Les notifs « 🆕 » (bilan rempli par une cliente, nouvelles mensurations) restent
+  // TOUJOURS VISIBLES en haut, hors onglets — ce sont des notifs importantes.
+  const estNouveau = (a) => a.type === "nouveau_bilan" || a.type === "nouvelle_mensuration";
+  const nouveaux = all.filter(estNouveau);
+  const reste    = all.filter(a => !estNouveau(a)).slice(0, 40);
+  if (pin) pin.innerHTML = nouveaux.length
+    ? `<div style="display:flex;flex-direction:column;gap:8px;margin:10px 0 4px">${nouveaux.map(alertHtml).join("")}</div>`
     : "";
-  // Le reste, regroupé dans un bandeau REPLIABLE (fermé) pour éviter le scroll forcé.
-  const resteHtml = reste.length
-    ? `<details class="section-block" style="margin:14px 0">
-        <summary><span class="chev">▸</span>🔔 À traiter<span class="count" style="background:var(--accent);color:#fff">${reste.length}</span></summary>
-        <div class="section-body" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${reste.map(alertHtml).join("")}</div>
-      </details>`
+  // Le reste s'affiche dans l'onglet « À traiter » (déjà regroupé par la barre d'onglets).
+  box.innerHTML = reste.length
+    ? `<div style="display:flex;flex-direction:column;gap:8px;width:100%">${reste.map(alertHtml).join("")}</div>`
     : "";
-  box.innerHTML = nouveauxHtml + resteHtml;
+  // Compteur sur l'onglet « À traiter » (toutes les alertes, y compris les 🆕).
+  if (badge){ if (all.length){ badge.textContent = all.length; badge.hidden = false; } else badge.hidden = true; }
 }
 
 // ---- Filtres ----
@@ -687,6 +718,29 @@ document.getElementById("newCliente").onclick = async () => {
   } catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e), "err"); }
 };
 
+// ---- Onglets (réorganisation de l'affichage — aucune logique métier touchée) ----
+function setupTabs(){
+  const tabs = document.getElementById("coachTabs");
+  if (!tabs) return;
+  const panels = document.querySelectorAll(".panel[data-panel]");
+  const show = (name) => {
+    let found = false;
+    panels.forEach(p => { const on = p.dataset.panel === name; p.hidden = !on; if (on) found = true; });
+    if (!found) { name = "clientes"; panels.forEach(p => p.hidden = p.dataset.panel !== "clientes"); }
+    tabs.querySelectorAll(".ctab").forEach(b => {
+      const on = b.dataset.tab === name;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    try { localStorage.setItem("coachTab", name); } catch(e) {}
+    window.scrollTo(0, 0);
+  };
+  tabs.addEventListener("click", (e) => { const b = e.target.closest(".ctab"); if (b) show(b.dataset.tab); });
+  let start = "clientes";
+  try { const s = localStorage.getItem("coachTab"); if (s) start = s; } catch(e) {}
+  show(start);
+}
+
 // ---- Init ----
 (async () => {
   const p = await Auth.requireCoach();
@@ -740,6 +794,7 @@ document.getElementById("newCliente").onclick = async () => {
   try {
     await loadAll();
     renderAlerts(); renderAgenda(); renderComptes(); renderProgrammes(); renderBilans(); renderBilansDemarrage(); renderSansSeance(); renderFilters(); renderList();
+    setupTabs();
   } catch(e){
     console.error(e);
     document.getElementById("content").innerHTML =
