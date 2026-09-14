@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e75">
+<link rel="stylesheet" href="css/app.css?v=e76">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e75"></script>
-<script src="js/supabaseClient.js?v=e75"></script>
-<script src="js/auth.js?v=e75"></script>
-<script src="js/db.js?v=e75"></script>
-<script src="js/calc.js?v=e75"></script>
-<script src="js/ui/modal.js?v=e75"></script>
-<script src="js/ui/progress.js?v=e75"></script>
+<script src="js/config.js?v=e76"></script>
+<script src="js/supabaseClient.js?v=e76"></script>
+<script src="js/auth.js?v=e76"></script>
+<script src="js/db.js?v=e76"></script>
+<script src="js/calc.js?v=e76"></script>
+<script src="js/ui/modal.js?v=e76"></script>
+<script src="js/ui/progress.js?v=e76"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -314,7 +314,7 @@ function sectionSeances(){
         <div class="ititle">${esc(x.type||"Séance")} ${x.statut==="realisee"?`<span class="tag tag-done">✅ Fait</span>`:`<span class="tag">${x.statut}</span>`}</div>
         <div class="isub">${[x.objectif&&esc(x.objectif),x.intensite&&("Intensité "+esc(x.intensite)),x.duree&&(x.duree+" min")].filter(Boolean).join(" · ")||"&nbsp;"}</div>
         ${x.commentaire?`<div class="isub">${esc(x.commentaire)}</div>`:""}
-        ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub">${x.exercices.map(e=>esc(e.nom||e)).join(" • ")}</div>`:""}
+        ${Array.isArray(x.exercices)&&x.exercices.length?`<div class="isub" style="margin-top:4px;line-height:1.6">${x.exercices.map(fmtExo).join("<br>")}</div>`:""}
         ${x.statut==="prevue"?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
           <button class="btn-accent btn-sm" data-act="seance-done" data-id="${x.id}">✅ Marquer faite</button>
           <button class="btn-ghost btn-sm" data-act="ics-seance" data-id="${x.id}" title="Ajouter à mon agenda Apple (avec rappels)">📅 Mon agenda</button>
@@ -547,6 +547,43 @@ async function addPhoto(){
 }
 
 // ============================ FORMULAIRES ENTITÉS ============================
+// --- Exercices détaillés : format LIGNE souple « Nom | séries x reps | charge | consigne | lien »
+// Chaque champ après le nom est facultatif ; l'ordre est libre (on reconnaît charge/lien/séries).
+// Rétro-compatible : une ligne = juste un nom marche toujours (ancien format).
+function parseExoLine(line){
+  const parts = String(line||"").split("|").map(s=>s.trim());
+  const nom = parts[0]; if (!nom) return null;
+  const ex = { nom };
+  for (let i=1;i<parts.length;i++){
+    const p = parts[i]; if (!p) continue;
+    if (/^https?:\/\//i.test(p)){ ex.video = p; continue; }
+    const m = p.match(/^(\d+)\s*[x×]\s*(.+)$/i);            // « 4x12 », « 3 x 30s »
+    if (m && ex.series==null){ ex.series = Number(m[1]); ex.reps = m[2].trim(); continue; }
+    if (ex.charge==null && /\d/.test(p) && /kg|lb|kilo|élas|band|poids|%/i.test(p)){ ex.charge = p; continue; }
+    ex.notes = ex.notes ? (ex.notes + " · " + p) : p;       // le reste = consigne
+  }
+  return ex;
+}
+// Reconstruit la ligne éditable depuis un exercice stocké (objet ou ancienne chaîne).
+function exoToLine(e){
+  if (!e) return "";
+  if (typeof e === "string") return e;
+  const seg = [e.nom||""];
+  if (e.series!=null || e.reps) seg.push((e.series!=null?e.series:"") + (e.reps?("x"+e.reps):""));
+  if (e.charge) seg.push(e.charge);
+  if (e.notes) seg.push(e.notes);
+  if (e.video) seg.push(e.video);
+  return seg.filter((s,i)=>i===0||s!=="").join(" | ");
+}
+// Affichage riche d'un exercice (fiche coach + espace cliente).
+function fmtExo(e){
+  if (typeof e === "string") return `<strong>${esc(e)}</strong>`;
+  const sr = (e.series!=null||e.reps) ? ` — ${e.series!=null?e.series:""}${e.reps?("×"+esc(e.reps)):""}` : "";
+  const ch = e.charge ? ` · ${esc(e.charge)}` : "";
+  const nt = e.notes ? ` · <span style="color:var(--text-light)">${esc(e.notes)}</span>` : "";
+  const vd = e.video ? ` · <a href="${esc(e.video)}" target="_blank" rel="noopener">🎥 vidéo</a>` : "";
+  return `<strong>${esc(e.nom||"")}</strong>${sr}${ch}${nt}${vd}`;
+}
 function seanceFields(x){ x=x||{}; return [
   { name:"date", label:"Date", type:"date", half:true, value:x.date||Calc.today() },
   { name:"heure", label:"Heure (facultatif)", type:"time", half:true, value:x.heure },
@@ -557,11 +594,12 @@ function seanceFields(x){ x=x||{}; return [
   { name:"objectif", label:"Objectif (facultatif)", value:x.objectif },
   { name:"intensite", label:"Intensité (facultatif)", half:true, value:x.intensite, placeholder:"légère / modérée / forte" },
   { name:"commentaire", label:"Commentaire", type:"textarea", value:x.commentaire },
-  { name:"_exercices", label:"Exercices détaillés (1 par ligne, facultatif)", type:"textarea",
-    value:(Array.isArray(x.exercices)?x.exercices.map(e=>e.nom||e).join("\n"):"") },
+  { name:"_exercices", label:"Exercices (1 par ligne)", type:"textarea",
+    hint:"Format libre : Nom | séries×reps | charge | consigne | lien vidéo. Ex. « Squat | 4x12 | 40 kg | descends bien | https://… ». Le nom seul suffit.",
+    value:(Array.isArray(x.exercices)?x.exercices.map(exoToLine).join("\n"):"") },
 ];}
 function seancePayload(v){
-  const ex = (v._exercices||"").split("\n").map(l=>l.trim()).filter(Boolean).map(nom=>({nom}));
+  const ex = (v._exercices||"").split("\n").map(parseExoLine).filter(Boolean);
   const niveau = ex.length?"detaille":((v.objectif||v.intensite||v.duree)?"standard":"rapide");
   return { cliente_id:CID, date:v.date, heure:v.heure||null, type:v.type, statut:v.statut, duree:v.duree,
     objectif:v.objectif, intensite:v.intensite, commentaire:v.commentaire,
@@ -1287,9 +1325,14 @@ function showUndo(tbl, rec){
     if (e.target.classList && e.target.classList.contains("selchk")) updateSelCount();
   });
   await reload();
-  // Arrivée depuis l'agenda du dashboard avec ?editSeance=... → ouvre direct l'édition.
-  const sid = new URLSearchParams(location.search).get("editSeance");
+  // Deep-links « Faire maintenant » depuis « À traiter » / l'agenda → ouvre DROIT l'action.
+  const qp = new URLSearchParams(location.search);
+  const sid = qp.get("editSeance");
   if (sid){ const rec = findRec("seance", sid); if (rec) addOrEdit("seance", rec); }
+  else if (qp.get("addSeance")) addOrEdit("seance");
+  else if (qp.get("prog") === "sportif") progEnvoye("sportif");
+  else if (qp.get("prog") === "nutrition") progEnvoye("nutrition");
+  else if (qp.get("bilan")) addBilanCoach();
  }
  catch(e){
    console.error(e);

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e75">
+<link rel="stylesheet" href="css/app.css?v=e76">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e75"></script>
-<script src="js/supabaseClient.js?v=e75"></script>
-<script src="js/auth.js?v=e75"></script>
-<script src="js/db.js?v=e75"></script>
-<script src="js/calc.js?v=e75"></script>
-<script src="js/ui/modal.js?v=e75"></script>
-<script src="js/ui/progress.js?v=e75"></script>
+<script src="js/config.js?v=e76"></script>
+<script src="js/supabaseClient.js?v=e76"></script>
+<script src="js/auth.js?v=e76"></script>
+<script src="js/db.js?v=e76"></script>
+<script src="js/calc.js?v=e76"></script>
+<script src="js/ui/modal.js?v=e76"></script>
+<script src="js/ui/progress.js?v=e76"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -561,17 +561,25 @@ function renderAlerts() {
   STATE.clientes.forEach(c => Calc.alertes(c).forEach(a => all.push({ ...a, c })));
   const pin = document.getElementById("pinnedNotifs");
   const badge = document.getElementById("badgeTraiter");
-  if (!all.length) {
-    box.innerHTML = "";
-    if (pin) pin.innerHTML = "";
-    if (badge) badge.hidden = true;
-    return;
-  }
-  const order = { nouveau_bilan:0, bilan:1, bilan_demarrage:2, programme:3, nutrition_mensuelle:3, fin:4, prevoir_seances:5, seances:6, renouveler:7 };
-  all.sort((a,b)=>(order[a.type]??9)-(order[b.type]??9));
-  // Rendu d'UNE alerte (lien vers la fiche ou action WhatsApp selon le type).
+  // Priorité d'une alerte : 1 = 🔴 Urgent (en retard / risque), 2 = 🟠 À faire (bientôt).
+  const tierFor = (a) => {
+    const c = a.c;
+    if (a.type === "bilan"){ const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut); return (b.joursAvant!==null && b.joursAvant<0) ? 1 : 2; }
+    if (a.type === "renouveler" || a.type === "seances") return 1;
+    if (a.type === "programme"){ const s = Calc.programmeStatus(c,"sportif"); return (s && s.statut==="retard") ? 1 : 2; }
+    if (a.type === "nutrition_mensuelle"){ const n = Calc.programmeStatus(c,"nutrition"); return (n && n.statut==="retard") ? 1 : 2; }
+    return 2; // prevoir_seances, fin
+  };
+  // Rendu d'UNE alerte (action DIRECTE selon le type : WhatsApp ou deep-link vers l'action).
   const alertHtml = (a) => {
     const cl = a.c.cliente;
+    // « Faire maintenant » qui mène DROIT à l'action (pas juste à la fiche).
+    const deep = (params, label) => `<a class="alert" href="cliente.html?id=${cl.id}&${params}">
+         <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+         <span class="alert-cta go">${label}</span></a>`;
+    if (a.type === "programme")           return deep("prog=sportif", "Envoyer 📤");
+    if (a.type === "nutrition_mensuelle") return deep("prog=nutrition", "Envoyer 🥗");
+    if (a.type === "prevoir_seances" || a.type === "seances") return deep("addSeance=1", "Programmer 🗓️");
     // Rappel de bilan → cliquer envoie la demande à la cliente sur WhatsApp.
     if (a.type === "bilan") {
       const b = Calc.bilanStats(a.c.bilans, a.c.accompagnement && a.c.accompagnement.date_debut);
@@ -615,20 +623,27 @@ function renderAlerts() {
     }
     return `<a class="alert" href="cliente.html?id=${cl.id}">
        <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
-     </a>`;
+       <span class="alert-cta go">Ouvrir 👀</span></a>`;
   };
   // Les notifs « 🆕 » (bilan rempli par une cliente, nouvelles mensurations) restent
   // TOUJOURS VISIBLES en haut, hors onglets — ce sont des notifs importantes.
   const estNouveau = (a) => a.type === "nouveau_bilan" || a.type === "nouvelle_mensuration";
   const nouveaux = all.filter(estNouveau);
-  const reste    = all.filter(a => !estNouveau(a)).slice(0, 40);
+  const reste    = all.filter(a => !estNouveau(a)).slice(0, 60);
   if (pin) pin.innerHTML = nouveaux.length
     ? `<div style="display:flex;flex-direction:column;gap:8px;margin:10px 0 4px">${nouveaux.map(alertHtml).join("")}</div>`
     : "";
-  // Le reste s'affiche dans l'onglet « À traiter » (déjà regroupé par la barre d'onglets).
-  box.innerHTML = reste.length
-    ? `<div style="display:flex;flex-direction:column;gap:8px;width:100%">${reste.map(alertHtml).join("")}</div>`
+  // À traiter regroupé par priorité : 🔴 Urgent puis 🟠 À faire. Chaque ligne mène droit à l'action.
+  const urgent = reste.filter(a => tierFor(a) === 1);
+  const afaire = reste.filter(a => tierFor(a) === 2);
+  const groupHtml = (titre, couleur, arr) => arr.length
+    ? `<div class="todo-head" style="color:${couleur}">${titre} (${arr.length})</div>
+       <div style="display:flex;flex-direction:column;gap:8px;width:100%;margin-bottom:6px">${arr.map(alertHtml).join("")}</div>`
     : "";
+  box.innerHTML = (urgent.length || afaire.length)
+    ? groupHtml("🔴 Urgent", "#c0564b", urgent) + groupHtml("🟠 À faire", "#b87316", afaire)
+    : `<div class="card" style="text-align:center;padding:22px 18px">
+         <p class="empty" style="font-style:normal;margin:0">🟢 Aucune alerte urgente — tu es à jour ✨</p></div>`;
   // Compteur sur l'onglet « À traiter » (toutes les alertes, y compris les 🆕).
   if (badge){ if (all.length){ badge.textContent = all.length; badge.hidden = false; } else badge.hidden = true; }
 }
