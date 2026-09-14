@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e74">
+<link rel="stylesheet" href="css/app.css?v=e75">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e74"></script>
-<script src="js/supabaseClient.js?v=e74"></script>
-<script src="js/auth.js?v=e74"></script>
-<script src="js/db.js?v=e74"></script>
-<script src="js/calc.js?v=e74"></script>
-<script src="js/ui/modal.js?v=e74"></script>
-<script src="js/ui/progress.js?v=e74"></script>
+<script src="js/config.js?v=e75"></script>
+<script src="js/supabaseClient.js?v=e75"></script>
+<script src="js/auth.js?v=e75"></script>
+<script src="js/db.js?v=e75"></script>
+<script src="js/calc.js?v=e75"></script>
+<script src="js/ui/modal.js?v=e75"></script>
+<script src="js/ui/progress.js?v=e75"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -81,6 +81,8 @@ function render(focusTitle){
         <button class="btn-ghost btn-sm" data-act="del-cliente" style="color:var(--danger);border-color:rgba(192,86,75,.4)">Supprimer</button>
       </div>
     </div>
+
+    ${jumpNav()}
 
     <!-- ACTIONS RAPIDES (en haut pour être visibles tout de suite, surtout sur mobile) -->
     <div class="quick" style="margin-bottom:14px">
@@ -143,6 +145,29 @@ function render(focusTitle){
 }
 
 function lastProg(kind){ return (D.programmes||[]).filter(p=>p.kind===kind).sort((a,b)=>a.created_at<b.created_at?1:-1)[0]||null; }
+
+// Barre de navigation par section : ＋ Séance (action n°1) + sauts directs.
+// Les libellés courts pointent vers le titre EXACT de chaque section (cf. block()).
+function jumpNav(){
+  const items = [
+    ["Séances","Séances"], ["Bilans","Bilans"], ["Mensu","Mensurations & évolution"],
+    ["Photos","Photos de progression"], ["Prog","Programmes"], ["Paiements","Paiements"],
+    ["Objectifs","Objectifs"], ["Notes","Notes privées"],
+  ];
+  return `<nav class="jumpnav" aria-label="Aller à une section">
+    <button type="button" class="jchip jchip-accent" data-act="add-seance">＋ Séance</button>
+    ${items.map(([lbl,t])=>`<button type="button" class="jchip" data-jump="${esc(t)}">${lbl}</button>`).join("")}
+  </nav>`;
+}
+// Ouvre la section visée et y défile (en tenant compte des barres collées en haut).
+function jumpToSection(title){
+  const sec = [...document.querySelectorAll('#main .section-block')]
+    .find(d => { const s = d.querySelector('summary'); return s && s.textContent.trim().startsWith(title); });
+  if (!sec) return;
+  sec.open = true;
+  const y = sec.getBoundingClientRect().top + window.scrollY - 112;
+  window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+}
 
 // ============================ SECTIONS ============================
 function block(title, count, body, open){
@@ -1048,6 +1073,9 @@ async function editAccomp(){
 
 // ============================ ÉVÉNEMENTS ============================
 document.getElementById("main").addEventListener("click", async (e)=>{
+  // Saut vers une section (barre de navigation) — avant la logique data-act.
+  const jump = e.target.closest("[data-jump]");
+  if (jump){ jumpToSection(jump.dataset.jump); return; }
   const el = e.target.closest("[data-act]"); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
   // En mode « Sélection », un clic sur la carte séance sert à cocher, pas à éditer.
