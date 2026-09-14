@@ -198,9 +198,14 @@ button{font-family:inherit;cursor:pointer}
 .item .ibody{flex:1;min-width:0}
 .item .ititle{font-weight:600;font-size:.9rem;color:var(--dark)}
 .item .isub{font-size:.8rem;color:var(--text-light);margin-top:2px}
-.item .iact{display:flex;gap:6px;align-items:flex-start;flex-shrink:0}
-.icon-btn{background:none;border:none;color:var(--text-light);font-size:.85rem;padding:4px 6px;border-radius:8px}
+.item .iact{display:flex;gap:10px;align-items:flex-start;flex-shrink:0}
+/* Cibles tactiles ≥40px : faciles à viser sur iPhone, et le 🗑 assez loin du ✎ pour ne pas supprimer par erreur. */
+.icon-btn{background:none;border:none;color:var(--text-light);font-size:1.05rem;min-width:40px;min-height:40px;
+  display:inline-flex;align-items:center;justify-content:center;padding:6px;border-radius:10px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
 .icon-btn:hover{background:var(--cream);color:var(--accent)}
+.icon-btn:active{background:var(--cream);transform:scale(.92)}
+.icon-btn[data-act="del"],.icon-btn[data-entity]{color:var(--danger)}
 .empty{color:var(--text-light);font-size:.85rem;font-style:italic;padding:10px 0}
 .tag{display:inline-block;font-size:.68rem;font-weight:700;color:var(--brown);background:var(--cream);
   border:1px solid var(--line);border-radius:50px;padding:2px 9px;margin-right:5px}

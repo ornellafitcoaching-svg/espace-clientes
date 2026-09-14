@@ -1100,6 +1100,17 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   }
   if (act==="edit-cliente") return editCliente();
   if (act==="edit-accomp") return editAccomp();
+  if (act==="edit-programme"){
+    const p = findRec("programme", id);
+    if (!p) return;
+    const v = await UI.form({ title:"Modifier le programme "+(p.kind==="nutrition"?"nutrition":"sportif"), fields:progFields(p.kind, p) });
+    if (!v) return;
+    const patch = { envoye:!!v.envoye, date_envoi:v.date_envoi, version:v.version,
+      date_debut:v.date_debut, date_fin:v.date_fin, commentaire:v.commentaire };
+    try{ await DB.update("programmes", id, patch); UI.toast("Programme modifié ✓"); reload("Programmes"); }
+    catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    return;
+  }
   if (act==="renouveler-accomp") return renouvelerAccomp();
   if (act==="create-access") return createAccess();
   if (act==="regen-access") return regenAccess();
