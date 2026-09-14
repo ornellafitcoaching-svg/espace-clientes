@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e73">
+<link rel="stylesheet" href="css/app.css?v=e74">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e73"></script>
-<script src="js/supabaseClient.js?v=e73"></script>
-<script src="js/auth.js?v=e73"></script>
-<script src="js/db.js?v=e73"></script>
-<script src="js/calc.js?v=e73"></script>
-<script src="js/ui/modal.js?v=e73"></script>
-<script src="js/ui/progress.js?v=e73"></script>
+<script src="js/config.js?v=e74"></script>
+<script src="js/supabaseClient.js?v=e74"></script>
+<script src="js/auth.js?v=e74"></script>
+<script src="js/db.js?v=e74"></script>
+<script src="js/calc.js?v=e74"></script>
+<script src="js/ui/modal.js?v=e74"></script>
+<script src="js/ui/progress.js?v=e74"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -516,7 +516,7 @@ async function addPhoto(){
         if (files.length > 1) UI.toast(`Envoi… ${ok}/${files.length}`);
       }
       UI.toast(`${ok} photo${ok>1?"s":""} ajoutée${ok>1?"s":""} ✓`); reload("Photos de progression");
-    }catch(e){ console.error(e); UI.toast("Erreur photo : "+(e.message||e),"err"); }
+    }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
   };
   input.click();
 }
@@ -702,7 +702,7 @@ async function editTaille(){
     }
     UI.toast("Taille enregistrée ✓" + (done ? ` · ${done} masse grasse calculée` : ""));
     reload("Mensurations & évolution");
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
 // Demander une mesure manquante à la cliente par WhatsApp (ex. tour de cou pour l'IMG).
@@ -748,7 +748,7 @@ async function addMensuSession(){
     // qui a déjà taille+hanches), on le complète à partir de l'état complet de cette date.
     if (mgVal == null){ const mg = await recalcMasseGrasse(v.date); if (mg != null) mgVal = mg; }
     UI.toast(rows.length+" mesure(s) enregistrée(s)"+(mgVal!=null?` · masse grasse ${mgVal}% calculée ✓`:" ✓")); reload("Mensurations & évolution"); }
-  catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+  catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
 // Bilan COMPLET côté coach : champs bilan + toutes les mensurations (+ masse grasse auto),
@@ -777,7 +777,7 @@ async function addBilanCoach(rec){
     else await DB.insert("bilans", bilanPayload);
     if (rows.length) await window.sb.from("mensurations").insert(rows);
     UI.toast("Bilan enregistré ✓"); reload("Bilans");
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
 // Recalcule la masse grasse (US Navy) pour une date donnée si taille+hanches+cou y sont
@@ -818,8 +818,21 @@ async function addOrEdit(entity, rec){
       else { UI.toast("Séance enregistrée ✓ — ajoute son n° (bouton Modifier) pour envoyer la confirmation","err"); }
     }
     const FOCUS = { seance:"Séances", objectif:"Objectifs", paiement:"Paiements", note:"Notes privées", mensuration:"Mensurations & évolution" }[entity];
-    UI.toast("Enregistré ✓"+extra); reload(FOCUS);
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    // Confirmation SPÉCIFIQUE (on sait quoi, pas juste « enregistré ») et durable.
+    let msg;
+    if (entity === "seance"){
+      msg = (rec ? "Séance modifiée" : "Séance enregistrée");
+      if (payload.statut === "prevue" && payload.date){
+        const hh = Calc.fmtHeure(payload.heure);
+        msg += " — prévue le " + Calc.fmt(payload.date) + (hh ? " à " + hh : "");
+      } else if (payload.statut === "realisee"){ msg += " ✓ faite"; }
+    } else if (entity === "paiement"){ msg = "Paiement de " + Calc.euro(payload.montant) + " enregistré";
+    } else if (entity === "objectif"){ msg = rec ? "Objectif modifié" : "Objectif enregistré";
+    } else if (entity === "note"){ msg = rec ? "Note modifiée" : "Note enregistrée";
+    } else if (entity === "mensuration"){ msg = "Mensurations enregistrées";
+    } else { msg = "Enregistré"; }
+    UI.toast(msg + extra); reload(FOCUS);
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
 async function progEnvoye(kind){
@@ -844,7 +857,7 @@ async function progEnvoye(kind){
       }
     }
     UI.toast("Programme "+kind+(patch.envoye?" marqué envoyé ✓":" décoché ✓")+extra); reload("Programmes");
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
 // ============================ ACCÈS CLIENTE ============================
@@ -874,7 +887,7 @@ async function regenAccess(){
     const uid = await Auth.provisionCliente(code, cl.prenom, cl.nom);
     await DB.update("clientes", cl.id, { profile_id: uid, access_code: code });
     UI.toast("Nouveau code généré ✓"); reload();
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e), "err"); }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e), "err"); }
 }
 
 // Saisie RAPIDE de ce que la cliente doit (un seul champ) → accompagnements.montant_du.
@@ -896,7 +909,7 @@ async function editMontantDu(){
     if (D.accompagnement) D.accompagnement.montant_du = montant; else D.accompagnement = { montant_du: montant };
     UI.toast(montant ? `Montant dû : ${Calc.euro(montant)} ✓` : "Montant dû effacé ✓");
     reload();
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
 async function editCliente(){
@@ -959,7 +972,7 @@ async function editCliente(){
     await DB.update("clientes", cl.id, cliP);
     await saveAccomp(accP);
     UI.toast("Enregistré ✓"); reload();
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 // Renouvellement : enregistre la date + ce qu'elle a pris + la durée, met à jour
 // l'engagement en cours (début/fin/formule) et garde l'historique. Le compte à
@@ -991,7 +1004,7 @@ async function renouvelerAccomp(){
     await DB.saveAccompagnement(CID, patch);
     if (D.cliente.statut !== "active") await DB.update("clientes", CID, { statut:"active" });
     UI.toast("Renouvellement enregistré ✓"); reload("Accompagnement");
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 async function editAccomp(){
   const ac = D.accompagnement||{};
@@ -1027,9 +1040,9 @@ async function editAccomp(){
       const { message_coach, ...rest } = v;
       try{ await DB.saveAccompagnement(CID, rest);
         UI.toast("Enregistré (le « mot » nécessite la migration SQL)","err"); return reload();
-      }catch(e2){ console.error(e2); UI.toast("Erreur : "+(e2.message||e2),"err"); return; }
+      }catch(e2){ console.error(e2); UI.toast(UI.errText(e2),"err"); return; }
     }
-    console.error(e); UI.toast("Erreur : "+(e.message||e),"err");
+    console.error(e); UI.toast(UI.errText(e),"err");
   }
 }
 
@@ -1058,7 +1071,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   }
   if (act==="seance-done"){
     try{ await DB.update("seances", id, { statut:"realisee" }); UI.toast("Séance marquée faite ✓"); reload(); }
-    catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
     return;
   }
   if (act==="ics-seance"){
@@ -1095,7 +1108,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
       const { error } = await window.sb.from("mensurations").update({ date:v.date }).eq("cliente_id", CID).eq("date", oldDate);
       if (error) throw error;
       UI.toast("Date du relevé modifiée ✓"); reload("Mensurations & évolution");
-    }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
     return;
   }
   if (act==="edit-cliente") return editCliente();
@@ -1108,7 +1121,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
     const patch = { envoye:!!v.envoye, date_envoi:v.date_envoi, version:v.version,
       date_debut:v.date_debut, date_fin:v.date_fin, commentaire:v.commentaire };
     try{ await DB.update("programmes", id, patch); UI.toast("Programme modifié ✓"); reload("Programmes"); }
-    catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
     return;
   }
   if (act==="renouveler-accomp") return renouvelerAccomp();
@@ -1123,7 +1136,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="del-cliente"){
     if (!(await UI.confirm("Supprimer définitivement cette cliente et TOUT son dossier ?"))) return;
     try{ await DB.deleteCliente(CID); UI.toast("Cliente supprimée"); location.href="coach.html"; }
-    catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+    catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
     return;
   }
   if (act.startsWith("edit-")){
@@ -1146,7 +1159,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
       await DB.remove(tbl, id);
       reload();
       if (backup) showUndo(tbl, backup); else UI.toast("Supprimé");
-    }catch(e2){ console.error(e2); UI.toast("Erreur : "+(e2.message||e2),"err"); }
+    }catch(e2){ console.error(e2); UI.toast(UI.errText(e2),"err"); }
   }
 });
 
@@ -1189,7 +1202,7 @@ async function deleteSelection(){
     setSelMode(false);
     await reload();
     if (backups.length) showUndoBatch(backups, checks.length); else UI.toast(`${checks.length} supprimé(s)`);
-  }catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e),"err"); }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 // Retour arrière groupé : réinsère toutes les lignes sauvegardées (regroupées par table).
 function showUndoBatch(items, total){

@@ -108,14 +108,42 @@ UI.form = function (opts) {
   });
 };
 
-// Petit toast de confirmation
-UI.toast = function (msg, kind) {
+// Toast de confirmation / d'erreur.
+//  • Succès (ok)  : vert, coche, disparaît tout seul (~4,5 s). Toujours visible
+//    en bas d'écran (position fixe) → pas besoin de descendre pour vérifier.
+//  • Erreur (err) : rouge, RESTE affichée avec une croix pour fermer (on ne rate
+//    jamais un échec de sauvegarde). Cliquer dessus la ferme aussi.
+UI.toast = function (msg, kind, opts) {
+  opts = opts || {};
+  kind = kind === "err" ? "err" : "ok";
+  // Un seul toast « vivant » à la fois (pas d'empilement).
+  document.querySelectorAll(".toast.live").forEach((n) => n.remove());
+  // Les messages historiques finissent souvent par « ✓ » : l'icône le porte déjà.
+  const text = String(msg == null ? "" : msg).replace(/\s*[✓✔✅]\s*$/, "").replace(/^\s*Erreur\s*:\s*/i, "");
   const t = document.createElement("div");
-  t.className = "toast " + (kind || "ok");
-  t.textContent = msg;
+  t.className = "toast live " + kind;
+  t.innerHTML = `<span class="ic">${kind === "err" ? "✕" : "✓"}</span><span class="tx"></span>`
+    + (kind === "err" ? `<button type="button" class="toast-x" aria-label="Fermer">✕</button>` : "");
+  t.querySelector(".tx").textContent = text;
   document.body.appendChild(t);
   requestAnimationFrame(() => t.classList.add("show"));
-  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 2600);
+  let timer = null;
+  const dismiss = () => { if (timer) clearTimeout(timer); t.classList.remove("show"); setTimeout(() => t.remove(), 300); };
+  // Durée : succès court, erreur longue (mais fermable à tout moment).
+  const dur = opts.duration != null ? opts.duration : (kind === "err" ? 9000 : 4500);
+  if (dur) timer = setTimeout(dismiss, dur);
+  t.addEventListener("click", dismiss);
+  return t;
+};
+
+// Traduit une erreur (Supabase / réseau / JS) en message humain pour la coach.
+UI.errText = function (e) {
+  const raw = (e && (e.message || e.error_description || e.msg)) || (typeof e === "string" ? e : "");
+  if (/délai dépassé|ne répond|timeout|Failed to fetch|NetworkError|Load failed/i.test(raw))
+    return "Non enregistré — le réseau ne répond pas. Vérifie ta connexion et réessaie.";
+  if (/duplicate key|already exists/i.test(raw)) return "Non enregistré — cet élément existe déjà.";
+  if (/permission|row-level security|RLS|not allowed/i.test(raw)) return "Non enregistré — accès refusé (droits).";
+  return "Non enregistré — " + (raw || "erreur inconnue") + ". Réessaie.";
 };
 
 // Confirmation simple

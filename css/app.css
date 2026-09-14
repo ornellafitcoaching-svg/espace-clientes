@@ -287,10 +287,18 @@ button{font-family:inherit;cursor:pointer}
 
 /* ---- Toast ---------------------------------------------------------------- */
 .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,20px);z-index:300;
-  background:var(--dark);color:#fff;padding:12px 22px;border-radius:50px;font-size:.85rem;font-weight:600;
-  box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transition:.28s}
+  display:flex;align-items:center;gap:11px;max-width:min(92vw,460px);
+  background:var(--dark);color:#fff;padding:13px 18px;border-radius:16px;font-size:.9rem;font-weight:600;
+  line-height:1.35;box-shadow:0 12px 34px rgba(0,0,0,.28);opacity:0;transition:.28s;cursor:pointer}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-.toast.err{background:var(--danger)}
+.toast .ic{flex:none;width:22px;height:22px;border-radius:50%;display:inline-flex;
+  align-items:center;justify-content:center;font-size:.78rem;background:rgba(255,255,255,.22);font-weight:700}
+.toast .tx{flex:1 1 auto}
+.toast.ok{background:#2f8f5b}
+.toast.err{background:var(--danger);font-weight:700}
+.toast .toast-x{flex:none;background:none;border:none;color:rgba(255,255,255,.85);
+  font-size:.95rem;cursor:pointer;padding:2px 4px;margin:-2px -4px -2px 2px}
+@media(prefers-reduced-motion:reduce){.toast{transition:opacity .2s}}
 
 /* ---- Code d'accès cliente (fiche coach) ---------------------------------- */
 .code-box{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--cream);

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e73">
+<link rel="stylesheet" href="css/app.css?v=e74">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e73"></script>
-<script src="js/supabaseClient.js?v=e73"></script>
-<script src="js/auth.js?v=e73"></script>
-<script src="js/db.js?v=e73"></script>
-<script src="js/calc.js?v=e73"></script>
-<script src="js/ui/modal.js?v=e73"></script>
-<script src="js/ui/progress.js?v=e73"></script>
+<script src="js/config.js?v=e74"></script>
+<script src="js/supabaseClient.js?v=e74"></script>
+<script src="js/auth.js?v=e74"></script>
+<script src="js/db.js?v=e74"></script>
+<script src="js/calc.js?v=e74"></script>
+<script src="js/ui/modal.js?v=e74"></script>
+<script src="js/ui/progress.js?v=e74"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -799,7 +799,7 @@ document.getElementById("newCliente").onclick = async () => {
     });
     UI.toast("Cliente créée ✓");
     location.href = "cliente.html?id=" + cliente.id;
-  } catch(e){ console.error(e); UI.toast("Erreur : "+(e.message||e), "err"); }
+  } catch(e){ console.error(e); UI.toast(UI.errText(e), "err"); }
 };
 
 // ---- Onglets (réorganisation de l'affichage — aucune logique métier touchée) ----
@@ -911,7 +911,7 @@ function showFatal(e){
       if (error) throw error;
       UI.toast("Séance marquée faite ✓");
     } catch(err){
-      console.error(err); UI.toast("Erreur : "+(err.message||err),"err");
+      console.error(err); UI.toast(UI.errText(err),"err");
       if (target) target.statut = prev; // rollback visuel
       renderStats(); renderAlerts(); renderAgenda(); renderBilansDemarrage(); renderSansSeance(); renderList();
     }
