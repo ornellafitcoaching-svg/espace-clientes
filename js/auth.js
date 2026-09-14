@@ -3,18 +3,21 @@
 // ============================================================================
 window.Auth = {
   async session() {
-    const { data } = await window.sb.auth.getSession();
+    // Garde-temps : si le rafraîchissement du jeton reste en attente (réseau
+    // instable), on lève une erreur au lieu de bloquer la page indéfiniment.
+    const { data } = await window.withTimeout(
+      window.sb.auth.getSession(), 12000, "Vérification de la session"
+    );
     return data.session || null;
   },
 
   async profile() {
     const s = await this.session();
     if (!s) return null;
-    const { data } = await window.sb
-      .from("profiles")
-      .select("id, role, prenom, nom, email")
-      .eq("id", s.user.id)
-      .maybeSingle();
+    const { data } = await window.withTimeout(
+      window.sb.from("profiles").select("id, role, prenom, nom, email").eq("id", s.user.id).maybeSingle(),
+      12000, "Chargement du profil"
+    );
     return data || null;
   },
 

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e72">
+<link rel="stylesheet" href="css/app.css?v=e73">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e72"></script>
-<script src="js/supabaseClient.js?v=e72"></script>
-<script src="js/auth.js?v=e72"></script>
-<script src="js/db.js?v=e72"></script>
-<script src="js/calc.js?v=e72"></script>
-<script src="js/ui/modal.js?v=e72"></script>
-<script src="js/ui/progress.js?v=e72"></script>
+<script src="js/config.js?v=e73"></script>
+<script src="js/supabaseClient.js?v=e73"></script>
+<script src="js/auth.js?v=e73"></script>
+<script src="js/db.js?v=e73"></script>
+<script src="js/calc.js?v=e73"></script>
+<script src="js/ui/modal.js?v=e73"></script>
+<script src="js/ui/progress.js?v=e73"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -1228,6 +1228,7 @@ function showUndo(tbl, rec){
 
 // ============================ INIT ============================
 (async ()=>{
+ try{
   const p = await Auth.requireCoach(); if (!p) return;
   document.getElementById("who").textContent = p.prenom||"Coach";
   document.getElementById("logout").onclick = ()=>Auth.signOut();
@@ -1244,13 +1245,22 @@ function showUndo(tbl, rec){
   document.getElementById("main").addEventListener("change", (e)=>{
     if (e.target.classList && e.target.classList.contains("selchk")) updateSelCount();
   });
-  try{ await reload();
-    // Arrivée depuis l'agenda du dashboard avec ?editSeance=... → ouvre direct l'édition.
-    const sid = new URLSearchParams(location.search).get("editSeance");
-    if (sid){ const rec = findRec("seance", sid); if (rec) addOrEdit("seance", rec); }
-  }
-  catch(e){ console.error(e); document.getElementById("main").innerHTML =
-    `<div class="card"><p class="empty">Erreur de chargement. Vérifie la config Supabase et le SQL.</p></div>`; }
+  await reload();
+  // Arrivée depuis l'agenda du dashboard avec ?editSeance=... → ouvre direct l'édition.
+  const sid = new URLSearchParams(location.search).get("editSeance");
+  if (sid){ const rec = findRec("seance", sid); if (rec) addOrEdit("seance", rec); }
+ }
+ catch(e){
+   console.error(e);
+   const reseau = /délai dépassé|ne répond/i.test(e && e.message || "");
+   document.getElementById("main").innerHTML =
+    `<div class="card" style="text-align:center;padding:28px 20px">
+       <p class="empty" style="font-style:normal;margin-bottom:6px">${reseau ? "Le réseau ne répond pas (connexion lente ou coupée)." : "Impossible de charger cette fiche pour le moment."}</p>
+       <p class="isub" style="color:var(--text-light);margin-bottom:14px">Vérifie ta connexion, puis réessaie.</p>
+       <button class="btn-accent" onclick="location.reload()">↻ Réessayer</button>
+       <a class="link" href="coach.html" style="display:inline-block;margin-top:12px">← Retour à mes clientes</a>
+     </div>`;
+ }
 })();
 </script>
 </body>
