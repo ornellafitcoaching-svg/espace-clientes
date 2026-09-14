@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e76">
+<link rel="stylesheet" href="css/app.css?v=e77">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e76"></script>
-<script src="js/supabaseClient.js?v=e76"></script>
-<script src="js/auth.js?v=e76"></script>
-<script src="js/db.js?v=e76"></script>
-<script src="js/calc.js?v=e76"></script>
-<script src="js/ui/modal.js?v=e76"></script>
-<script src="js/ui/progress.js?v=e76"></script>
+<script src="js/config.js?v=e77"></script>
+<script src="js/supabaseClient.js?v=e77"></script>
+<script src="js/auth.js?v=e77"></script>
+<script src="js/db.js?v=e77"></script>
+<script src="js/calc.js?v=e77"></script>
+<script src="js/ui/modal.js?v=e77"></script>
+<script src="js/ui/progress.js?v=e77"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -873,12 +873,13 @@ async function addOrEdit(entity, rec){
       const mg = await recalcMasseGrasse(payload.date);
       if (mg != null) extra = ` · masse grasse ${mg}% calculée ✓`;
     }
-    // Séance PROGRAMMÉE (prévue) créée ou déplacée → confirmation WhatsApp à la cliente
-    // (message pré-rempli avec la date/heure ; la coach n'a plus qu'à envoyer).
-    if (entity === "seance" && payload.statut === "prevue" && payload.date){
+    // Séance PROGRAMMÉE (prévue) : on ouvre la confirmation WhatsApp UNIQUEMENT à la CRÉATION
+    // (plus à chaque modif — corriger l'heure ou les exos ne relance plus WhatsApp).
+    // Pour prévenir d'un changement d'horaire : bouton « 🔔 Rappeler » dans l'agenda.
+    if (!rec && entity === "seance" && payload.statut === "prevue" && payload.date){
       const wa = Calc.waHref(D.cliente.telephone, Calc.seanceConfirmMsg(D.cliente, payload));
       if (wa){ window.open(wa, "_blank"); extra = " · confirmation WhatsApp ouverte 📲"; }
-      else { UI.toast("Séance enregistrée ✓ — ajoute son n° (bouton Modifier) pour envoyer la confirmation","err"); }
+      else { extra = " — ajoute son n° pour envoyer la confirmation"; }
     }
     const FOCUS = { seance:"Séances", objectif:"Objectifs", paiement:"Paiements", note:"Notes privées", mensuration:"Mensurations & évolution" }[entity];
     // Confirmation SPÉCIFIQUE (on sait quoi, pas juste « enregistré ») et durable.
@@ -1200,7 +1201,21 @@ document.getElementById("main").addEventListener("click", async (e)=>{
     return;
   }
   if (act==="del-cliente"){
-    if (!(await UI.confirm("Supprimer définitivement cette cliente et TOUT son dossier ?"))) return;
+    // Suppression IRRÉVERSIBLE (pas d'annulation possible, contrairement au reste) :
+    // on demande de retaper le prénom pour éviter tout accident.
+    const prenom = (D.cliente.prenom||"").trim();
+    const v = await UI.form({
+      title:"Supprimer définitivement cette cliente ?",
+      submit:"Supprimer définitivement",
+      fields:[
+        { name:"_warn", type:"static", label:"", value:`⚠️ Tout son dossier (séances, bilans, mensurations, photos, paiements, notes) sera <strong>définitivement perdu</strong>. Cette action ne peut PAS être annulée.` },
+        { name:"confirm", label:`Pour confirmer, retape son prénom : « ${esc(prenom)} »`, required:true, placeholder:prenom },
+      ],
+    });
+    if (!v) return;
+    if ((v.confirm||"").trim().toLowerCase() !== prenom.toLowerCase()){
+      UI.toast("Prénom incorrect — suppression annulée (rien n'a été supprimé)","err"); return;
+    }
     try{ await DB.deleteCliente(CID); UI.toast("Cliente supprimée"); location.href="coach.html"; }
     catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
     return;
