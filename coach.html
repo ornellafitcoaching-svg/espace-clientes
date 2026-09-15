@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e80">
+<link rel="stylesheet" href="css/app.css?v=e81">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e80"></script>
-<script src="js/supabaseClient.js?v=e80"></script>
-<script src="js/auth.js?v=e80"></script>
-<script src="js/db.js?v=e80"></script>
-<script src="js/calc.js?v=e80"></script>
-<script src="js/ui/modal.js?v=e80"></script>
-<script src="js/ui/progress.js?v=e80"></script>
+<script src="js/config.js?v=e81"></script>
+<script src="js/supabaseClient.js?v=e81"></script>
+<script src="js/auth.js?v=e81"></script>
+<script src="js/db.js?v=e81"></script>
+<script src="js/calc.js?v=e81"></script>
+<script src="js/ui/modal.js?v=e81"></script>
+<script src="js/ui/progress.js?v=e81"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -164,9 +164,11 @@ function renderAgenda(){
     return `<div class="cl-line" style="padding:5px 0;flex-wrap:wrap">${nom}
       <span style="display:flex;gap:6px;align-items:center;flex:1 1 100%;flex-wrap:wrap;justify-content:flex-start;margin-top:4px">
         <button class="tag tag-done" data-done="${it.id}" title="Marquer cette séance comme faite">✅ Fait</button>
+        <button class="tag" data-move="${it.id}" data-cl="${it.cl.id}" title="Déplacer cette séance (date / heure)">↔ Déplacer</button>
+        <button class="tag" data-cancel="${it.id}" data-cl="${it.cl.id}" title="Annuler cette séance" style="color:var(--danger)">✕ Annuler</button>
         <button class="tag" data-ics="${it.id}" data-cl="${it.cl.id}" title="Ajouter à mon agenda Apple (avec rappels)">📅 Agenda</button>
         ${wa?`<a class="tag tag-wa" href="${wa}" target="_blank" rel="noopener">🔔 Rappeler</a>`:""}
-        <a class="tag" href="cliente.html?id=${it.cl.id}&editSeance=${it.id}" title="Modifier cette séance">✏️ Modifier</a>
+        <a class="tag" href="cliente.html?id=${it.cl.id}&editSeance=${it.id}" title="Modifier tout le détail sur la fiche">✏️ Détail</a>
       </span></div>`;
   };
   // Rendu d'une liste de séances GROUPÉES PAR DATE (triées par heure dans chaque jour).
@@ -919,6 +921,57 @@ function showFatal(e){
       ]});
       if (!v || !v.id) return;
       location.href = `cliente.html?id=${encodeURIComponent(v.id)}&addSeance=1`;
+      return;
+    }
+    // Déplacer une séance directement depuis l'agenda (date / heure).
+    const moveBtn = e.target.closest("[data-move]");
+    if (moveBtn){
+      e.preventDefault();
+      const c = STATE.clientes.find(x => String(x.cliente.id) === String(moveBtn.dataset.cl));
+      const s = c && (c.seances||[]).find(x => String(x.id) === String(moveBtn.dataset.move));
+      if (!c || !s) return;
+      const v = await UI.form({ title:`Déplacer la séance de ${c.cliente.prenom||""}`, submit:"Déplacer", fields:[
+        { name:"date", label:"Nouvelle date", type:"date", half:true, value:s.date },
+        { name:"heure", label:"Heure (facultatif)", type:"time", half:true, value:s.heure||"" },
+      ]});
+      if (!v || !v.date) return;
+      const prevDate = s.date, prevHeure = s.heure;
+      s.date = v.date; s.heure = v.heure||null;
+      renderStats(); renderAgenda(); renderList();
+      try {
+        const { error } = await sb.from("seances").update({ date:v.date, heure:v.heure||null }).eq("id", s.id);
+        if (error) throw error;
+        UI.toast(`Séance déplacée au ${Calc.fmtJour(v.date)}${Calc.fmtHeure(v.heure)?` à ${Calc.fmtHeure(v.heure)}`:""} ✓`);
+        const wa = Calc.waHref(c.cliente.telephone, Calc.seanceConfirmMsg(c.cliente, s));
+        if (wa) window.open(wa, "_blank");
+      } catch(err){
+        console.error(err); UI.toast(UI.errText(err),"err");
+        s.date = prevDate; s.heure = prevHeure; renderStats(); renderAgenda(); renderList();
+      }
+      return;
+    }
+    // Annuler une séance directement depuis l'agenda (statut → annulée).
+    const cancelBtn = e.target.closest("[data-cancel]");
+    if (cancelBtn){
+      e.preventDefault();
+      const c = STATE.clientes.find(x => String(x.cliente.id) === String(cancelBtn.dataset.cl));
+      const s = c && (c.seances||[]).find(x => String(x.id) === String(cancelBtn.dataset.cancel));
+      if (!c || !s) return;
+      const ok = await UI.confirm(`Annuler la séance de ${c.cliente.prenom||""} du ${Calc.fmtJour(s.date)}${Calc.fmtHeure(s.heure)?` à ${Calc.fmtHeure(s.heure)}`:""} ?`);
+      if (!ok) return;
+      const prev = s.statut;
+      s.statut = "annulee";
+      renderStats(); renderAgenda(); renderList();
+      try {
+        const { error } = await sb.from("seances").update({ statut:"annulee" }).eq("id", s.id);
+        if (error) throw error;
+        UI.toast("Séance annulée");
+        const wa = Calc.waHref(c.cliente.telephone, Calc.seanceAnnulMsg(c.cliente, s));
+        if (wa) window.open(wa, "_blank");
+      } catch(err){
+        console.error(err); UI.toast(UI.errText(err),"err");
+        s.statut = prev; renderStats(); renderAgenda(); renderList();
+      }
       return;
     }
     // Ajout à l'agenda Apple (.ics) — priorité sur le bouton « Fait ».

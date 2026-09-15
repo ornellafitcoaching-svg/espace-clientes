@@ -366,6 +366,17 @@ window.Calc = {
     return "Bonjour " + cl.prenom + " 😊 C'est noté : votre séance est bien programmée le " + quand
       + " 💪 On se voit là-bas ! Si vous avez un empêchement, prévenez-moi 🙂";
   },
+  // Message d'ANNULATION d'une séance (WhatsApp) — tu/vous selon la cliente.
+  seanceAnnulMsg(cl, s) {
+    const h = this.fmtHeure(s && s.heure);
+    const quand = this.fmtJour(s && s.date) + (h ? " à " + h : "");
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 Je dois annuler ta séance du " + quand
+        + ". Je te propose un nouveau créneau très vite, désolée pour le contretemps 🙏";
+    }
+    return "Bonjour " + cl.prenom + " 😊 Je dois annuler votre séance du " + quand
+      + ". Je vous propose un nouveau créneau très vite, désolée pour le contretemps 🙏";
+  },
   // Récap de TOUTES les séances à venir d'une cliente (WhatsApp) + décompte fait/restant + invite à modif.
   recapSeancesMsg(cl, seances, accompagnement) {
     const today = this.today();
