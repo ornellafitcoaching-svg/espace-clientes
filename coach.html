@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e81">
+<link rel="stylesheet" href="css/app.css?v=e82">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e81"></script>
-<script src="js/supabaseClient.js?v=e81"></script>
-<script src="js/auth.js?v=e81"></script>
-<script src="js/db.js?v=e81"></script>
-<script src="js/calc.js?v=e81"></script>
-<script src="js/ui/modal.js?v=e81"></script>
-<script src="js/ui/progress.js?v=e81"></script>
+<script src="js/config.js?v=e82"></script>
+<script src="js/supabaseClient.js?v=e82"></script>
+<script src="js/auth.js?v=e82"></script>
+<script src="js/db.js?v=e82"></script>
+<script src="js/calc.js?v=e82"></script>
+<script src="js/ui/modal.js?v=e82"></script>
+<script src="js/ui/progress.js?v=e82"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -937,7 +937,7 @@ function showFatal(e){
       if (!v || !v.date) return;
       const prevDate = s.date, prevHeure = s.heure;
       s.date = v.date; s.heure = v.heure||null;
-      renderStats(); renderAgenda(); renderList();
+      renderAll();
       try {
         const { error } = await sb.from("seances").update({ date:v.date, heure:v.heure||null }).eq("id", s.id);
         if (error) throw error;
@@ -946,7 +946,7 @@ function showFatal(e){
         if (wa) window.open(wa, "_blank");
       } catch(err){
         console.error(err); UI.toast(UI.errText(err),"err");
-        s.date = prevDate; s.heure = prevHeure; renderStats(); renderAgenda(); renderList();
+        s.date = prevDate; s.heure = prevHeure; renderAll();
       }
       return;
     }
@@ -961,7 +961,7 @@ function showFatal(e){
       if (!ok) return;
       const prev = s.statut;
       s.statut = "annulee";
-      renderStats(); renderAgenda(); renderList();
+      renderAll();
       try {
         const { error } = await sb.from("seances").update({ statut:"annulee" }).eq("id", s.id);
         if (error) throw error;
@@ -970,7 +970,7 @@ function showFatal(e){
         if (wa) window.open(wa, "_blank");
       } catch(err){
         console.error(err); UI.toast(UI.errText(err),"err");
-        s.statut = prev; renderStats(); renderAgenda(); renderList();
+        s.statut = prev; renderAll();
       }
       return;
     }
