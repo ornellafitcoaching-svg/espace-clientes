@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e78">
+<link rel="stylesheet" href="css/app.css?v=e79">
 </head>
 <body>
 <header class="topbar">
@@ -25,13 +25,13 @@
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e78"></script>
-<script src="js/supabaseClient.js?v=e78"></script>
-<script src="js/auth.js?v=e78"></script>
-<script src="js/db.js?v=e78"></script>
-<script src="js/calc.js?v=e78"></script>
-<script src="js/ui/modal.js?v=e78"></script>
-<script src="js/ui/progress.js?v=e78"></script>
+<script src="js/config.js?v=e79"></script>
+<script src="js/supabaseClient.js?v=e79"></script>
+<script src="js/auth.js?v=e79"></script>
+<script src="js/db.js?v=e79"></script>
+<script src="js/calc.js?v=e79"></script>
+<script src="js/ui/modal.js?v=e79"></script>
+<script src="js/ui/progress.js?v=e79"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
 let D = null;             // dossier courant
@@ -77,11 +77,13 @@ function render(focusTitle){
       </div>
       <div class="row" style="gap:8px">
         <button class="btn-ghost btn-sm" data-act="toggle-select">☑️ Sélection</button>
+        <button class="btn-ghost btn-sm" data-act="toggle-pause">${cl.statut==="en_pause"?"▶️ Reprendre":"⏸ Mettre en pause"}</button>
         <button class="btn-ghost btn-sm" data-act="edit-cliente">Modifier</button>
         <button class="btn-ghost btn-sm" data-act="del-cliente" style="color:var(--danger);border-color:rgba(192,86,75,.4)">Supprimer</button>
       </div>
     </div>
 
+    ${pauseBanner(cl)}
     ${santeBanner(cl)}
     ${jumpNav()}
 
@@ -146,6 +148,20 @@ function render(focusTitle){
 }
 
 function lastProg(kind){ return (D.programmes||[]).filter(p=>p.kind===kind).sort((a,b)=>a.created_at<b.created_at?1:-1)[0]||null; }
+
+// Bandeau PAUSE « en gros » quand la cliente est en pause (ex. blessée). Rappelle que
+// le suivi est suspendu et que les relances (bilan/séances/programmes) sont coupées.
+function pauseBanner(cl){
+  if (cl.statut !== "en_pause") return "";
+  return `<div class="pause-banner">
+    <span class="pause-ico">⏸</span>
+    <div style="flex:1;min-width:0">
+      <div class="pause-h">Suivi EN PAUSE</div>
+      <div class="pause-tx">${cl.sante?esc(cl.sante):"Aucune relance ne sera envoyée tant que la cliente est en pause."}</div>
+    </div>
+    <button class="btn-ghost btn-sm" data-act="toggle-pause">▶️ Reprendre</button>
+  </div>`;
+}
 
 // Bandeau SANTÉ / BLESSURE « en gros » en haut de la fiche — pour ne jamais oublier
 // une contre-indication (cliente blessée). Cliquer « ✏️ » édite ; si vide, un lien discret d'ajout.
@@ -1212,6 +1228,20 @@ document.getElementById("main").addEventListener("click", async (e)=>{
     return;
   }
   if (act==="edit-cliente") return editCliente();
+  if (act==="toggle-pause"){
+    const enPause = D.cliente.statut === "en_pause";
+    const next = enPause ? "active" : "en_pause";
+    if (!enPause){
+      const ok = await UI.confirm("Mettre "+D.cliente.prenom+" en pause ? Son suivi est suspendu et toutes les relances (bilan, séances, programmes) sont coupées.");
+      if (!ok) return;
+    }
+    try{ await DB.update("clientes", CID, { statut: next });
+      D.cliente.statut = next;
+      UI.toast(enPause ? "Suivi repris ✅" : "Cliente mise en pause ⏸");
+      reload(); }
+    catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
+    return;
+  }
   if (act==="edit-accomp") return editAccomp();
   if (act==="edit-sante"){
     const v = await UI.form({ title:"Santé / blessures", submit:"Enregistrer", fields:[

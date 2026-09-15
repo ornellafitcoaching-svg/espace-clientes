@@ -249,6 +249,11 @@ window.Calc = {
         out.push({ type: "nouvelle_mensuration", label: "Nouvelles mensurations", icon: "🆕", date: jour });
       }
     }
+    // Cliente EN PAUSE (ex. blessée) : on ne la harcèle pas. On garde les notifs de
+    // CONSULTATION ci-dessus (elle a rempli un bilan / des mensurations) mais on coupe
+    // TOUTES les relances « à faire » (bilan, séances, fin de suivi, programmes…).
+    const enPause = c.cliente && c.cliente.statut === "en_pause";
+    if (enPause) return out;
     const b = this.bilanStats(c.bilans);
     if (b.joursAvant !== null && b.joursAvant <= 3) {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });

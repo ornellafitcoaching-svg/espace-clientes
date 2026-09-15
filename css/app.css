@@ -208,6 +208,20 @@ button{font-family:inherit;cursor:pointer}
 .sante-edit{flex:none;background:none;border:none;font-size:1.05rem;cursor:pointer;padding:4px 6px;border-radius:8px}
 .sante-edit:active{transform:scale(.9)}
 
+/* ---- Pause (cliente blessée / suivi suspendu) ---------------------------- */
+.pause-banner{display:flex;align-items:center;gap:12px;background:rgba(201,133,42,.12);
+  border:1px solid rgba(201,133,42,.4);border-left:5px solid #c9852a;
+  border-radius:14px;padding:13px 16px;margin:2px 0 12px}
+.pause-ico{font-size:1.5rem;line-height:1;flex:none;color:#9a6414}
+.pause-h{font-weight:800;color:#9a6414;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.pause-tx{font-size:.92rem;font-weight:600;color:var(--dark);line-height:1.4;white-space:pre-wrap}
+/* Flag « EN PAUSE » sur la carte du dashboard */
+.pause-flag{background:#c9852a;color:#fff;font-weight:800;font-size:.72rem;letter-spacing:.05em;
+  text-transform:uppercase;padding:6px 12px;border-radius:10px;margin-bottom:10px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-card--pause{opacity:.72}
+.cl-card--pause:hover{opacity:1}
+
 /* ---- Sections dépliables -------------------------------------------------- */
 .section-block{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
   margin-top:14px;overflow:hidden}

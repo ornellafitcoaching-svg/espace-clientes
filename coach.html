@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e78">
+<link rel="stylesheet" href="css/app.css?v=e79">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e78"></script>
-<script src="js/supabaseClient.js?v=e78"></script>
-<script src="js/auth.js?v=e78"></script>
-<script src="js/db.js?v=e78"></script>
-<script src="js/calc.js?v=e78"></script>
-<script src="js/ui/modal.js?v=e78"></script>
-<script src="js/ui/progress.js?v=e78"></script>
+<script src="js/config.js?v=e79"></script>
+<script src="js/supabaseClient.js?v=e79"></script>
+<script src="js/auth.js?v=e79"></script>
+<script src="js/db.js?v=e79"></script>
+<script src="js/calc.js?v=e79"></script>
+<script src="js/ui/modal.js?v=e79"></script>
+<script src="js/ui/progress.js?v=e79"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -727,7 +727,9 @@ function renderList() {
     const dette = Calc.detteCliente(c);
     const _today = Calc.today();
     const upcoming = (c.seances||[]).filter(x=>x.statut==="prevue" && x.date && x.date>=_today).sort((a,b)=>a.date<b.date?-1:1);
-    return `<a class="cl-card" href="cliente.html?id=${cl.id}">
+    const enPause = cl.statut === "en_pause";
+    return `<a class="cl-card${enPause?" cl-card--pause":""}" href="cliente.html?id=${cl.id}">
+      ${enPause?`<div class="pause-flag">⏸ EN PAUSE${cl.sante?` · ${esc(cl.sante)}`:''}</div>`:''}
       <div class="cl-top">
         <div style="display:flex;gap:11px;align-items:center;min-width:0">
           <div class="cl-avatar">${initials(cl)}</div>
