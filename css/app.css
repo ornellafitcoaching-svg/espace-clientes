@@ -198,6 +198,16 @@ button{font-family:inherit;cursor:pointer}
 .jchip-accent{background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff;border:none}
 .jchip-accent:hover{color:#fff}
 
+/* ---- Bandeau santé / blessure (fiche cliente) ---------------------------- */
+.sante-banner{display:flex;align-items:flex-start;gap:12px;background:#fdecea;
+  border:1px solid rgba(192,86,75,.4);border-left:5px solid var(--danger);
+  border-radius:14px;padding:13px 16px;margin:2px 0 12px}
+.sante-ico{font-size:1.4rem;line-height:1;flex:none}
+.sante-h{font-weight:700;color:var(--danger);font-size:.82rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+.sante-tx{font-size:.95rem;font-weight:600;color:var(--dark);line-height:1.4;white-space:pre-wrap}
+.sante-edit{flex:none;background:none;border:none;font-size:1.05rem;cursor:pointer;padding:4px 6px;border-radius:8px}
+.sante-edit:active{transform:scale(.9)}
+
 /* ---- Sections dépliables -------------------------------------------------- */
 .section-block{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);
   margin-top:14px;overflow:hidden}

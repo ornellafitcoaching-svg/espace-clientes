@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e77">
+<link rel="stylesheet" href="css/app.css?v=e78">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e77"></script>
-<script src="js/supabaseClient.js?v=e77"></script>
-<script src="js/auth.js?v=e77"></script>
-<script src="js/db.js?v=e77"></script>
-<script src="js/calc.js?v=e77"></script>
-<script src="js/ui/modal.js?v=e77"></script>
-<script src="js/ui/progress.js?v=e77"></script>
+<script src="js/config.js?v=e78"></script>
+<script src="js/supabaseClient.js?v=e78"></script>
+<script src="js/auth.js?v=e78"></script>
+<script src="js/db.js?v=e78"></script>
+<script src="js/calc.js?v=e78"></script>
+<script src="js/ui/modal.js?v=e78"></script>
+<script src="js/ui/progress.js?v=e78"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -740,6 +740,7 @@ function renderList() {
       <div class="cl-meta">
         <span class="badge badge-type">${Calc.labelType(cl.type)}</span>
         <span class="st st-${cl.statut}">${Calc.labelStatut(cl.statut)}</span>
+        ${cl.sante?`<span class="badge" style="background:#fdecea;color:var(--danger);border:1px solid rgba(192,86,75,.35);font-weight:700" title="${esc(cl.sante)}">🩹 Santé</span>`:''}
         ${dette>0?`<span class="badge" style="background:rgba(201,99,88,.12);color:var(--accent-deep);border:1px solid rgba(201,99,88,.28);font-weight:700">💳 doit ${Calc.euro(dette)}</span>`:''}
       </div>
       ${s.prevues ? UI.progressBar(s.pct, `${s.realisees} / ${s.prevues} séances`) : ''}
