@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e79">
+<link rel="stylesheet" href="css/app.css?v=e80">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e79"></script>
-<script src="js/supabaseClient.js?v=e79"></script>
-<script src="js/auth.js?v=e79"></script>
-<script src="js/db.js?v=e79"></script>
-<script src="js/calc.js?v=e79"></script>
-<script src="js/ui/modal.js?v=e79"></script>
-<script src="js/ui/progress.js?v=e79"></script>
+<script src="js/config.js?v=e80"></script>
+<script src="js/supabaseClient.js?v=e80"></script>
+<script src="js/auth.js?v=e80"></script>
+<script src="js/db.js?v=e80"></script>
+<script src="js/calc.js?v=e80"></script>
+<script src="js/ui/modal.js?v=e80"></script>
+<script src="js/ui/progress.js?v=e80"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -135,6 +135,8 @@ const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'
 function renderAgenda(){
   const box = document.getElementById("agenda");
   const today = Calc.today();
+  // Bouton d'ajout de séance DEPUIS l'agenda (choisit la cliente puis ouvre le form).
+  const addBtn = `<button class="btn-accent" data-act="agenda-add-seance" style="margin:14px 0 0">＋ Programmer une séance</button>`;
   const items = [];
   STATE.clientes.forEach(c => (c.seances||[]).forEach(s => {
     // On garde aussi les séances déjà "réalisées" (à partir d'aujourd'hui) pour qu'une séance
@@ -143,11 +145,11 @@ function renderAgenda(){
       items.push({ id:s.id, date:s.date, type:s.type, heure:s.heure, statut:s.statut, cl:c.cliente });
   }));
   if (!items.length){
-    box.innerHTML = `<details class="section-block" style="margin:14px 0">
+    box.innerHTML = addBtn + `<details class="section-block" open style="margin:14px 0">
       <summary><span class="chev">▸</span>📅 Séances à venir<span class="count">0</span></summary>
-      <div class="section-body"><p class="empty">Aucune séance programmée. Depuis une fiche cliente, clique
-        « 🏋️ Séance », choisis le statut <strong>Prévue</strong> et une date à venir : elle apparaîtra ici
-        et dans l'espace de ta cliente.</p></div></details>`;
+      <div class="section-body"><p class="empty">Aucune séance programmée. Clique
+        « ＋ Programmer une séance » ci-dessus (ou, depuis une fiche cliente, « 🏋️ Séance » en statut
+        <strong>Prévue</strong>) : elle apparaîtra ici et dans l'espace de ta cliente.</p></div></details>`;
     return;
   }
   // Rendu d'UNE séance (ligne).
@@ -217,7 +219,7 @@ function renderAgenda(){
       <button class="chip ${STATE.agendaView!=="week"?"on":""}" data-view="list">📅 À venir</button>
       <button class="chip ${STATE.agendaView==="week"?"on":""}" data-view="week">🗓️ Semaine</button>
     </div>`;
-  box.innerHTML = toggle + (STATE.agendaView==="week" ? weekContent : listContent);
+  box.innerHTML = addBtn + toggle + (STATE.agendaView==="week" ? weekContent : listContent);
 }
 
 // ---- Suivi des bilans : qui a rempli, quand, et qui doit le faire ----
@@ -902,6 +904,23 @@ function showFatal(e){
     // Bascule de vue « À venir » / « Semaine ».
     const viewBtn = e.target.closest("[data-view]");
     if (viewBtn){ e.preventDefault(); STATE.agendaView = viewBtn.dataset.view; renderAgenda(); return; }
+    // ＋ Programmer une séance depuis l'agenda : on choisit la cliente, puis on ouvre
+    // directement le formulaire Séance sur sa fiche (deep-link ?addSeance=1).
+    const addSea = e.target.closest("[data-act='agenda-add-seance']");
+    if (addSea){
+      e.preventDefault();
+      if (!STATE.clientes.length){ UI.toast("Crée d'abord une cliente","err"); return; }
+      const opts = STATE.clientes
+        .slice()
+        .sort((a,b)=>(a.cliente.prenom||"").localeCompare(b.cliente.prenom||"","fr"))
+        .map(c => ({ value:String(c.cliente.id), label:`${c.cliente.prenom||""} ${c.cliente.nom||""}`.trim() }));
+      const v = await UI.form({ title:"Programmer une séance", submit:"Continuer", fields:[
+        { name:"id", label:"Pour quelle cliente ?", type:"select", options:opts, value:opts[0].value },
+      ]});
+      if (!v || !v.id) return;
+      location.href = `cliente.html?id=${encodeURIComponent(v.id)}&addSeance=1`;
+      return;
+    }
     // Ajout à l'agenda Apple (.ics) — priorité sur le bouton « Fait ».
     const icsBtn = e.target.closest("[data-ics]");
     if (icsBtn){
