@@ -267,7 +267,7 @@ window.Calc = {
       // Bilan de FIN : une seule fois, tant qu'aucun bilan n'est enregistré depuis la
       // date de fin. Réutilise le type "bilan" → même action « demander le bilan ».
       const bilanDeFinFait = (c.bilans || []).some(x => x.date && dateFin && x.date >= dateFin);
-      if (!bilanDeFinFait) out.push({ type: "bilan", label: "Bilan de fin à faire", icon: "🏁" });
+      if (!bilanDeFinFait) out.push({ type: "bilan_fin", label: "Bilan de fin à faire", icon: "🏁" });
       out.push({ type: "fin_termine", label: "Suivi terminé le " + this.fmt(dateFin) + " → à renouveler", icon: "⏳" });
       return out;
     }
@@ -366,6 +366,31 @@ window.Calc = {
     return "Bonjour " + cl.prenom + " 😊 C'est le moment de faire votre bilan " + quand
       + " 📊\n\nVous pouvez le remplir en 2 min directement dans votre espace (connexion en 1 clic) : " + lien
       + "\n\nCela me permet de suivre votre progression et d'ajuster votre programme 💪";
+  },
+  // Message « BILAN DE FIN » (clôture d'accompagnement) — cohérent avec une fin, pas le récurrent.
+  bilanFinMsg(cl) {
+    const lien = this.espaceLink(cl.access_code);
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 On arrive au bout de ton accompagnement 🎉\n\n"
+        + "J'aimerais qu'on fasse ton *bilan de fin* pour mesurer tout le chemin parcouru depuis le début 📊 "
+        + "Tu peux le remplir en 2 min dans ton espace : " + lien
+        + "\n\nJ'ai hâte de voir tes résultats — on fera le point ensemble sur la suite 💪";
+    }
+    return "Bonjour " + cl.prenom + " 😊 Nous arrivons au terme de votre accompagnement 🎉\n\n"
+      + "J'aimerais faire votre *bilan de fin* pour mesurer le chemin parcouru depuis le début 📊 "
+      + "Vous pouvez le remplir en 2 min dans votre espace : " + lien
+      + "\n\nNous ferons le point ensemble sur vos résultats et la suite 💪";
+  },
+  // Message « RENOUVELLEMENT » — proposer de continuer à la fin de l'accompagnement.
+  renouvellementMsg(cl) {
+    if (cl.tutoiement) {
+      return "Coucou " + cl.prenom + " 🌸 Ton accompagnement touche à sa fin, et j'ai adoré bosser avec toi 💚\n\n"
+        + "Est-ce que tu veux qu'on continue l'aventure ensemble et qu'on reparte sur un nouveau cycle ? "
+        + "Dis-moi ce que tu en penses, je te prépare la suite adaptée à tes objectifs 💪";
+    }
+    return "Bonjour " + cl.prenom + " 😊 Votre accompagnement touche à sa fin, et j'ai adoré travailler avec vous 💚\n\n"
+      + "Souhaitez-vous continuer et repartir sur un nouveau cycle ? "
+      + "Dites-moi ce que vous en pensez, je vous prépare la suite adaptée à vos objectifs 💪";
   },
   // Message « rappel de séance » pré-rempli (tutoiement selon cl.tutoiement).
   seanceRappelMsg(cl, date, type, heure) {

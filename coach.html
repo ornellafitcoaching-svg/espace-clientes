@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e82"></script>
-<script src="js/calc.js?v=e86"></script>
+<script src="js/calc.js?v=e87"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -320,7 +320,7 @@ function renderBilans(){
     else if (b.joursAvant!==null && b.joursAvant<0){ prio=1; chip=`🟠 En retard de ${Math.abs(b.joursAvant)} j`; col=COL.orange; }
     else if (b.joursAvant!==null && b.joursAvant<=7){ prio=2; chip=`🟡 Prochain dans ${b.joursAvant} j`; col=COL.yellow; }
     else { prio=3; chip="✅ À jour"; col=COL.green; }
-    return { cl, bilans, dernier, b, prio, chip, col, aRempli, demarree };
+    return { cl, bilans, dernier, b, prio, chip, col, aRempli, demarree, termine };
   });
 
   // Ligne d'une cliente (réutilisée dans les deux blocs).
@@ -341,7 +341,7 @@ function renderBilans(){
       detail = `dernier : <strong>${Calc.fmt(d.date)}</strong> · ${qui} le ${quand} · ${r.bilans.length} au total`;
       prochain = r.b.prochain ? ` · prochain le ${Calc.fmt(r.b.prochain)}` : "";
     }
-    const wa = (r.prio<=2) ? Calc.waHref(cl.telephone, Calc.bilanMsg(cl, r.b.joursAvant!==null && r.b.joursAvant<0)) : null;
+    const wa = (r.prio<=2) ? Calc.waHref(cl.telephone, r.termine ? Calc.bilanFinMsg(cl) : Calc.bilanMsg(cl, r.b.joursAvant!==null && r.b.joursAvant<0)) : null;
     return `<div class="cl-line" style="padding:7px 0;gap:8px;flex-wrap:wrap">
       <a href="cliente.html?id=${cl.id}" style="text-decoration:none;color:inherit;min-width:0;flex:1 1 55%">
         <strong>${esc(cl.prenom)} ${esc(cl.nom||"")}</strong>
@@ -577,6 +577,7 @@ function renderAlerts() {
   const tierFor = (a) => {
     const c = a.c;
     if (a.type === "bilan"){ const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut); return (b.joursAvant!==null && b.joursAvant<0) ? 1 : 2; }
+    if (a.type === "bilan_fin") return 1;
     if (a.type === "renouveler" || a.type === "seances") return 1;
     if (a.type === "programme"){ const s = Calc.programmeStatus(c,"sportif"); return (s && s.statut==="retard") ? 1 : 2; }
     if (a.type === "nutrition_mensuelle"){ const n = Calc.programmeStatus(c,"nutrition"); return (n && n.statut==="retard") ? 1 : 2; }
@@ -616,6 +617,30 @@ function renderAlerts() {
            <span class="alert-cta">Demander 📲</span></a>`;
       }
       return `<a class="alert" href="cliente.html?id=${cl.id}" title="Ajoute son numéro de téléphone dans sa fiche pour demander en un clic">
+           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           <span class="alert-cta muted">☎️ n° manquant</span></a>`;
+    }
+    // Bilan de FIN (clôture) → message dédié, cohérent avec une fin d'accompagnement.
+    if (a.type === "bilan_fin") {
+      const wa = Calc.waHref(cl.telephone, Calc.bilanFinMsg(cl));
+      if (wa) {
+        return `<a class="alert alert-action" href="${wa}" target="_blank" rel="noopener">
+           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           <span class="alert-cta">Demander le bilan de fin 📲</span></a>`;
+      }
+      return `<a class="alert" href="cliente.html?id=${cl.id}" title="Ajoute son numéro pour demander en un clic">
+           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           <span class="alert-cta muted">☎️ n° manquant</span></a>`;
+    }
+    // Suivi terminé → proposer le renouvellement à la cliente (WhatsApp).
+    if (a.type === "fin_termine") {
+      const wa = Calc.waHref(cl.telephone, Calc.renouvellementMsg(cl));
+      if (wa) {
+        return `<a class="alert alert-action" href="${wa}" target="_blank" rel="noopener">
+           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           <span class="alert-cta">Proposer de renouveler 📲</span></a>`;
+      }
+      return `<a class="alert" href="cliente.html?id=${cl.id}" title="Ajoute son numéro pour proposer le renouvellement en un clic">
            <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
            <span class="alert-cta muted">☎️ n° manquant</span></a>`;
     }
