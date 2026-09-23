@@ -259,9 +259,15 @@ window.Calc = {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });
     }
     const s = this.seancesStats(c.accompagnement, c.seances);
-    // « Presque finies » seulement si elle a DÉJÀ consommé des séances (restantes < forfait).
-    // Sinon un petit forfait à 0 séance faite (ex. 0/2) déclencherait une alerte absurde.
-    if (s.prevues > 0 && s.restantes <= 2 && s.restantes < s.prevues) {
+    // Séances réellement programmées à venir (RDV pas encore passés).
+    const today = this.today();
+    const programmees = (c.seances || []).filter(x => x.statut === "prevue" && x.date && x.date >= today).length;
+    // « Presque finies » = il reste peu de séances au forfait ET il en reste à
+    // PROGRAMMER (le CTA est « Programmer »). On l'affiche donc seulement s'il reste
+    // des séances non encore calées. Si tout ce qui reste est déjà programmé (ex. un
+    // hybride 2 séances dont la dernière est déjà prévue), aucune action → pas d'alerte.
+    // Restriction restantes < prevues : évite l'alerte absurde d'un forfait à 0 séance faite (ex. 0/2).
+    if (s.prevues > 0 && s.restantes <= 2 && s.restantes < s.prevues && programmees < s.restantes) {
       out.push({ type: "seances", label: "Séances presque finies", icon: "🏋️" });
     }
     // Point 7 — « prévoir des séances » : il reste beaucoup de séances au forfait
@@ -270,8 +276,6 @@ window.Calc = {
     // n'ont pas de séances programmées (cf. bloc « Sans séance programmée »).
     if (c.cliente && c.cliente.statut === "active") {
       const avecRdv = c.cliente.type === "presentiel" || c.cliente.type === "hybride";
-      const today = this.today();
-      const programmees = (c.seances || []).filter(x => x.statut === "prevue" && x.date && x.date >= today).length;
       if (avecRdv && s.restantes > 2 && programmees <= 2) {
         out.push({ type: "prevoir_seances", label: "Prévoir des séances", icon: "🗓️" });
       }
