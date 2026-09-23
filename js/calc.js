@@ -257,18 +257,21 @@ window.Calc = {
     const ac = c.accompagnement || null;
     const suivi = this.suiviStats(ac);
     const dateFin = ac && ac.date_fin ? ac.date_fin : null;
-    const active = c.cliente && c.cliente.statut === "active";
-    // FIN DE PARCOURS : date de fin dépassée et cliente encore active. On bascule en
-    // logique « fin » et on coupe les rappels récurrents qui n'ont plus de sens
-    // (bilan des 4 sem, renvoi de programme, séances à programmer). Voir retour Ornella :
-    // une cliente finie appelle UN bilan de fin + une décision renouveler/clôturer.
-    const termine = active && suivi.joursRestants !== null && suivi.joursRestants < 0;
+    const statut = c.cliente ? c.cliente.statut : null;
+    const active = statut === "active";
+    // FIN DE PARCOURS : soit la date de fin est dépassée (cliente encore active), soit elle
+    // est explicitement marquée « à renouveler ». On bascule en logique « fin » et on coupe
+    // les rappels récurrents qui n'ont plus de sens (bilan des 4 sem, renvoi de programme,
+    // séances). Une cliente finie appelle UN bilan de fin + une décision renouveler/clôturer,
+    // chacun avec son message WhatsApp dédié.
+    const dateFinPassee = suivi.joursRestants !== null && suivi.joursRestants < 0;
+    const termine = (active && dateFinPassee) || statut === "a_renouveler";
     if (termine) {
-      // Bilan de FIN : une seule fois, tant qu'aucun bilan n'est enregistré depuis la
-      // date de fin. Réutilise le type "bilan" → même action « demander le bilan ».
+      // Bilan de FIN : une seule fois, tant qu'aucun bilan n'est enregistré depuis la date
+      // de fin (uniquement si la date de fin est connue).
       const bilanDeFinFait = (c.bilans || []).some(x => x.date && dateFin && x.date >= dateFin);
-      if (!bilanDeFinFait) out.push({ type: "bilan_fin", label: "Bilan de fin à faire", icon: "🏁" });
-      out.push({ type: "fin_termine", label: "Suivi terminé le " + this.fmt(dateFin) + " → à renouveler", icon: "⏳" });
+      if (dateFin && !bilanDeFinFait) out.push({ type: "bilan_fin", label: "Bilan de fin à faire", icon: "🏁" });
+      out.push({ type: "fin_termine", label: dateFin ? ("Suivi terminé le " + this.fmt(dateFin) + " → à renouveler") : "Suivi à renouveler", icon: "⏳" });
       return out;
     }
     // Suivi sur le point de finir (moins d'une semaine) : on ne réclame plus de NOUVEAU
@@ -305,9 +308,7 @@ window.Calc = {
     if (suivi.joursRestants !== null && suivi.joursRestants <= 14 && suivi.joursRestants >= 0) {
       out.push({ type: "fin", label: "Suivi bientôt terminé", icon: "⏳" });
     }
-    if (c.cliente && c.cliente.statut === "a_renouveler") {
-      out.push({ type: "renouveler", label: "À renouveler", icon: "🔁" });
-    }
+    // (Le statut « à renouveler » est traité plus haut en fin de parcours.)
     // Programmes à envoyer / renouveler — UNIQUEMENT pour les clientes concernées :
     //   • distanciel / hybride  → programme de SÉANCE (celles à faire entre les présentiels
     //                              pour les hybrides, ou à distance pour les distancielles) ;
