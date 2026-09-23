@@ -560,16 +560,28 @@ window.Calc = {
       "DESCRIPTION:" + summary, alarms.replace(/\r\n$/, ""), "END:VEVENT", "END:VCALENDAR",
     ].filter(Boolean).join("\r\n");
   },
-  // Déclenche le téléchargement/ouverture du .ics (iOS ouvre l'app Calendrier).
+  // Déclenche l'ouverture/téléchargement du .ics.
+  // iOS (surtout l'app installée / PWA en mode standalone) NE SUPPORTE PAS le
+  // téléchargement blob avec l'attribut `download` : le fichier ne s'ouvre jamais et
+  // rien n'arrive dans Calendrier. On ouvre donc le .ics via une URL `data:` que iOS
+  // reconnaît → feuille système « Ajouter au calendrier ». Sur desktop/Android on garde
+  // le téléchargement classique. Renvoie true si un mécanisme a été déclenché.
   downloadSeanceICS(cl, s) {
     const text = this.seanceICS(cl, s);
     const nom = (cl.prenom || "seance").normalize("NFD").replace(/[^A-Za-z0-9]/g, "") || "seance";
+    const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      window.location.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(text);
+      return true;
+    }
     const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "seance-" + nom + "-" + (s.date || "") + ".ics";
     document.body.appendChild(a); a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+    return true;
   },
 
   // ---- Bilan de démarrage (ressenti des premières séances) ----------------

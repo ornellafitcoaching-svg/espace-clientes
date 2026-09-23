@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e82"></script>
-<script src="js/calc.js?v=e83"></script>
+<script src="js/calc.js?v=e84"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -942,8 +942,9 @@ function showFatal(e){
         const { error } = await sb.from("seances").update({ date:v.date, heure:v.heure||null }).eq("id", s.id);
         if (error) throw error;
         UI.toast(`Séance déplacée au ${Calc.fmtJour(v.date)}${Calc.fmtHeure(v.heure)?` à ${Calc.fmtHeure(v.heure)}`:""} ✓`);
+        // On laisse le choix de prévenir la cliente (plus d'ouverture WhatsApp imposée).
         const wa = Calc.waHref(c.cliente.telephone, Calc.seanceConfirmMsg(c.cliente, s));
-        if (wa) window.open(wa, "_blank");
+        if (wa && await UI.confirm(`Prévenir ${c.cliente.prenom||"la cliente"} du nouvel horaire sur WhatsApp ?`)) window.open(wa, "_blank");
       } catch(err){
         console.error(err); UI.toast(UI.errText(err),"err");
         s.date = prevDate; s.heure = prevHeure; renderAll();
@@ -966,8 +967,9 @@ function showFatal(e){
         const { error } = await sb.from("seances").update({ statut:"annulee" }).eq("id", s.id);
         if (error) throw error;
         UI.toast("Séance annulée");
+        // On laisse le choix de prévenir la cliente (plus d'ouverture WhatsApp imposée).
         const wa = Calc.waHref(c.cliente.telephone, Calc.seanceAnnulMsg(c.cliente, s));
-        if (wa) window.open(wa, "_blank");
+        if (wa && await UI.confirm(`Prévenir ${c.cliente.prenom||"la cliente"} de l'annulation sur WhatsApp ?`)) window.open(wa, "_blank");
       } catch(err){
         console.error(err); UI.toast(UI.errText(err),"err");
         s.statut = prev; renderAll();
@@ -980,7 +982,7 @@ function showFatal(e){
       e.preventDefault();
       const c = STATE.clientes.find(x => String(x.cliente.id) === String(icsBtn.dataset.cl));
       const s = c && (c.seances||[]).find(x => String(x.id) === String(icsBtn.dataset.ics));
-      if (c && s){ Calc.downloadSeanceICS(c.cliente, s); UI.toast("Séance ajoutée à ton agenda 📅"); }
+      if (c && s){ Calc.downloadSeanceICS(c.cliente, s); UI.toast("Agenda ouvert — valide l'ajout 📅"); }
       return;
     }
     const btn = e.target.closest("[data-done]"); if (!btn) return;
