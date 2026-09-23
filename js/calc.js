@@ -271,6 +271,9 @@ window.Calc = {
       out.push({ type: "fin_termine", label: "Suivi terminé le " + this.fmt(dateFin) + " → à renouveler", icon: "⏳" });
       return out;
     }
+    // Suivi sur le point de finir (moins d'une semaine) : on ne réclame plus de NOUVEAU
+    // programme (il dépasserait la fin du suivi) — la bonne action c'est renouveler/clôturer.
+    const finProche = suivi.joursRestants !== null && suivi.joursRestants < 7;
     const b = this.bilanStats(c.bilans);
     if (b.joursAvant !== null && b.joursAvant <= 3) {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });
@@ -312,7 +315,8 @@ window.Calc = {
     // Désormais RÉCURRENT (pas seulement le 1er) : dès qu'un programme arrive à échéance
     // (date_fin saisie, sinon dernier envoi + 1 mois), on rappelle de renvoyer le suivant.
     // Une cliente présentiel sans nutrition est coachée en personne : rien à envoyer.
-    if (active) {
+    // Et si le suivi finit dans moins d'une semaine, on ne réclame plus de programme.
+    if (active && !finProche) {
       const ps = this.programmeStatus(c, "sportif");
       if (ps) {
         if (ps.jamais) out.push({ type: "programme", label: "Programme de séance à envoyer", icon: "📤" });
