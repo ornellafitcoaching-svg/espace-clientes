@@ -254,11 +254,28 @@ window.Calc = {
     // TOUTES les relances « à faire » (bilan, séances, fin de suivi, programmes…).
     const enPause = c.cliente && c.cliente.statut === "en_pause";
     if (enPause) return out;
+    const ac = c.accompagnement || null;
+    const suivi = this.suiviStats(ac);
+    const dateFin = ac && ac.date_fin ? ac.date_fin : null;
+    const active = c.cliente && c.cliente.statut === "active";
+    // FIN DE PARCOURS : date de fin dépassée et cliente encore active. On bascule en
+    // logique « fin » et on coupe les rappels récurrents qui n'ont plus de sens
+    // (bilan des 4 sem, renvoi de programme, séances à programmer). Voir retour Ornella :
+    // une cliente finie appelle UN bilan de fin + une décision renouveler/clôturer.
+    const termine = active && suivi.joursRestants !== null && suivi.joursRestants < 0;
+    if (termine) {
+      // Bilan de FIN : une seule fois, tant qu'aucun bilan n'est enregistré depuis la
+      // date de fin. Réutilise le type "bilan" → même action « demander le bilan ».
+      const bilanDeFinFait = (c.bilans || []).some(x => x.date && dateFin && x.date >= dateFin);
+      if (!bilanDeFinFait) out.push({ type: "bilan", label: "Bilan de fin à faire", icon: "🏁" });
+      out.push({ type: "fin_termine", label: "Suivi terminé le " + this.fmt(dateFin) + " → à renouveler", icon: "⏳" });
+      return out;
+    }
     const b = this.bilanStats(c.bilans);
     if (b.joursAvant !== null && b.joursAvant <= 3) {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });
     }
-    const s = this.seancesStats(c.accompagnement, c.seances);
+    const s = this.seancesStats(ac, c.seances);
     // Séances réellement programmées à venir (RDV pas encore passés).
     const today = this.today();
     const programmees = (c.seances || []).filter(x => x.statut === "prevue" && x.date && x.date >= today).length;
@@ -274,7 +291,7 @@ window.Calc = {
     // (> 2) mais très peu sont réellement programmées à venir (≤ 2). Uniquement pour
     // les accompagnements avec RDV en personne (présentiel / hybride) ; les distancielles
     // n'ont pas de séances programmées (cf. bloc « Sans séance programmée »).
-    if (c.cliente && c.cliente.statut === "active") {
+    if (active) {
       const avecRdv = c.cliente.type === "presentiel" || c.cliente.type === "hybride";
       if (avecRdv && s.restantes > 2 && programmees <= 2) {
         out.push({ type: "prevoir_seances", label: "Prévoir des séances", icon: "🗓️" });
@@ -282,7 +299,6 @@ window.Calc = {
     }
     // NB : le bilan de démarrage n'est PAS une alerte automatique — c'est Ornella
     // qui choisit de l'envoyer via le bouton sur la fiche (pas de notif imposée).
-    const suivi = this.suiviStats(c.accompagnement);
     if (suivi.joursRestants !== null && suivi.joursRestants <= 14 && suivi.joursRestants >= 0) {
       out.push({ type: "fin", label: "Suivi bientôt terminé", icon: "⏳" });
     }
@@ -296,7 +312,6 @@ window.Calc = {
     // Désormais RÉCURRENT (pas seulement le 1er) : dès qu'un programme arrive à échéance
     // (date_fin saisie, sinon dernier envoi + 1 mois), on rappelle de renvoyer le suivant.
     // Une cliente présentiel sans nutrition est coachée en personne : rien à envoyer.
-    const active = c.cliente && c.cliente.statut === "active";
     if (active) {
       const ps = this.programmeStatus(c, "sportif");
       if (ps) {

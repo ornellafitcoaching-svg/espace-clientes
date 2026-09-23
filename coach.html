@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e82"></script>
-<script src="js/calc.js?v=e84"></script>
+<script src="js/calc.js?v=e85"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -307,8 +307,16 @@ function renderBilans(){
     // Une cliente démarrée SANS bilan saisi n'est PAS « jamais rempli » : son bilan
     // initial a été fait au démarrage (hors appli). On la traite comme les autres, le
     // prochain bilan tombant à date_debut + 28 j (calculé dans bilanStats).
+    // Fin de parcours : date de fin dépassée et cliente encore active → on parle de
+    // BILAN DE FIN, pas de « bilan en retard » récurrent.
+    const suiviSt = Calc.suiviStats(c.accompagnement);
+    const dateFin = c.accompagnement && c.accompagnement.date_fin;
+    const termine = cl.statut === "active" && suiviSt.joursRestants !== null && suiviSt.joursRestants < 0;
+    const bilanFinFait = termine && bilans.some(x => x.date && dateFin && x.date >= dateFin);
     let prio, chip, col;
     if (!demarree){ prio=4; chip="Pas encore démarré"; col=COL.grey; }
+    else if (termine && !bilanFinFait){ prio=1; chip="🏁 Bilan de fin"; col=COL.orange; }
+    else if (termine && bilanFinFait){ prio=3; chip="✅ Bilan de fin fait"; col=COL.green; }
     else if (b.joursAvant!==null && b.joursAvant<0){ prio=1; chip=`🟠 En retard de ${Math.abs(b.joursAvant)} j`; col=COL.orange; }
     else if (b.joursAvant!==null && b.joursAvant<=7){ prio=2; chip=`🟡 Prochain dans ${b.joursAvant} j`; col=COL.yellow; }
     else { prio=3; chip="✅ À jour"; col=COL.green; }
