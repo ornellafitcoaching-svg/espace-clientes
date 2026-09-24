@@ -29,7 +29,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e89"></script>
-<script src="js/calc.js?v=e89"></script>
+<script src="js/calc.js?v=e90"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -476,6 +476,7 @@ function sectionQuestionnaireInitial(){
   } else {
     const x = list[0]; const rep = x.reponses||{};
     const rows = (Calc.QI||[]).map(function(item){
+      if (!item.id) return "";
       const val = rep[item.id];
       if (val==null || String(val).trim()==="") return "";
       return `<div class="isub" style="margin-bottom:7px"><span style="color:var(--text-light)">${esc(item.q)}</span><br><strong>${esc(String(val))}</strong></div>`;

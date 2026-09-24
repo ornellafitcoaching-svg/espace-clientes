@@ -27,7 +27,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e89"></script>
-<script src="js/calc.js?v=e89"></script>
+<script src="js/calc.js?v=e90"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -761,16 +761,24 @@ function bilanDemarrageCard(){
 // ---- Questionnaire de démarrage (le "premier bilan") : rempli UNE FOIS -----
 async function addMyQuestionnaireInitial(){
   if ((D.questionnaire_initial||[]).length){ UI.toast(adr("Ton questionnaire est déjà rempli ✓","Votre questionnaire est déjà rempli ✓")); return; }
-  const fields = (Calc.QI||[]).map(function(item){
-    return { name:item.id, label:item.q, type:(item.t==="num"?"number":(item.t==="area"?"textarea":"text")) };
+  const fields = [];
+  (Calc.QI||[]).forEach(function(item, i){
+    if (item.section){ fields.push({ type:"static", name:"_sec"+i, label:"", value:'<div style="margin:16px 0 0;padding-top:12px;border-top:1px solid rgba(0,0,0,.08);font-weight:800;color:var(--accent);font-size:1.05rem">'+item.section+'</div>' }); return; }
+    if (item.type==="select"){
+      const options = [{value:"",label:"— choisir —"}].concat((item.options||[]).map(function(o){ return {value:o,label:o}; }));
+      fields.push({ name:item.id, label:item.q, type:"select", options:options });
+    } else {
+      fields.push({ name:item.id, label:item.q, type:(item.type||"text") });
+    }
   });
-  const v = await UI.form({ title:adr("Mon questionnaire de démarrage","Mon questionnaire de démarrage"), submit:"Envoyer à Ornella", fields });
+  const v = await UI.form({ title:"Mon questionnaire de démarrage 📋", submit:"Envoyer à Ornella", fields });
   if (!v) return;
   const reponses = {};
   (Calc.QI||[]).forEach(function(item){
+    if (!item.id) return;
     const raw = v[item.id];
     if (raw==null || String(raw).trim()==="") return;
-    reponses[item.id] = (item.t==="num" ? Number(raw) : String(raw).trim());
+    reponses[item.id] = (typeof raw==="string" ? raw.trim() : raw);
   });
   const row = { cliente_id:D.cliente.id, date:Calc.today(), saisi_par:"cliente", reponses:reponses };
   try{
@@ -804,6 +812,7 @@ function questionnaireInitialCard(){
   }
   const x = list[0]; const rep = x.reponses||{};
   const rows = (Calc.QI||[]).map(function(item){
+    if (!item.id) return "";
     const val = rep[item.id];
     if (val==null || String(val).trim()==="") return "";
     return `<div style="margin-bottom:8px"><div style="font-size:.72rem;color:var(--text-mid)">${esc(item.q)}</div><div>${esc(String(val))}</div></div>`;
