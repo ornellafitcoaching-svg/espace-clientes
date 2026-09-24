@@ -28,8 +28,8 @@
 <script src="js/config.js?v=e82"></script>
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
-<script src="js/db.js?v=e82"></script>
-<script src="js/calc.js?v=e88"></script>
+<script src="js/db.js?v=e89"></script>
+<script src="js/calc.js?v=e89"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -127,6 +127,7 @@ function render(focusTitle){
     ${sectionSeances()}
     ${sectionProgrammes()}
     ${sectionBilans()}
+    ${sectionQuestionnaireInitial()}
     ${sectionBilanDemarrage()}
     ${sectionMensurations()}
     ${sectionPhotos()}
@@ -454,6 +455,34 @@ function sectionBilanDemarrage(){
       </div>${delEdit("bilan_demarrage",x.id)}</div>`).join("") : `<p class="empty">Aucun bilan de démarrage rempli pour l'instant.</p>`)
     + `<div style="margin-top:10px"><button class="link" data-act="add-bilan_demarrage">＋ Saisir moi-même le bilan de démarrage</button></div>`;
   return block("Bilan de démarrage 🩹", list.length, body, false);
+}
+
+// Questionnaire de démarrage (le "premier bilan" complet, rempli une fois par la cliente).
+function sectionQuestionnaireInitial(){
+  const list = D.questionnaire_initial||[];
+  const cl = D.cliente;
+  const lien = Calc.espaceLink(cl.access_code);
+  const prenom = cl.prenom||"";
+  const msg = cl.tutoiement
+    ? `Bonjour ${prenom} 🙂 Pour bien démarrer ton accompagnement, remplis ton questionnaire de démarrage dans ton espace : ${lien}`
+    : `Bonjour ${prenom} 🙂 Pour bien démarrer votre accompagnement, remplissez votre questionnaire de démarrage dans votre espace : ${lien}`;
+  const wa = Calc.waHref(cl.telephone, msg);
+  const askBtn = wa
+    ? `<div style="margin-bottom:12px"><a class="btn-accent btn-sm" href="${wa}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px">📲 Demander le questionnaire de démarrage</a></div>`
+    : `<p class="isub" style="margin-bottom:12px">Ajoute son numéro de téléphone (bouton « Modifier ») pour lui demander en un clic sur WhatsApp.</p>`;
+  let body;
+  if (!list.length){
+    body = askBtn + `<p class="empty">Questionnaire de démarrage pas encore rempli.</p>`;
+  } else {
+    const x = list[0]; const rep = x.reponses||{};
+    const rows = (Calc.QI||[]).map(function(item){
+      const val = rep[item.id];
+      if (val==null || String(val).trim()==="") return "";
+      return `<div class="isub" style="margin-bottom:7px"><span style="color:var(--text-light)">${esc(item.q)}</span><br><strong>${esc(String(val))}</strong></div>`;
+    }).filter(Boolean).join("");
+    body = askBtn + `<div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div><div class="ibody"><div class="ititle">Réponses de la cliente</div>${rows||'<div class="isub">&nbsp;</div>'}</div></div>`;
+  }
+  return block("Questionnaire de démarrage 📋", list.length, body, false);
 }
 
 function sectionMensurations(){

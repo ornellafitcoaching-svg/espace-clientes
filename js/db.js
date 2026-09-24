@@ -79,7 +79,7 @@ window.DB = {
 
   // ---- Bundle : tout le dossier d'une cliente en 1 aller-retour groupé -----
   async dossier(clienteId) {
-    const [cliente, accompagnement, seances, bilans, bilans_demarrage, mensurations, objectifs, programmes, photos, notes, paiements] =
+    const [cliente, accompagnement, seances, bilans, bilans_demarrage, questionnaire_initial, mensurations, objectifs, programmes, photos, notes, paiements] =
       await window.withTimeout(Promise.all([
         this.cliente(clienteId),
         this.accompagnement(clienteId),
@@ -88,6 +88,8 @@ window.DB = {
         // Résilient : si la table n'existe pas encore (migration 12 non exécutée),
         // on renvoie [] au lieu de faire échouer tout le dossier.
         this.list("bilans_demarrage", clienteId, { col: "date", asc: false }).catch(() => []),
+        // Idem migration 17 (questionnaire de démarrage) : résilient.
+        this.list("questionnaire_initial", clienteId, { col: "date", asc: false }).catch(() => []),
         this.list("mensurations", clienteId, { col: "date", asc: true }),
         this.list("objectifs", clienteId, { col: "date_creation", asc: false }),
         this.list("programmes", clienteId, { col: "created_at", asc: false }),
@@ -95,7 +97,7 @@ window.DB = {
         this.list("notes_privees", clienteId, { col: "date", asc: false }),
         this.list("paiements", clienteId, { col: "date", asc: false }),
       ]), 18000, "Chargement du dossier");
-    return { cliente, accompagnement, seances, bilans, bilans_demarrage, mensurations, objectifs, programmes, photos, notes, paiements };
+    return { cliente, accompagnement, seances, bilans, bilans_demarrage, questionnaire_initial, mensurations, objectifs, programmes, photos, notes, paiements };
   },
 
   async deleteCliente(clienteId) {
