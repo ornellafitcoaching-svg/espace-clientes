@@ -611,12 +611,25 @@ window.Calc = {
   // rien n'arrive dans Calendrier. On ouvre donc le .ics via une URL `data:` que iOS
   // reconnaît → feuille système « Ajouter au calendrier ». Sur desktop/Android on garde
   // le téléchargement classique. Renvoie true si un mécanisme a été déclenché.
+  // Flux .ics d'UNE cliente (fonction Supabase agenda-ics, clé = son code d'accès).
+  agendaFeedUrl(code) {
+    const base = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL) || "";
+    return code && base ? base + "/functions/v1/agenda-ics?code=" + encodeURIComponent(code) : "";
+  },
+  isIOS() {
+    return /iP(hone|od|ad)/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  },
   downloadSeanceICS(cl, s) {
     const text = this.seanceICS(cl, s);
     const nom = (cl.prenom || "seance").normalize("NFD").replace(/[^A-Za-z0-9]/g, "") || "seance";
-    const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent)
-      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (isIOS) {
+    if (this.isIOS()) {
+      // iPhone : l'URL data: ne s'ouvre PAS depuis l'app installée (écran d'accueil) →
+      // rien n'arrivait dans Calendrier. On ouvre le vrai flux https (text/calendar) dans
+      // Safari : iOS affiche « Ajouter tout » avec les séances à venir de la cliente
+      // (UID stables → pas de doublon si déjà ajoutées). Secours : data: si pas de code.
+      const feed = this.agendaFeedUrl(cl.access_code);
+      if (feed) { window.open(feed, "_blank"); return true; }
       window.location.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(text);
       return true;
     }
@@ -627,6 +640,44 @@ window.Calc = {
     document.body.appendChild(a); a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
     return true;
+  },
+
+  // ---- Programmer plusieurs séances d'un coup (liste collée) ---------------
+  // 1 ligne = 1 séance. Ex. « Lundi 28 septembre : 12 H45 », « Jeudi 1er octobre : 18h30 »,
+  // « 09/10 13:45 ». Lignes « complète / indisponible / annulé / off » ignorées.
+  // Année : celle de ref ; si la date est passée de plus de 30 j, année suivante.
+  parseSeancesListe(text, ref) {
+    const MOIS = { janv:1, janvier:1, fevr:2, fevrier:2, mars:3, avr:4, avril:4, mai:5, juin:6, juil:7, juillet:7,
+      aout:8, sept:9, septembre:9, oct:10, octobre:10, nov:11, novembre:11, dec:12, decembre:12 };
+    const today = ref ? new Date(ref + "T12:00:00") : new Date();
+    const out = [];
+    String(text || "").split(/\r?\n/).forEach(raw => {
+      const line = raw.trim(); if (!line) return;
+      const n = line.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      let d = null, mo = null, y = null;
+      let m = n.match(/\b(\d{1,2})(?:er)?\s+([a-z]+)\.?(?:\s+(\d{4}))?/);
+      if (m && MOIS[m[2]]) { d = +m[1]; mo = MOIS[m[2]]; y = m[3] ? +m[3] : null; }
+      else if ((m = n.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/))) { d = +m[1]; mo = +m[2]; y = m[3] ? (+m[3] < 100 ? 2000 + +m[3] : +m[3]) : null; }
+      if (!d || !mo || mo > 12 || d > 31) { out.push({ raw: line, skip: "date non reconnue" }); return; }
+      if (!y) {
+        y = today.getFullYear();
+        const cand = new Date(y, mo - 1, d, 12);
+        if (cand < new Date(today.getTime() - 30 * 864e5)) y++;
+      }
+      const dt = new Date(y, mo - 1, d, 12);
+      if (dt.getMonth() !== mo - 1) { out.push({ raw: line, skip: "date impossible" }); return; }
+      const date = `${y}-${this._pad2(mo)}-${this._pad2(d)}`;
+      const OFF = [[/complet/, "complète"], [/indispo/, "indisponible"], [/annul/, "annulée"], [/\boff\b/, "off"], [/pas de seance/, "pas de séance"], [/ferme/, "fermé"]];
+      const off = OFF.find(o => o[0].test(n));
+      if (off) { out.push({ raw: line, date, skip: off[1] }); return; }
+      // Heure : on enlève d'abord la date pour ne pas prendre « 28 » pour une heure.
+      const rest = n.replace(m[0], " ");
+      const h = rest.match(/\b(\d{1,2})\s*(?:h|:)\s*(\d{2})?\b/);
+      let heure = null;
+      if (h && +h[1] < 24 && (!h[2] || +h[2] < 60)) heure = this._pad2(+h[1]) + ":" + (h[2] || "00");
+      out.push({ raw: line, date, heure, doute: /\?/.test(line) });
+    });
+    return out;
   },
 
   // ---- Bilan de démarrage (ressenti des premières séances) ----------------

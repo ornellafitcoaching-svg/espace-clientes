@@ -29,7 +29,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e89"></script>
-<script src="js/calc.js?v=e90"></script>
+<script src="js/calc.js?v=e91"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -90,6 +90,8 @@ function render(focusTitle){
     <!-- ACTIONS RAPIDES (en haut pour être visibles tout de suite, surtout sur mobile) -->
     <div class="quick" style="margin-bottom:14px">
       <button class="qbtn qbtn-accent" data-act="add-seance"><span class="i">🏋️</span> Séance</button>
+      <button class="qbtn" data-act="add-seances-lot"><span class="i">🗓️</span> Plusieurs séances</button>
+      <button class="qbtn" data-act="agenda-cliente"><span class="i">📅</span> Agenda Apple</button>
       <button class="qbtn" data-act="recap-seances"><span class="i">📲</span> Récap séances</button>
       <button class="qbtn" data-act="add-bilan"><span class="i">📋</span> Bilan</button>
       <button class="qbtn" data-act="add-mensu"><span class="i">📏</span> Mensurations</button>
@@ -978,6 +980,75 @@ async function addOrEdit(entity, rec){
   }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
+// Programmer PLUSIEURS séances d'un coup : on colle le planning (1 ligne = 1 séance),
+// aperçu avant enregistrement, doublons (même date + heure) ignorés.
+async function addSeancesLot(prefill){
+  const v = await UI.form({ title:"Programmer plusieurs séances", submit:"Voir l'aperçu", fields:[
+    { name:"liste", label:"Colle le planning (1 ligne = 1 séance)", type:"textarea", value:prefill||"",
+      placeholder:"Lundi 28 septembre : 12h45\nJeudi 1er octobre : 18h30\nVendredi 2 octobre : complète",
+      hint:"Formats acceptés : « Lundi 28 septembre : 12h45 », « 1er octobre 18h30 », « 09/10 13:45 ». Les lignes « complète », « indisponible », « annulé » sont ignorées." },
+    { name:"type", label:"Type de séance", half:true, placeholder:"Full body, Jambes…" },
+    { name:"duree", label:"Durée (min)", type:"number", half:true, value:60 },
+  ]});
+  if (!v || !String(v.liste||"").trim()) return;
+  const rows = Calc.parseSeancesListe(v.liste);
+  const exist = (D.seances||[]).filter(x=>x.statut!=="annulee").map(x=>x.date+"|"+(x.heure||"").slice(0,5));
+  const ok = [], out = [];
+  rows.forEach(r=>{
+    if (r.skip){ out.push(`⏭️ ${esc(r.raw)} <small>(${esc(r.skip)})</small>`); return; }
+    if (exist.includes(r.date+"|"+(r.heure||""))){ out.push(`⏭️ ${esc(r.raw)} <small>(déjà programmée)</small>`); return; }
+    ok.push(r);
+    out.push(`✅ <b style="text-transform:capitalize">${Calc.fmtJour(r.date)}</b>${r.heure?" à "+Calc.fmtHeure(r.heure):" <small>(sans heure)</small>"}${r.doute?' <b style="color:var(--gold-text)">⚠️ « ? » dans ta liste</b>':""}`);
+  });
+  if (!ok.length){ UI.toast("Aucune séance à créer — vérifie les dates","err"); return; }
+  const go = await UI.form({ title:`Créer ${ok.length} séance${ok.length>1?"s":""} pour ${esc(D.cliente.prenom||"")} ?`, submit:`✓ Créer ${ok.length} séance${ok.length>1?"s":""}`,
+    fields:[{ name:"_p", type:"static", value:`<div style="line-height:1.9">${out.join("<br>")}</div>` }]});
+  if (!go) return;
+  let n = 0;
+  try{
+    for (const r of ok){
+      await DB.insert("seances", { cliente_id:CID, date:r.date, heure:r.heure||null, type:v.type||null,
+        statut:"prevue", duree:v.duree?Number(v.duree):null, niveau:"rapide" });
+      n++;
+    }
+  }catch(e){ console.error(e); UI.toast(`${n} créée(s) puis erreur : `+UI.errText(e),"err"); return reload("Séances"); }
+  await reload("Séances");
+  UI.toast(`${n} séance${n>1?"s":""} programmée${n>1?"s":""} ✓`);
+  const next = await UI.form({ title:`${n} séances programmées ✓ Et maintenant ?`, submit:"Fermer", fields:[
+    { name:"_b", type:"static", value:`<div style="display:flex;flex-direction:column;gap:8px">
+      <button type="button" class="btn-accent" data-lot="agenda">📅 Ajouter à mon agenda Apple</button>
+      <button type="button" class="btn-ghost" data-lot="wa">📲 Envoyer le planning à ${esc(D.cliente.prenom||"la cliente")} (WhatsApp)</button></div>` }]});
+  void next;
+}
+// Boutons de l'écran « Et maintenant ? » (dans la modale, hors #main).
+document.addEventListener("click", (e)=>{
+  const b = e.target.closest("[data-lot]"); if (!b) return;
+  if (b.dataset.lot==="agenda") agendaCliente();
+  if (b.dataset.lot==="wa"){
+    const wa = Calc.waHref(D.cliente.telephone, Calc.recapSeancesMsg(D.cliente, D.seances, D.accompagnement));
+    if (wa) window.open(wa, "_blank"); else UI.toast("Numéro de téléphone manquant pour cette cliente","err");
+  }
+});
+// Agenda Apple de la cliente. RECOMMANDÉ : l'abonnement (webcal) → Calendrier se met à
+// jour tout seul (ajout / déplacement / annulation) ; secours : ajout en une fois (https,
+// Safari → « Ajouter tout »). Sans code d'accès : fichier de la prochaine séance.
+async function agendaCliente(){
+  const feed = Calc.agendaFeedUrl(D.cliente.access_code);
+  if (feed){
+    const pr = esc(D.cliente.prenom||"la cliente");
+    await UI.form({ title:"📅 Séances de "+pr+" dans mon agenda Apple", submit:"Fermer", fields:[
+      { name:"_a", type:"static", value:`<div style="display:flex;flex-direction:column;gap:10px">
+        <a class="btn-accent" href="${feed.replace(/^https:/,"webcal:")}" style="text-align:center">🔄 S'abonner (recommandé)</a>
+        <div class="isub" style="color:var(--text-mid);margin-top:-4px">Une seule fois : toutes ses séances arrivent dans Calendrier <b>et se mettent à jour toutes seules</b> (nouvelles, déplacées, annulées). Touche « S'abonner » puis « OK ».</div>
+        <a class="btn-ghost" href="${feed}" target="_blank" rel="noopener" style="text-align:center">➕ Ajouter en une fois (sans mise à jour)</a>
+        <div class="isub" style="color:var(--text-light)">Choisis l'un <b>ou</b> l'autre, pas les deux (sinon doublons). Si rien ne s'ouvre depuis l'app installée, ouvre ton espace dans Safari.</div></div>` }]});
+    return;
+  }
+  const next = (D.seances||[]).filter(x=>x.statut==="prevue" && x.date>=Calc.today()).sort((a,b)=>a.date<b.date?-1:1)[0];
+  if (!next){ UI.toast("Aucune séance à venir","err"); return; }
+  Calc.downloadSeanceICS(D.cliente, next); UI.toast("Crée l'accès cliente pour ajouter toutes ses séances d'un coup");
+}
+
 async function progEnvoye(kind){
   // Interrupteur : on pré-remplit l'état ACTUEL (coché/décoché) et on MODIFIE le
   // programme existant au lieu d'en recréer un → on peut cocher ET décocher.
@@ -1199,6 +1270,8 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   // En mode « Sélection », un clic sur la carte séance sert à cocher, pas à éditer.
   if (SELMODE && act==="edit-seance" && el.classList.contains("seance-card")) return;
   if (act==="add-seance") return addOrEdit("seance");
+  if (act==="add-seances-lot") return addSeancesLot();
+  if (act==="agenda-cliente") return agendaCliente();
   if (act==="add-bilan") return addBilanCoach();
   if (act==="edit-bilan") return addBilanCoach(findRec("bilan", id));
   if (act==="add-bilan_demarrage") return addOrEdit("bilan_demarrage");
@@ -1469,6 +1542,7 @@ function showUndo(tbl, rec){
   else if (qp.get("prog") === "sportif") progEnvoye("sportif");
   else if (qp.get("prog") === "nutrition") progEnvoye("nutrition");
   else if (qp.get("bilan")) addBilanCoach();
+  else if (qp.get("lot")) addSeancesLot(qp.get("lot"));
  }
  catch(e){
    console.error(e);

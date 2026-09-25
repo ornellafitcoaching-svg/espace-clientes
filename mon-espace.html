@@ -27,7 +27,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e89"></script>
-<script src="js/calc.js?v=e90"></script>
+<script src="js/calc.js?v=e91"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -178,6 +178,71 @@ function calendarSubBtns(){
       💡 ${adr("Sur iPhone, ouvre ton espace dans <strong>Safari</strong> puis tape « Apple / iPhone » → « S'abonner ». Si rien ne s'ouvre (app installée, lien depuis Insta…), ","Sur iPhone, ouvrez votre espace dans <strong>Safari</strong> puis tapez « Apple / iPhone » → « S'abonner ». Si rien ne s'ouvre (app installée, lien depuis Insta…), ")}<a href="${https}" style="color:var(--accent)">${adr("ajoute-les en une fois ici","ajoutez-les en une fois ici")}</a>.
     </div>
   </div>`;
+}
+
+// ============================ NOTIF SÉANCES (en haut de l'espace) ============================
+// Compare les séances à venir avec la « photo » mémorisée sur l'appareil à la visite précédente :
+// nouvelle séance, séance déplacée, séance annulée → notif gardée jusqu'à ce que la cliente
+// touche « OK ». + rappel quand la prochaine séance est aujourd'hui / demain / après-demain.
+// Aucun changement de base nécessaire (tout est local à l'appareil de la cliente).
+let SEANCE_NOTIF = [];
+function seanceSig(x){ return x.date+"|"+String(x.heure||"").slice(0,5)+"|"+x.statut; }
+function computeSeanceNotif(){
+  const code = D.cliente.access_code || D.cliente.id, today = Calc.today();
+  const snapK = "ofc_snap_"+code, notifK = "ofc_notif_"+code;
+  let snap = null, pending = [];
+  try { snap = JSON.parse(localStorage.getItem(snapK)||"null"); pending = JSON.parse(localStorage.getItem(notifK)||"[]")||[]; } catch(_) {}
+  const all = D.seances||[], fut = all.filter(x=>x.date>=today), changes = [];
+  if (snap){
+    fut.forEach(x=>{
+      const prev = snap[x.id], cur = seanceSig(x);
+      if (!prev){ if (x.statut==="prevue") changes.push({ k:"new", id:x.id, d:x.date, h:x.heure }); return; }
+      if (prev===cur) return;
+      const [pd,ph,pst] = prev.split("|");
+      if (x.statut==="annulee" && pst!=="annulee") changes.push({ k:"cancel", id:x.id, d:x.date, h:x.heure });
+      else if (x.statut==="prevue" && (pd!==x.date || ph!==String(x.heure||"").slice(0,5))) changes.push({ k:"move", id:x.id, d:x.date, h:x.heure, pd, ph });
+    });
+    const ids = new Set(all.map(x=>String(x.id)));
+    Object.keys(snap).forEach(id=>{ const [pd,ph,pst] = snap[id].split("|");
+      if (!ids.has(String(id)) && pd>=today && pst==="prevue") changes.push({ k:"cancel", id, d:pd, h:ph }); });
+  } else if (PREV_VISIT){
+    // 1re visite depuis cette mise à jour : séances créées depuis la dernière visite = nouvelles.
+    const since = new Date(PREV_VISIT);
+    fut.filter(x=>x.statut==="prevue" && x.created_at && new Date(x.created_at)>since)
+       .forEach(x=>changes.push({ k:"new", id:x.id, d:x.date, h:x.heure }));
+  }
+  // On cumule jusqu'à ce qu'elle touche « OK » (même séance → un seul message, le plus juste).
+  changes.forEach(c=>{
+    const i = pending.findIndex(p=>String(p.id)===String(c.id)), old = i>=0 ? pending[i] : null;
+    if (old && old.k==="new" && c.k==="move"){ old.d = c.d; old.h = c.h; }          // ajoutée puis déplacée = nouvelle
+    else if (old && old.k==="new" && c.k==="cancel"){ pending.splice(i,1); }       // ajoutée puis annulée = rien
+    else if (old && old.k==="move" && c.k==="move"){ old.d = c.d; old.h = c.h; }   // garde l'horaire d'origine
+    else if (old){ pending[i] = c; }
+    else pending.push(c);
+  });
+  pending = pending.filter(p=>p.d>=today);
+  const newSnap = {}; fut.forEach(x=>{ newSnap[x.id] = seanceSig(x); });
+  try { localStorage.setItem(snapK, JSON.stringify(newSnap)); localStorage.setItem(notifK, JSON.stringify(pending)); } catch(_) {}
+  SEANCE_NOTIF = pending;
+}
+function notifBar(){
+  // Rappel « séance aujourd'hui / demain » : désormais assuré par la bannière persistante
+  // « prochaine séance » (prochaineSeanceBanner) en haut de chaque page → on ne le double pas ici.
+  // Cette barre ne garde que les CHANGEMENTS de planning (nouvelle séance, déplacement, annulation).
+  const rappel = "";
+  let modifs = "";
+  if (SEANCE_NOTIF.length){
+    const L = SEANCE_NOTIF.slice().sort((a,b)=>a.d<b.d?-1:1), f = (d,h)=>`<span style="text-transform:capitalize">${Calc.fmtJour(d)}</span>${h?" à "+Calc.fmtHeure(h):""}`;
+    const nNew = L.filter(x=>x.k==="new").length;
+    const titre = nNew===L.length ? `${nNew} nouvelle${nNew>1?"s":""} séance${nNew>1?"s":""} ${adr("programmée"+(nNew>1?"s":"")+" par Ornella","programmée"+(nNew>1?"s":"")+" par Ornella")}` : adr("Ornella a mis à jour ton planning","Ornella a mis à jour votre planning");
+    const lignes = L.slice(0,5).map(x=> x.k==="new" ? `🆕 ${f(x.d,x.h)}` : (x.k==="move" ? `🔁 ${f(x.pd,x.ph)} → <b>${f(x.d,x.h)}</b>` : `❌ <s>${f(x.d,x.h)}</s> ${adr("annulée","annulée")}`));
+    if (L.length>5) lignes.push(`… et ${L.length-5} autre${L.length-5>1?"s":""}`);
+    modifs = `<div${rappel?' style="border-top:1px solid rgba(201,99,88,.25);margin-top:10px;padding-top:10px"':""}><div style="display:flex;align-items:center;gap:10px"><span style="font-size:1.3rem">🔔</span><b style="flex:1">${titre}</b></div>
+      <div class="isub" style="margin:6px 0 0 34px;line-height:1.8;color:var(--text-mid)">${lignes.join("<br>")}</div>
+      <div style="display:flex;gap:8px;margin:10px 0 0 34px;flex-wrap:wrap"><button class="btn-accent btn-sm" data-view="seances" data-notif-ok="1">📅 ${adr("Voir mes séances","Voir mes séances")}</button><button class="btn-ghost btn-sm" data-notif-ok="1">OK, vu</button></div></div>`;
+  }
+  if (!rappel && !modifs) return "";
+  return `<div class="card notif-seances" style="margin-bottom:14px;border-left:4px solid var(--accent);background:linear-gradient(135deg,rgba(201,99,88,.10),rgba(201,99,88,.03))">${rappel}${modifs}</div>`;
 }
 
 // ============================ VUES ============================
@@ -1084,9 +1149,10 @@ function render(){
     const badge = (n.k==="programmes" && showBadge) ? `<span class="nav-badge"></span>` : "";
     return `<button class="navbtn ${n.k===VIEW?"on":""}" data-view="${n.k}"><span class="i">${n.i}</span>${n.label}${badge}</button>`;
   }).join("") + `</nav>`;
+  let bar = ""; try { bar = notifBar(); } catch(e){ console.error(e); }
   // Bandeau fin « prochaine séance » en haut des AUTRES pages (l'accueil a la version pleine).
   const banner = VIEW!=="accueil" ? prochaineSeanceBanner(true) : "";
-  document.getElementById("main").innerHTML = nav + banner + `<div id="viewBox">${VIEWS[VIEW]()}</div>`;
+  document.getElementById("main").innerHTML = bar + nav + banner + `<div id="viewBox">${VIEWS[VIEW]()}</div>`;
   if (VIEW==="photos") loadPhotoThumbs();
 }
 
@@ -1122,6 +1188,11 @@ document.getElementById("main").addEventListener("click", (e)=>{
     render();
     return;
   }
+  const code = D && D.cliente && (D.cliente.access_code || D.cliente.id);
+  const nok = e.target.closest("[data-next-ok]");
+  if (nok){ try{ localStorage.setItem("ofc_nextok_"+code, nok.dataset.nextOk); }catch(_){} render(); return; }
+  if (e.target.closest("[data-notif-ok]")){ SEANCE_NOTIF = []; try{ localStorage.setItem("ofc_notif_"+code, "[]"); }catch(_){}
+    if (!e.target.closest("[data-view]")){ render(); return; } }
   if (e.target.closest("#guideMesureBtn")){ showGuideMesure(); return; }
   if (e.target.closest("#addMensuBtn")){ addMyMensu(); return; }
   if (e.target.closest("#addBilanBtn")){ addMyBilan(); return; }
@@ -1166,6 +1237,12 @@ document.getElementById("main").addEventListener("click", (e)=>{
           seances, bilans, bilans_demarrage, mensurations, objectifs, programmes, photos,
           notes: [], paiements: [] };
     PRENOM = me.prenom || "";
+    // Code d'accès (exclu de ma_fiche par sécurité) = identifiant de connexion
+    // « code@domaine » → sert au lien agenda perso et aux notifs de séances.
+    if (!me.access_code){
+      try { const ss = await sb.auth.getSession(); const em = ss && ss.data && ss.data.session && ss.data.session.user && ss.data.session.user.email;
+            if (em && em.includes("@")) me.access_code = em.split("@")[0].toUpperCase(); } catch(_) {}
+    }
     // Dernière visite mémorisée SUR L'APPAREIL (pas de dépendance base) pour l'encart
     // « Nouveautés ». On lit l'ancienne valeur puis on enregistre celle de maintenant.
     try {
@@ -1182,6 +1259,7 @@ document.getElementById("main").addEventListener("click", (e)=>{
   // chaque étape secondaire pour qu'une erreur (extra, WhatsApp, connexion…) ne
   // puisse JAMAIS blanchir l'espace de la cliente.
   try { mountWhatsApp(); } catch(e){ console.error(e); }
+  try { computeSeanceNotif(); } catch(e){ console.error(e); }
   try { render(); } catch(e){ console.error(e); }
   // Enregistre la connexion (dernière visite + compteur) — totalement découplé du chargement.
   // NB : le builder Supabase n'a pas de .catch → on l'enveloppe dans Promise.resolve.
