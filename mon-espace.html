@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e82">
+<link rel="stylesheet" href="css/app.css?v=e91">
 </head>
 <body>
 <header class="topbar">
@@ -255,6 +255,87 @@ function maProgressionCard(){
   </div>`;
 }
 
+// ===================== ALERTE 1 : PROCHAINE SÉANCE =====================
+// Date longue « lundi 28/09 » (jour de la semaine complet + JJ/MM), pour les alertes RDV.
+function fmtJourLong(d){
+  const dt = Calc.parse(d); if (!dt) return "";
+  return dt.toLocaleDateString("fr-FR", { weekday:"long", day:"2-digit", month:"2-digit" });
+}
+// Prochaine séance À VENIR de la cliente : prévue, datée d'aujourd'hui ou plus tard,
+// la plus proche (les séances réalisées / annulées sont exclues par statut==="prevue").
+function nextSeanceInfo(){
+  return (D.seances||[])
+    .filter(x => x.statut==="prevue" && x.date >= Calc.today())
+    .sort((a,b) => a.date!==b.date ? (a.date<b.date?-1:1) : ((a.heure||"99")<(b.heure||"99")?-1:1))[0] || null;
+}
+// Bannière « prochaine séance » (pleine sur l'accueil, .compact = bandeau fin ailleurs).
+// Aujourd'hui = coral plein ; demain = coral clair ; sinon = crème. Clic → onglet Mes séances.
+// Aucune séance à venir + cliente distanciel → à la place, le prochain bilan (→ onglet Bilans).
+function prochaineSeanceBanner(compact){
+  const cls = "seance-banner" + (compact ? " compact" : "");
+  const s = nextSeanceInfo();
+  if (s){
+    const hh = Calc.fmtHeure(s.heure);
+    const heure = hh ? " à " + hh : "";
+    let bg, color, emoji, txt;
+    if (s.date === Calc.today()){
+      emoji = "🔥"; bg = "#C96358"; color = "#fff";
+      txt = "C'est aujourd'hui" + heure + " !";
+    } else if (Calc.daysFromToday(s.date) === 1){
+      emoji = "⏰"; bg = "#F3D9D4"; color = "#7A2E26";
+      txt = "C'est demain" + heure + " !";
+    } else {
+      emoji = "📅"; bg = "#F5EFE6"; color = "#1B3A2D";
+      txt = adr("Ta prochaine séance avec Ornella","Votre prochaine séance avec Ornella") + " : " + fmtJourLong(s.date) + heure;
+    }
+    return `<button type="button" class="${cls}" data-view="seances" style="background:${bg};color:${color}">
+      <span class="sb-emoji">${emoji}</span><span class="sb-txt">${esc(txt)}</span><span class="sb-arrow">›</span></button>`;
+  }
+  // Pas de séance planifiée : pour les distanciel, on affiche plutôt le prochain bilan.
+  if (D.cliente && D.cliente.type === "distanciel"){
+    const b = Calc.bilanStats(D.bilans, D.accompagnement && D.accompagnement.date_debut);
+    if (b.prochain){
+      const txt = adr("Ton prochain bilan","Votre prochain bilan") + " : " + fmtJourLong(b.prochain);
+      return `<button type="button" class="${cls}" data-view="bilans" style="background:#F5EFE6;color:#1B3A2D">
+        <span class="sb-emoji">📋</span><span class="sb-txt">${esc(txt)}</span><span class="sb-arrow">›</span></button>`;
+    }
+  }
+  return "";
+}
+
+// ===================== ALERTE 2 : PROGRAMME DISPONIBLE =====================
+// Le « vu » est mémorisé PAR ID de programme sur l'appareil (localStorage, aucune écriture base).
+// Un nouvel id (nouveau programme) fait donc réapparaître l'alerte + la pastille.
+function progSeenKey(){ return "ofc_prog_seen_" + ((D.cliente && (D.cliente.access_code || D.cliente.id)) || ""); }
+function getProgSeen(){ try { return localStorage.getItem(progSeenKey()); } catch(_) { return null; } }
+function setProgSeen(id){ try { localStorage.setItem(progSeenKey(), String(id)); } catch(_) {} }
+// Dernier programme ENVOYÉ qui contient un lien (URL dans le commentaire).
+function latestLinkedProg(){
+  return (D.programmes||[])
+    .filter(p => p.envoye && /https?:\/\/[^\s]+/.test(p.commentaire||""))
+    .sort((a,b) => a.created_at < b.created_at ? 1 : -1)[0] || null;
+}
+// État de l'alerte programme : { prog, link, seen } ou null si rien à signaler.
+function progAlertState(){
+  const p = latestLinkedProg(); if (!p) return null;
+  const link = (p.commentaire||"").match(/https?:\/\/[^\s]+/)[0];
+  return { prog:p, link, seen: String(getProgSeen()) === String(p.id) };
+}
+function progHasUnseen(){ const st = progAlertState(); return !!(st && !st.seen); }
+// Carte accueil : alerte tant que non ouvert, puis raccourci permanent « Mon programme ».
+function programmeDispoCard(){
+  const st = progAlertState(); if (!st) return "";
+  if (!st.seen){
+    return `<div class="card prog-alert">
+      <div class="pa-title">🎉 ${adr("Ton nouveau programme est disponible !","Votre nouveau programme est disponible !")}</div>
+      <a class="btn-accent btn-sm" href="${esc(st.link)}" target="_blank" rel="noopener"
+         data-prog-open="${esc(st.prog.id)}" style="display:inline-flex;align-items:center;gap:6px">
+        📄 ${adr("Voir mon programme","Voir mon programme")} →</a>
+    </div>`;
+  }
+  return `<a class="prog-shortcut" href="${esc(st.link)}" target="_blank" rel="noopener">📋 ${adr("Mon programme","Mon programme")}</a>`;
+}
+
 function viewAccueil(){
   const cl = D.cliente, ac = D.accompagnement;
   const s = Calc.seancesStats(ac, D.seances);
@@ -276,6 +357,8 @@ function viewAccueil(){
       <div class="hero-hello">Bonjour <em>${esc(cl.prenom)}</em> 👋</div>
       <p class="page-sub" style="margin-bottom:0">${adr("Voici ton suivi, mis à jour par Ornella.","Voici votre suivi, mis à jour par Ornella.")}</p>
     </div>
+    ${prochaineSeanceBanner(false)}
+    ${programmeDispoCard()}
     ${qiNudge()}
     ${nouveautesCard()}
     ${tempsRestantCard()}
@@ -996,9 +1079,14 @@ function render(){
     (n.k!=="nutrition"   || hasNutrition()) &&
     (n.k!=="programmes"  || hasProgrammes()));
   if (!menu.some(n=>n.k===VIEW)) VIEW = "accueil";
-  const nav = `<nav class="cl-nav">` + menu.map(n=>
-    `<button class="navbtn ${n.k===VIEW?"on":""}" data-view="${n.k}"><span class="i">${n.i}</span>${n.label}</button>`).join("") + `</nav>`;
-  document.getElementById("main").innerHTML = nav + `<div id="viewBox">${VIEWS[VIEW]()}</div>`;
+  const showBadge = progHasUnseen();
+  const nav = `<nav class="cl-nav">` + menu.map(n=>{
+    const badge = (n.k==="programmes" && showBadge) ? `<span class="nav-badge"></span>` : "";
+    return `<button class="navbtn ${n.k===VIEW?"on":""}" data-view="${n.k}"><span class="i">${n.i}</span>${n.label}${badge}</button>`;
+  }).join("") + `</nav>`;
+  // Bandeau fin « prochaine séance » en haut des AUTRES pages (l'accueil a la version pleine).
+  const banner = VIEW!=="accueil" ? prochaineSeanceBanner(true) : "";
+  document.getElementById("main").innerHTML = nav + banner + `<div id="viewBox">${VIEWS[VIEW]()}</div>`;
   if (VIEW==="photos") loadPhotoThumbs();
 }
 
@@ -1024,6 +1112,16 @@ async function loadPhotoThumbs(){
 }
 
 document.getElementById("main").addEventListener("click", (e)=>{
+  // « Voir mon programme » : ouvre le lien + mémorise le programme comme vu (carte → raccourci, pastille off).
+  const po = e.target.closest("[data-prog-open]");
+  if (po){
+    e.preventDefault();
+    const href = po.getAttribute("href");
+    if (href) window.open(href, "_blank", "noopener");
+    setProgSeen(po.dataset.progOpen);
+    render();
+    return;
+  }
   if (e.target.closest("#guideMesureBtn")){ showGuideMesure(); return; }
   if (e.target.closest("#addMensuBtn")){ addMyMensu(); return; }
   if (e.target.closest("#addBilanBtn")){ addMyBilan(); return; }
