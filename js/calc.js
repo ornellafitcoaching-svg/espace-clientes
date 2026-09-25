@@ -642,6 +642,51 @@ window.Calc = {
     return true;
   },
 
+  // ---- Rappel « prochain programme à envoyer » dans l'agenda de LA COACH -------
+  // Événement journée entière sur la date d'échéance (« prochain le X ») pour ne pas
+  // oublier d'(r)envoyer le programme d'entraînement / nutrition d'une cliente
+  // distanciel / hybride / nutrition. UID stable par cliente+type → re-télécharger
+  // après avoir changé la date REMPLACE l'événement (pas de doublon). 2 alarmes :
+  // la veille à 9h + le jour même à 9h.
+  programmeICS(cl, kind, dateEcheance) {
+    const nom = [cl.prenom, cl.nom].filter(Boolean).join(" ").trim() || "Cliente";
+    const quoi = kind === "nutrition" ? "nutrition" : "entraînement";
+    const summary = this.icsEsc("📤 Programme " + quoi + " de " + (cl.prenom || nom) + " à envoyer");
+    const desc = this.icsEsc("Prépare et envoie le programme " + quoi + " de " + nom + " (espace coach).");
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const uid = "prog-" + kind + "-" + (cl.id || Math.random().toString(36).slice(2)) + "@ornellafitcoaching";
+    const day = this.icsDay(dateEcheance);
+    const dt = new Date(this.parse(dateEcheance)); dt.setDate(dt.getDate() + 1);
+    const next = `${dt.getFullYear()}${this._pad2(dt.getMonth() + 1)}${this._pad2(dt.getDate())}`;
+    const alarms =
+      `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT15H\r\nDESCRIPTION:${summary}\r\nEND:VALARM\r\n`
+      + `BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:PT9H\r\nDESCRIPTION:${summary}\r\nEND:VALARM`;
+    return [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Ornella Fit Coaching//Espace Coach//FR",
+      "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+      "UID:" + uid, "DTSTAMP:" + stamp,
+      `DTSTART;VALUE=DATE:${day}`, `DTEND;VALUE=DATE:${next}`,
+      "SUMMARY:" + summary, "DESCRIPTION:" + desc, alarms, "END:VEVENT", "END:VCALENDAR",
+    ].join("\r\n");
+  },
+  downloadProgrammeICS(cl, kind, dateEcheance) {
+    if (!dateEcheance) return false;
+    const text = this.programmeICS(cl, kind, dateEcheance);
+    const nom = (cl.prenom || "prog").normalize("NFD").replace(/[^A-Za-z0-9]/g, "") || "prog";
+    if (this.isIOS()) {
+      // iPhone (Safari) : l'URL data: ouvre la feuille système « Ajouter au calendrier ».
+      window.location.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(text);
+      return true;
+    }
+    const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "programme-" + kind + "-" + nom + "-" + (dateEcheance || "") + ".ics";
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+    return true;
+  },
+
   // ---- Programmer plusieurs séances d'un coup (liste collée) ---------------
   // 1 ligne = 1 séance. Ex. « Lundi 28 septembre : 12 H45 », « Jeudi 1er octobre : 18h30 »,
   // « 09/10 13:45 ». Lignes « complète / indisponible / annulé / off » ignorées.

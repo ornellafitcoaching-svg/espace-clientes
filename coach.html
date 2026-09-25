@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e89"></script>
-<script src="js/calc.js?v=e91"></script>
+<script src="js/calc.js?v=e92"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -259,12 +259,17 @@ function renderProgrammes(){
   const detailTxt = (st) => st.jamais
     ? "jamais envoyé"
     : `envoyé le <strong>${Calc.fmt(st.dernier)}</strong>${st.prochain ? ` → prochain le ${Calc.fmt(st.prochain)}` : ""}`;
-  const ligne = (label, st) => {
+  const ligne = (label, st, cl) => {
     if (!st) return "";
     const col = st.jamais ? COL.jamais : COL[st.statut];
+    // Bouton « 📅 Agenda » : rappel dans l'agenda Apple d'Ornella à la date d'échéance
+    // (« prochain le X »), pour ne pas oublier d'(r)envoyer le programme. Rien si jamais envoyé.
+    const agenda = (!st.jamais && st.prochain)
+      ? `<button class="btn-ghost btn-sm" data-prog-ics="${st.kind}" data-cl="${cl.id}" data-date="${st.prochain}" style="flex:none;padding:4px 10px">📅 Agenda</button>`
+      : "";
     return `<div class="cl-line" style="padding:5px 0;gap:8px;flex-wrap:wrap">
         <span style="min-width:0;flex:1 1 55%"><strong>${label}</strong> <span style="font-size:.8rem;color:var(--text-light)">${detailTxt(st)}</span></span>
-        <span class="dot-alert" style="${col};flex:none">${chipText(st)}</span></div>`;
+        <span class="dot-alert" style="${col};flex:none">${chipText(st)}</span>${agenda}</div>`;
   };
   const entryPrio  = (e) => Math.min(e.sport ? prio(e.sport) : 9, e.nut ? prio(e.nut) : 9);
   const entryJours = (e) => Math.min(e.sport ? (e.sport.joursAvant ?? 9999) : 9999, e.nut ? (e.nut.joursAvant ?? 9999) : 9999);
@@ -272,8 +277,8 @@ function renderProgrammes(){
 
   const cardHtml = (e) => `<div class="card" style="margin-top:8px;padding:9px 12px">
       <a href="cliente.html?id=${e.cl.id}" style="text-decoration:none;color:inherit;font-weight:700;display:block;margin-bottom:2px">${esc(e.cl.prenom)} ${esc(e.cl.nom||"")} <span class="badge badge-type" style="vertical-align:middle">${Calc.labelType(e.cl.type)}</span></a>
-      ${ligne("🏋️ Entraînement", e.sport)}
-      ${e.nut ? ligne("🥗 Nutrition", e.nut)
+      ${ligne("🏋️ Entraînement", e.sport, e.cl)}
+      ${e.nut ? ligne("🥗 Nutrition", e.nut, e.cl)
               : (e.sport ? `<div class="cl-line" style="padding:5px 0"><span style="font-size:.8rem;color:var(--text-light)">🥗 Nutrition : non incluse</span></div>` : "")}
     </div>`;
 
@@ -950,6 +955,15 @@ function openPendingLot(){
   document.getElementById("content").addEventListener("click", (e) => {
     const w = e.target.closest(".dot-wa");
     if (w && w.dataset.wa) { e.preventDefault(); e.stopPropagation(); window.open(w.dataset.wa, "_blank"); }
+  });
+  // « 📅 Agenda » sur un programme à envoyer → rappel .ics dans l'agenda Apple d'Ornella.
+  document.getElementById("programmes").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-prog-ics]"); if (!b) return;
+    e.preventDefault();
+    const c = STATE.clientes.find(x => String(x.cliente.id) === String(b.dataset.cl));
+    if (!c) return;
+    Calc.downloadProgrammeICS(c.cliente, b.dataset.progIcs, b.dataset.date);
+    UI.toast("Rappel ajouté à ton agenda 📅");
   });
   // Bouton « ✅ Fait » dans l'agenda → passe la séance en réalisée + rafraîchit.
   document.getElementById("agenda").addEventListener("click", async (e) => {
