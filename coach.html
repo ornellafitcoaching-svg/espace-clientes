@@ -921,6 +921,23 @@ function showFatal(e){
 }
 
 // ---- Init ----
+// Lien « planning à programmer » : coach.html?cliente=Prénom&lot=... → mémorisé AVANT la
+// garde de connexion (survit à un passage par login), puis ouvre la fiche avec la liste.
+try {
+  const _qp = new URLSearchParams(location.search);
+  if (_qp.get("lot")) localStorage.setItem("ofc_pending_lot", JSON.stringify({ cliente:_qp.get("cliente")||"", lot:_qp.get("lot"), t:Date.now() }));
+} catch(_) {}
+function openPendingLot(){
+  let pl = null;
+  try { pl = JSON.parse(localStorage.getItem("ofc_pending_lot")||"null"); } catch(_) {}
+  if (!pl || !pl.lot || Date.now()-pl.t > 864e5) { try{ localStorage.removeItem("ofc_pending_lot"); }catch(_){} return false; }
+  const norm = x => String(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+  const hits = STATE.clientes.filter(c => norm(c.cliente.prenom) === norm(pl.cliente));
+  try { localStorage.removeItem("ofc_pending_lot"); } catch(_) {}
+  if (hits.length === 1){ location.href = `cliente.html?id=${encodeURIComponent(hits[0].cliente.id)}&lot=${encodeURIComponent(pl.lot)}`; return true; }
+  UI.toast(hits.length ? `Plusieurs clientes « ${pl.cliente} » : ouvre la bonne fiche → « 🗓️ Plusieurs séances »` : `Cliente « ${pl.cliente} » introuvable`, "err");
+  return false;
+}
 (async () => {
  try {
   const p = await Auth.requireCoach();
@@ -1042,6 +1059,7 @@ function showFatal(e){
     }
   });
   await loadAll();
+  if (openPendingLot()) return;
   renderAll();
   setupTabs();
   // Rafraîchissement auto (voir refreshData) : notifs sans recharger.

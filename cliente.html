@@ -982,9 +982,9 @@ async function addOrEdit(entity, rec){
 
 // Programmer PLUSIEURS séances d'un coup : on colle le planning (1 ligne = 1 séance),
 // aperçu avant enregistrement, doublons (même date + heure) ignorés.
-async function addSeancesLot(){
+async function addSeancesLot(prefill){
   const v = await UI.form({ title:"Programmer plusieurs séances", submit:"Voir l'aperçu", fields:[
-    { name:"liste", label:"Colle le planning (1 ligne = 1 séance)", type:"textarea",
+    { name:"liste", label:"Colle le planning (1 ligne = 1 séance)", type:"textarea", value:prefill||"",
       placeholder:"Lundi 28 septembre : 12h45\nJeudi 1er octobre : 18h30\nVendredi 2 octobre : complète",
       hint:"Formats acceptés : « Lundi 28 septembre : 12h45 », « 1er octobre 18h30 », « 09/10 13:45 ». Les lignes « complète », « indisponible », « annulé » sont ignorées." },
     { name:"type", label:"Type de séance", half:true, placeholder:"Full body, Jambes…" },
@@ -1029,11 +1029,21 @@ document.addEventListener("click", (e)=>{
     if (wa) window.open(wa, "_blank"); else UI.toast("Numéro de téléphone manquant pour cette cliente","err");
   }
 });
-// Agenda Apple : ajoute TOUTES les séances à venir de la cliente (flux .ics https,
-// s'ouvre dans Safari → « Ajouter tout »). Sans code d'accès : fichier de la prochaine séance.
-function agendaCliente(){
+// Agenda Apple de la cliente. RECOMMANDÉ : l'abonnement (webcal) → Calendrier se met à
+// jour tout seul (ajout / déplacement / annulation) ; secours : ajout en une fois (https,
+// Safari → « Ajouter tout »). Sans code d'accès : fichier de la prochaine séance.
+async function agendaCliente(){
   const feed = Calc.agendaFeedUrl(D.cliente.access_code);
-  if (feed){ window.open(feed, "_blank"); UI.toast("Agenda ouvert — touche « Ajouter tout » 📅"); return; }
+  if (feed){
+    const pr = esc(D.cliente.prenom||"la cliente");
+    await UI.form({ title:"📅 Séances de "+pr+" dans mon agenda Apple", submit:"Fermer", fields:[
+      { name:"_a", type:"static", value:`<div style="display:flex;flex-direction:column;gap:10px">
+        <a class="btn-accent" href="${feed.replace(/^https:/,"webcal:")}" style="text-align:center">🔄 S'abonner (recommandé)</a>
+        <div class="isub" style="color:var(--text-mid);margin-top:-4px">Une seule fois : toutes ses séances arrivent dans Calendrier <b>et se mettent à jour toutes seules</b> (nouvelles, déplacées, annulées). Touche « S'abonner » puis « OK ».</div>
+        <a class="btn-ghost" href="${feed}" target="_blank" rel="noopener" style="text-align:center">➕ Ajouter en une fois (sans mise à jour)</a>
+        <div class="isub" style="color:var(--text-light)">Choisis l'un <b>ou</b> l'autre, pas les deux (sinon doublons). Si rien ne s'ouvre depuis l'app installée, ouvre ton espace dans Safari.</div></div>` }]});
+    return;
+  }
   const next = (D.seances||[]).filter(x=>x.statut==="prevue" && x.date>=Calc.today()).sort((a,b)=>a.date<b.date?-1:1)[0];
   if (!next){ UI.toast("Aucune séance à venir","err"); return; }
   Calc.downloadSeanceICS(D.cliente, next); UI.toast("Crée l'accès cliente pour ajouter toutes ses séances d'un coup");
@@ -1532,6 +1542,7 @@ function showUndo(tbl, rec){
   else if (qp.get("prog") === "sportif") progEnvoye("sportif");
   else if (qp.get("prog") === "nutrition") progEnvoye("nutrition");
   else if (qp.get("bilan")) addBilanCoach();
+  else if (qp.get("lot")) addSeancesLot(qp.get("lot"));
  }
  catch(e){
    console.error(e);
