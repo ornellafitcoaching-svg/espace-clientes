@@ -236,10 +236,19 @@ window.Calc = {
       const jour = String(dernier.created_at).slice(0, 10);
       out.push({ type: "nouveau_bilan", label: "Nouveau bilan rempli", icon: "🆕", date: jour });
     }
+    // Questionnaire de démarrage (le « 1er bilan complet ») rempli par la cliente récemment
+    // (≤ 14 j) → notif importante qui reste affichée avec la DATE.
+    const qiCliente = (c.questionnaireInitial || []).filter((x) =>
+      (x.saisi_par === "cliente" || !x.saisi_par) && x.created_at &&
+      this.daysFromToday(String(x.created_at).slice(0, 10)) >= -14);
+    if (qiCliente.length) {
+      const dernier = qiCliente.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+      out.push({ type: "nouveau_questionnaire", label: "Questionnaire de démarrage rempli", icon: "🆕", date: String(dernier.created_at).slice(0, 10) });
+    }
     // Mensurations saisies par la CLIENTE récemment (≤ 10 j) → à consulter côté coach.
-    // On n'affiche PAS ce badge si un « nouveau bilan » est déjà signalé : le bilan
-    // contient déjà ses mensurations, inutile de notifier deux fois le même moment.
-    if (!bilansCliente.length) {
+    // On n'affiche PAS ce badge si un « nouveau bilan » OU un questionnaire est déjà signalé :
+    // ils contiennent déjà ces mensurations, inutile de notifier deux fois le même moment.
+    if (!bilansCliente.length && !qiCliente.length) {
       const mensuCliente = (c.mensurations || []).filter((x) =>
         x.saisi_par === "cliente" && x.created_at &&
         this.daysFromToday(String(x.created_at).slice(0, 10)) >= -10);

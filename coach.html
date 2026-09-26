@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e89"></script>
-<script src="js/calc.js?v=e92"></script>
+<script src="js/calc.js?v=e93"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -448,7 +448,7 @@ function renderSansSeance(){
 
 // ---- Chargement groupé (peu de requêtes, quel que soit le nb de clientes) ----
 async function loadAll() {
-  const [clientes, accomp, seances, bilans, bilansDem, programmes, mensu, paiements] = await window.withTimeout(Promise.all([
+  const [clientes, accomp, seances, bilans, bilansDem, programmes, mensu, paiements, qinit] = await window.withTimeout(Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
     sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois,prix,montant_du"),
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
@@ -457,6 +457,7 @@ async function loadAll() {
     sb.from("programmes").select("cliente_id,kind,envoye,date_envoi,date_fin,created_at"),
     sb.from("mensurations").select("cliente_id,type,saisi_par,created_at,date"),
     sb.from("paiements").select("cliente_id,montant,date,mode"),
+    sb.from("questionnaire_initial").select("cliente_id,date,saisi_par,created_at"),
   ]), 18000, "Chargement du tableau de bord");
   // Si la requête principale (clientes) échoue, on ARRÊTE tout : mieux vaut un écran
   // d'erreur clair qu'un tableau de bord vide qui ferait croire à une perte de données.
@@ -465,7 +466,7 @@ async function loadAll() {
   // discrètement via une bannière au lieu d'afficher un bloc vide en silence.
   STATE.loadWarnings = [
     ["accompagnements",accomp],["séances",seances],["bilans",bilans],["bilans de démarrage",bilansDem],
-    ["programmes",programmes],["mensurations",mensu],["paiements",paiements],
+    ["programmes",programmes],["mensurations",mensu],["paiements",paiements],["questionnaire",qinit],
   ].filter(([,r]) => r && r.error).map(([nom]) => nom);
   const group = (rows, key="cliente_id") => {
     const m = {}; (rows.data||[]).forEach(r => { (m[r[key]] ||= []).push(r); }); return m;
@@ -476,6 +477,7 @@ async function loadAll() {
   const bilDemMap = group(bilansDem.data ? bilansDem : {data:[]});
   const proMap = group(programmes.data ? programmes : {data:[]});
   const payMap = group(paiements.data ? paiements : {data:[]});
+  const qiMap  = group(qinit && qinit.data ? qinit : {data:[]});
   // Types de mensurations par cliente → sert au repère « cou manquant pour l'IMG ».
   const mensTypes = {}; (mensu.data||[]).forEach(m => { (mensTypes[m.cliente_id] ||= new Set()).add(m.type); });
   // Mensurations groupées (avec saisi_par/created_at) → notif « nouvelles mensurations ».
@@ -498,6 +500,7 @@ async function loadAll() {
       programmes: proMap[cl.id]||[],
       paiements: payMap[cl.id]||[],
       mensurations: mensMap[cl.id]||[],
+      questionnaireInitial: qiMap[cl.id]||[],
       imgCouManquant,
       imgTailleManquante,
     };
@@ -656,6 +659,13 @@ function renderAlerts() {
          <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span>${quand?` · <span style="color:var(--text-light)">le ${quand}</span>`:""}</span>
          <span class="alert-cta">Voir 👀</span></a>`;
     }
+    // Questionnaire de démarrage rempli par la cliente → le « 1er bilan complet », mis en avant.
+    if (a.type === "nouveau_questionnaire") {
+      const quand = a.date ? Calc.fmt(a.date) : "";
+      return `<a class="alert alert-action" href="cliente.html?id=${cl.id}" style="border-left:4px solid var(--ok)">
+         <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span>${quand?` · <span style="color:var(--text-light)">le ${quand}</span>`:""}</span>
+         <span class="alert-cta">Voir 📋</span></a>`;
+    }
     // Nouvelles mensurations saisies par la cliente → mises en avant avec la DATE, ~10 j.
     if (a.type === "nouvelle_mensuration") {
       const quand = a.date ? Calc.fmt(a.date) : "";
@@ -669,7 +679,7 @@ function renderAlerts() {
   };
   // Les notifs « 🆕 » (bilan rempli par une cliente, nouvelles mensurations) restent
   // TOUJOURS VISIBLES en haut, hors onglets — ce sont des notifs importantes.
-  const estNouveau = (a) => a.type === "nouveau_bilan" || a.type === "nouvelle_mensuration";
+  const estNouveau = (a) => a.type === "nouveau_bilan" || a.type === "nouvelle_mensuration" || a.type === "nouveau_questionnaire";
   const nouveaux = all.filter(estNouveau);
   const reste    = all.filter(a => !estNouveau(a)).slice(0, 60);
   if (pin) pin.innerHTML = nouveaux.length
