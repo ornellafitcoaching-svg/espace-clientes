@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e99">
+<link rel="stylesheet" href="css/app.css?v=f01">
 </head>
 <body>
 <header class="topbar">
@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=e99"></script>
+<script src="js/calc.js?v=f01"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -137,7 +137,8 @@ function renderAgenda(){
   const box = document.getElementById("agenda");
   const today = Calc.today();
   // Bouton d'ajout de séance DEPUIS l'agenda (choisit la cliente puis ouvre le form).
-  const addBtn = `<button class="btn-accent" data-act="agenda-add-seance" style="margin:14px 0 0">＋ Programmer une séance</button>`;
+  const addBtn = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0"><button class="btn-accent" data-act="agenda-add-seance">＋ Programmer une séance</button>
+    <button class="btn-ghost" data-act="agenda-ics-all">📅 Toutes mes séances → Calendrier</button></div>`;
   const items = [];
   STATE.clientes.forEach(c => (c.seances||[]).forEach(s => {
     // On garde aussi les séances déjà "réalisées" (à partir d'aujourd'hui) pour qu'une séance
@@ -1050,6 +1051,19 @@ function openPendingLot(){
     if (viewBtn){ e.preventDefault(); STATE.agendaView = viewBtn.dataset.view; renderAgenda(); return; }
     // ＋ Programmer une séance depuis l'agenda : on choisit la cliente, puis on ouvre
     // directement le formulaire Séance sur sa fiche (deep-link ?addSeance=1).
+    // Toutes les séances À VENIR (toutes clientes) dans le Calendrier, en 1 fichier.
+    if (e.target.closest("[data-act='agenda-ics-all']")){
+      const today = Calc.today(), items = [];
+      STATE.clientes.forEach(c => (c.seances||[]).forEach(s => { if (s.statut==="prevue" && s.date>=today) items.push({ cl:c.cliente, s }); }));
+      if (!items.length){ UI.toast("Aucune séance à venir", "err"); return; }
+      items.sort((a,b)=>a.s.date<b.s.date?-1:1);
+      const text = Calc.seancesICS(items);
+      if (Calc.isIOS()) { Calc.offerICS(text, "Mes séances à venir"); return; }
+      const blob = new Blob([text], { type:"text/calendar;charset=utf-8" }), url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url; a.download = "mes-seances.ics"; document.body.appendChild(a); a.click();
+      setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 1500);
+      return;
+    }
     const addSea = e.target.closest("[data-act='agenda-add-seance']");
     if (addSea){
       e.preventDefault();

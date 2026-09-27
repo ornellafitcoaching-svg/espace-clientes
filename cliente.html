@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e99">
+<link rel="stylesheet" href="css/app.css?v=f01">
 </head>
 <body>
 <header class="topbar">
@@ -29,7 +29,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=e99"></script>
+<script src="js/calc.js?v=f01"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -386,7 +386,8 @@ function sectionProgrammes(){
       <div class="item"><div class="idate">${Calc.fmtShort(p.date_envoi)}</div>
         <div class="ibody"><div class="ititle">${p.envoye?"Envoyé":"Non envoyé"} ${p.version?`<span class="tag">v${esc(p.version)}</span>`:""}</div>
           <div class="isub">${[p.date_debut&&("du "+Calc.fmt(p.date_debut)),p.date_fin&&("au "+Calc.fmt(p.date_fin))].filter(Boolean).join(" ")||"&nbsp;"}</div>
-          ${p.commentaire?`<div class="isub">${esc(p.commentaire)}</div>`:""}
+          ${Calc.progStrip(p.commentaire)?`<div class="isub">${esc(Calc.progStrip(p.commentaire))}</div>`:""}
+          ${Calc.progFile(p.commentaire)?`<span class="tag">📎 Fichier joint</span>`:(p.envoye&&!Calc.progLink(p.commentaire)?`<span class="tag" style="background:#fdecea;color:#b3261e">⚠️ Ni lien ni fichier : la cliente ne peut pas l'ouvrir</span>`:"")}
         </div>${delEdit("programme",p.id)}</div>`).join("") : `<p class="empty">Aucun programme ${kind}.</p>`);
   };
   // Nutrition affichée seulement si suivi nutrition actif (ou si un programme nutrition existe déjà,
@@ -798,13 +799,53 @@ function progFields(kind,x){ x=x||{};
       { name:"_mode", label:"Moyen de paiement", type:"select", half:true, value:modeDefaut, options:[
         {value:"Virement",label:"Virement"},{value:"Stripe",label:"Stripe"},{value:"GoCardless",label:"GoCardless"},
         {value:"Espèces",label:"Espèces"},{value:"Chèque",label:"Chèque"},{value:"Autre",label:"Autre"}]},
-      { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:x.commentaire, hint:lienHint },
+      { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:Calc.progStrip(x.commentaire), hint:lienHint },
+      progJoindreField(x),
     ]);
   }
   return base.concat([
     { name:"date_fin", label:"Fin du programme", type:"date", half:true, value:x.date_fin },
-    { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:x.commentaire, hint:lienHint },
+    { name:"commentaire", label:"Commentaire + lien du programme", type:"textarea", value:Calc.progStrip(x.commentaire), hint:lienHint },
+    progJoindreField(x),
   ]);
+}
+// Fichier du programme (PDF / image) : la cliente l'ouvre dans son espace (bouton « 📄 »).
+function progJoindreField(x){
+  const f = Calc.progFile(x && x.commentaire);
+  return { name:"_joindre", type:"checkbox", value:false,
+    label: f ? "📎 Remplacer le fichier joint (PDF ou image)" : "📎 Joindre le fichier du programme (PDF ou image)",
+    hint: f ? "Un fichier est déjà joint : la cliente peut l'ouvrir dans son espace." : "Si tu n'as pas de lien : coche, puis choisis le PDF. La cliente l'ouvrira dans son espace." };
+}
+// Commentaire enregistré = texte saisi + fichier déjà joint (conservé sauf remplacement).
+function progCommentaire(v, old){
+  const f = Calc.progFile(old);
+  const txt = String(v.commentaire||"").trim();
+  return (f && !v._joindre) ? (txt ? txt+"\n" : "")+"[fichier:"+f+"]" : txt;
+}
+// Choix + envoi du fichier du programme, puis mise à jour du programme.
+function pickProgFile(progId, kind, baseTxt){
+  let input = document.getElementById("progInput");
+  if (!input){ input = document.createElement("input"); input.type = "file"; input.id = "progInput";
+    input.accept = "application/pdf,image/*"; input.style.display = "none"; document.body.appendChild(input); }
+  input.value = "";
+  input.onchange = async () => {
+    const file = input.files && input.files[0]; if (!file) return;
+    try{
+      UI.toast("Envoi du fichier…");
+      const ext = (file.name.split(".").pop()||"pdf").toLowerCase();
+      const path = `${CID}/cliente/programme-${kind}-${uuid()}.${ext}`;   // dossier lisible par la cliente
+      const up = await sb.storage.from("photos").upload(path, file, { upsert:false, contentType:file.type||undefined });
+      if (up.error) throw up.error;
+      await DB.update("programmes", progId, { commentaire:(baseTxt ? baseTxt+"\n" : "")+"[fichier:"+path+"]" });
+      UI.toast("Fichier joint ✓ — "+(D.cliente.prenom||"la cliente")+" peut l'ouvrir dans son espace"); reload("Programmes");
+    }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
+  };
+  input.click();
+}
+// Programme « envoyé » que la cliente ne pourra pas ouvrir (ni lien ni fichier) → on prévient.
+function progAccessWarn(patch, joindre){
+  if (!patch.envoye || joindre || Calc.progLink(patch.commentaire) || Calc.progFile(patch.commentaire)) return "";
+  return " ⚠️ Sans lien ni fichier, "+(D.cliente.prenom||"la cliente")+" ne peut pas l'ouvrir dans son espace";
 }
 
 // mapping entité → { table, fields, payload }
@@ -1059,24 +1100,15 @@ document.addEventListener("click", (e)=>{
     if (wa) window.open(wa, "_blank"); else UI.toast("Numéro de téléphone manquant pour cette cliente","err");
   }
 });
-// Agenda Apple de la cliente. RECOMMANDÉ : l'abonnement (webcal) → Calendrier se met à
-// jour tout seul (ajout / déplacement / annulation) ; secours : ajout en une fois (https,
-// Safari → « Ajouter tout »). Sans code d'accès : fichier de la prochaine séance.
-async function agendaCliente(){
-  const feed = Calc.agendaFeedUrl(D.cliente.access_code);
-  if (feed){
-    const pr = esc(D.cliente.prenom||"la cliente");
-    await UI.form({ title:"📅 Séances de "+pr+" dans mon agenda Apple", submit:"Fermer", fields:[
-      { name:"_a", type:"static", value:`<div style="display:flex;flex-direction:column;gap:10px">
-        <a class="btn-accent" href="${feed.replace(/^https:/,"webcal:")}" style="text-align:center">🔄 S'abonner (recommandé)</a>
-        <div class="isub" style="color:var(--text-mid);margin-top:-4px">Une seule fois : toutes ses séances arrivent dans Calendrier <b>et se mettent à jour toutes seules</b> (nouvelles, déplacées, annulées). Touche « S'abonner » puis « OK ».</div>
-        <a class="btn-ghost" href="${feed}" target="_blank" rel="noopener" style="text-align:center">➕ Ajouter en une fois (sans mise à jour)</a>
-        <div class="isub" style="color:var(--text-light)">Choisis l'un <b>ou</b> l'autre, pas les deux (sinon doublons). Si rien ne s'ouvre depuis l'app installée, ouvre ton espace dans Safari.</div></div>` }]});
-    return;
-  }
-  const next = (D.seances||[]).filter(x=>x.statut==="prevue" && x.date>=Calc.today()).sort((a,b)=>a.date<b.date?-1:1)[0];
-  if (!next){ UI.toast("Aucune séance à venir","err"); return; }
-  Calc.downloadSeanceICS(D.cliente, next); UI.toast("Crée l'accès cliente pour ajouter toutes ses séances d'un coup");
+// Agenda Apple : TOUTES les séances à venir de la cliente dans ton Calendrier, en 1 fois.
+function agendaCliente(){
+  const list = (D.seances||[]).filter(x=>x.statut==="prevue" && x.date>=Calc.today()).sort((a,b)=>a.date<b.date?-1:1);
+  if (!list.length){ UI.toast("Aucune séance à venir","err"); return; }
+  const text = Calc.seancesICS(list.map(s=>({ cl:D.cliente, s })));
+  if (Calc.isIOS()) return Calc.offerICS(text, "Séances de "+(D.cliente.prenom||""));
+  const blob = new Blob([text], { type:"text/calendar;charset=utf-8" }), url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = "seances-"+(D.cliente.prenom||"cliente")+".ics"; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); }, 1500);
 }
 
 async function progEnvoye(kind){
@@ -1086,10 +1118,12 @@ async function progEnvoye(kind){
   const v = await UI.form({ title:(kind==="sportif"?"Programme sportif":"Programme nutrition"), fields:progFields(kind, existing||{}) });
   if (!v) return;
   const patch = { cliente_id:CID, kind, envoye:!!v.envoye, date_envoi:v.date_envoi,
-    version:v.version, date_debut:v.date_debut, date_fin:v.date_fin, commentaire:v.commentaire };
+    version:v.version, date_debut:v.date_debut, date_fin:v.date_fin, commentaire:progCommentaire(v, existing&&existing.commentaire) };
   try{
+    let progId = existing && existing.id;
     if (existing) await DB.update("programmes", existing.id, patch);
-    else await DB.insert("programmes", patch);
+    else { const row = await DB.insert("programmes", patch); progId = row && row.id; }
+    if (v._joindre && progId) pickProgFile(progId, kind, String(v.commentaire||"").trim());
     // Abonnement nutrition : si un montant est saisi, on crée le paiement automatiquement.
     let extra = "";
     if (kind==="nutrition" && v._montant){
@@ -1100,7 +1134,8 @@ async function progEnvoye(kind){
         extra = " · paiement "+Calc.euro(montant)+" enregistré 💶";
       }
     }
-    UI.toast("Programme "+kind+(patch.envoye?" marqué envoyé ✓":" décoché ✓")+extra); reload("Programmes");
+    const warn = progAccessWarn(patch, v._joindre);
+    UI.toast("Programme "+kind+(patch.envoye?" marqué envoyé ✓":" décoché ✓")+extra+warn, warn?"err":undefined); reload("Programmes");
   }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
@@ -1410,8 +1445,11 @@ document.getElementById("main").addEventListener("click", async (e)=>{
     const v = await UI.form({ title:"Modifier le programme "+(p.kind==="nutrition"?"nutrition":"sportif"), fields:progFields(p.kind, p) });
     if (!v) return;
     const patch = { envoye:!!v.envoye, date_envoi:v.date_envoi, version:v.version,
-      date_debut:v.date_debut, date_fin:v.date_fin, commentaire:v.commentaire };
-    try{ await DB.update("programmes", id, patch); UI.toast("Programme modifié ✓"); reload("Programmes"); }
+      date_debut:v.date_debut, date_fin:v.date_fin, commentaire:progCommentaire(v, p.commentaire) };
+    try{ await DB.update("programmes", id, patch);
+      if (v._joindre) pickProgFile(id, p.kind, String(v.commentaire||"").trim());
+      const warn = progAccessWarn(patch, v._joindre);
+      UI.toast("Programme modifié ✓"+warn, warn?"err":undefined); reload("Programmes"); }
     catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
     return;
   }

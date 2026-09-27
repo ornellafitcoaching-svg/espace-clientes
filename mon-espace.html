@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e99">
+<link rel="stylesheet" href="css/app.css?v=f01">
 </head>
 <body>
 <header class="topbar">
@@ -27,7 +27,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=e99"></script>
+<script src="js/calc.js?v=f01"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -1137,7 +1137,7 @@ function viewPhotos(){
   if (list.length >= 2){
     const apres = list[0], avant = list[list.length-1];
     const vignette = (p, titre) => `<div>
-        <div class="isub" style="text-align:center;font-weight:700;margin-bottom:4px">${titre} · ${Calc.fmt(p.date)}</div>
+        <div class="isub" style="text-align:center;font-weight:700;margin-bottom:4px;font-size:.74rem;white-space:nowrap">${titre} · ${Calc.fmtShort(p.date)}</div>
         <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="min-height:170px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem;background:var(--cream);border-radius:12px">chargement…</div>
       </div>`;
     compare = `<div class="card" style="margin-bottom:16px">
@@ -1226,9 +1226,11 @@ function progItems(list){
   return `<div class="card">` + list.map(p=>{
     // Si Ornella a collé un lien (programme HTML) dans le commentaire, on l'affiche en
     // BOUTON « Voir mon programme » ; le reste du commentaire reste en texte.
-    const m = (p.commentaire||"").match(/https?:\/\/[^\s]+/);
-    const lien = m ? m[0] : null;
-    const texte = lien ? (p.commentaire||"").replace(lien,"").trim() : (p.commentaire||"");
+    // Fichier joint par Ornella (PDF / image, marqueur [fichier:…]) → bouton signé après rendu.
+    const fichier = Calc.progFile(p.commentaire);
+    const brut = Calc.progStrip(p.commentaire);
+    const lien = Calc.progLink(p.commentaire);
+    const texte = lien ? brut.replace(lien,"").trim() : brut;
     return `<div class="item">
       <div class="idate">${Calc.fmtShort(p.date_envoi||p.date_debut)}</div>
       <div class="ibody">
@@ -1236,6 +1238,8 @@ function progItems(list){
         <div class="isub">${[p.date_debut&&("du "+Calc.fmt(p.date_debut)), p.date_fin&&("au "+Calc.fmt(p.date_fin))].filter(Boolean).join(" ")||"&nbsp;"}</div>
         ${texte?`<div class="isub">${esc(texte)}</div>`:""}
         ${lien?`<a class="btn-accent btn-sm" href="${esc(lien)}" target="_blank" rel="noopener" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px">📄 ${adr("Voir mon programme","Voir mon programme")}</a>`:""}
+        ${fichier?`<a class="btn-accent btn-sm prog-file" data-prog-file="${esc(fichier)}" href="#" target="_blank" rel="noopener" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px">📄 ${adr("Ouvrir mon programme","Ouvrir mon programme")}</a>`:""}
+        ${(!lien && !fichier && p.envoye)?`<div class="isub" style="margin-top:6px;color:var(--text-mid)">📲 ${adr("Ornella te l'a transmis directement (WhatsApp ou e-mail).","Ornella vous l'a transmis directement (WhatsApp ou e-mail).")}</div>`:""}
       </div>
     </div>`;
   }).join("") + `</div>`;
@@ -1274,6 +1278,7 @@ function render(){
   const banner = VIEW!=="accueil" ? prochaineSeanceBanner(true) : "";
   document.getElementById("main").innerHTML = bar + nav + banner + `<div id="viewBox">${VIEWS[VIEW]()}</div>`;
   if (VIEW==="photos") loadPhotoThumbs();
+  try { loadProgLinks(); } catch(e){ console.error(e); }
 }
 
 // Bouton WhatsApp flottant (présent sur tout l'espace). Masqué si aucun numéro.
@@ -1286,6 +1291,19 @@ function mountWhatsApp(){
   a.setAttribute("aria-label", "Contacter Ornella sur WhatsApp");
   a.innerHTML = `<span class="wa-ico">💬</span><span class="wa-txt">Contacter Ornella</span>`;
   document.body.appendChild(a);
+}
+
+// Liens des fichiers de programme : URL signée (7 jours) posée sur le bouton → un vrai lien
+// que l'iPhone ouvre au toucher (pas de window.open après attente, bloqué sur iOS).
+function loadProgLinks(){
+  document.querySelectorAll("[data-prog-file]").forEach(async a=>{
+    a.addEventListener("click", ev=>{ if (a.getAttribute("href")==="#"){ ev.preventDefault(); } });
+    try{
+      const { data } = await sb.storage.from("photos").createSignedUrl(a.dataset.progFile, 7*24*3600);
+      if (data && data.signedUrl) a.href = data.signedUrl;
+      else a.textContent = "Fichier indisponible — écris à Ornella";
+    }catch(e){ console.error(e); }
+  });
 }
 
 async function loadPhotoThumbs(){

@@ -659,22 +659,50 @@ window.Calc = {
   downloadSeanceICS(cl, s) {
     const text = this.seanceICS(cl, s);
     const nom = (cl.prenom || "seance").normalize("NFD").replace(/[^A-Za-z0-9]/g, "") || "seance";
-    if (this.isIOS()) {
-      // iPhone : l'URL data: ne s'ouvre PAS depuis l'app installée (écran d'accueil) →
-      // rien n'arrivait dans Calendrier. On ouvre le vrai flux https (text/calendar) dans
-      // Safari : iOS affiche « Ajouter tout » avec les séances à venir de la cliente
-      // (UID stables → pas de doublon si déjà ajoutées). Secours : data: si pas de code.
-      const feed = this.agendaFeedUrl(cl.access_code);
-      if (feed) { window.open(feed, "_blank"); return true; }
-      window.location.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(text);
-      return true;
-    }
+    if (this.isIOS()) { this.offerICS(text, "Séance " + (cl.prenom || "")); return true; }
     const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "seance-" + nom + "-" + (s.date || "") + ".ics";
     document.body.appendChild(a); a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+    return true;
+  },
+
+  // Plusieurs séances (d'une ou plusieurs clientes) dans UN seul fichier .ics.
+  // items = [{ cl, s }]. UID stables (seance-<id>) → ré-ajouter met à jour, pas de doublon.
+  seancesICS(items) {
+    const ev = (items || []).map(({ cl, s }) => {
+      const t = this.seanceICS(cl, s);
+      return t.slice(t.indexOf("BEGIN:VEVENT"), t.indexOf("END:VEVENT") + "END:VEVENT".length);
+    });
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Ornella Fit Coaching//Espace Coach//FR",
+      "CALSCALE:GREGORIAN", "METHOD:PUBLISH"].concat(ev, ["END:VCALENDAR"]).join("\r\n");
+  },
+  // iPhone : ni data: ni blob ne s'ouvrent de façon fiable (surtout depuis l'app installée).
+  // On dépose le .ics dans le stockage Supabase (bucket « photos », dossier coach « agenda/ »,
+  // droits coach déjà en place) et on donne un VRAI lien https (text/calendar) : Safari
+  // ouvre alors « Ajouter au calendrier ». Le lien est un bouton → vrai geste utilisateur.
+  async offerICS(text, titre) {
+    const UIx = window.UI;
+    try {
+      if (UIx) UIx.toast("Préparation de l'agenda…");
+      const path = "agenda/" + Date.now() + "-" + Math.random().toString(36).slice(2, 8) + ".ics";
+      const file = new Blob([text], { type: "text/calendar;charset=utf-8" });
+      const up = await window.sb.storage.from("photos").upload(path, file, { contentType: "text/calendar;charset=utf-8", upsert: true });
+      if (up.error) throw up.error;
+      const sg = await window.sb.storage.from("photos").createSignedUrl(path, 3600);
+      if (sg.error || !sg.data || !sg.data.signedUrl) throw (sg.error || new Error("lien indisponible"));
+      const n = (text.match(/BEGIN:VEVENT/g) || []).length;
+      if (UIx) await UIx.form({ title: "📅 " + (titre || "Agenda"), submit: "Fermer", fields: [
+        { name: "_ics", type: "static", value: `<div style="display:flex;flex-direction:column;gap:10px">
+          <a class="btn-accent" href="${sg.data.signedUrl}" target="_blank" rel="noopener" style="text-align:center">📅 Ouvrir dans Calendrier (${n} séance${n > 1 ? "s" : ""})</a>
+          <div class="isub" style="color:var(--text-mid)">Puis touche <b>« Ajouter »</b> (ou « Ajouter tout »). Déjà ajoutées ? Elles sont mises à jour, pas en double.</div></div>` }] });
+      else window.open(sg.data.signedUrl, "_blank");
+    } catch (e) {
+      console.error(e);
+      if (UIx) UIx.toast("Agenda : " + ((e && e.message) || e) + " — réessaie", "err");
+    }
     return true;
   },
 
@@ -709,11 +737,7 @@ window.Calc = {
     if (!dateEcheance) return false;
     const text = this.programmeICS(cl, kind, dateEcheance);
     const nom = (cl.prenom || "prog").normalize("NFD").replace(/[^A-Za-z0-9]/g, "") || "prog";
-    if (this.isIOS()) {
-      // iPhone (Safari) : l'URL data: ouvre la feuille système « Ajouter au calendrier ».
-      window.location.href = "data:text/calendar;charset=utf-8," + encodeURIComponent(text);
-      return true;
-    }
+    if (this.isIOS()) { this.offerICS(text, "Rappel programme " + (cl.prenom || "")); return true; }
     const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -722,6 +746,11 @@ window.Calc = {
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
     return true;
   },
+
+  // ---- Programme : fichier joint (PDF / image) stocké dans le commentaire -----
+  progFile(c) { const m = String(c || "").match(/\[fichier:([^\]]+)\]/); return m ? m[1] : null; },
+  progStrip(c) { return String(c || "").replace(/\s*\[fichier:[^\]]+\]/g, "").trim(); },
+  progLink(c) { const m = this.progStrip(c).match(/https?:\/\/[^\s]+/); return m ? m[0] : null; },
 
   // ---- Programmer plusieurs séances d'un coup (liste collée) ---------------
   // 1 ligne = 1 séance. Ex. « Lundi 28 septembre : 12 H45 », « Jeudi 1er octobre : 18h30 »,
