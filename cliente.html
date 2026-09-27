@@ -29,7 +29,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=f01"></script>
+<script src="js/calc.js?v=f02"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -424,7 +424,8 @@ function sectionBilanDemarrage(){
   const list = D.bilans_demarrage||[];
   const cl = D.cliente;
   const st = Calc.seancesStats(D.accompagnement, D.seances);
-  const due = Calc.bilanDemarrageDue(D.accompagnement, D.seances, list);
+  if (!list.length && !Calc.estNouvelle(cl)) return "";   // ancienne cliente : pas concernée
+  const due = Calc.bilanDemarrageDue(D.accompagnement, D.seances, list, cl);
   const wa = Calc.waHref(cl.telephone, Calc.bilanDemarrageMsg(cl));
   const scale = (v,max)=> v!=null ? `${v}/${max}` : "—";
   const hint = due
@@ -465,6 +466,7 @@ function sectionBilanDemarrage(){
 function sectionQuestionnaireInitial(){
   const list = D.questionnaire_initial||[];
   const cl = D.cliente;
+  if (!list.length && !Calc.estNouvelle(cl)) return "";   // ancienne cliente : pas concernée
   const lien = Calc.espaceLink(cl.access_code);
   const prenom = cl.prenom||"";
   const msg = cl.tutoiement
@@ -493,6 +495,7 @@ function sectionQuestionnaireInitial(){
 function sectionQuestionnaireNutrition(){
   const list = D.questionnaire_nutrition||[];
   const cl = D.cliente;
+  if (!list.length && !Calc.estNouvelle(cl)) return "";   // ancienne cliente : pas concernée
   const lien = Calc.espaceLink(cl.access_code);
   const prenom = cl.prenom||"";
   const msg = cl.tutoiement
@@ -1601,6 +1604,7 @@ function showUndo(tbl, rec){
   document.getElementById("main").addEventListener("change", (e)=>{
     if (e.target.classList && e.target.classList.contains("selchk")) updateSelCount();
   });
+  await Calc.initNouvellesDepuis();   // bilans / questionnaires de départ : nouvelles clientes seulement
   await reload();
   // Deep-links « Faire maintenant » depuis « À traiter » / l'agenda → ouvre DROIT l'action.
   const qp = new URLSearchParams(location.search);

@@ -27,7 +27,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=f01"></script>
+<script src="js/calc.js?v=f02"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -109,7 +109,7 @@ function bilanNudge(){
 // Carte « nudge » pour le bilan de démarrage (ressenti des premières séances), après ~5 séances.
 function bilanDemarrageNudge(){
   if ((D.bilans_demarrage||[]).length) return "";
-  if (!Calc.bilanDemarrageDue(D.accompagnement, D.seances, D.bilans_demarrage)) return "";
+  if (!Calc.bilanDemarrageDue(D.accompagnement, D.seances, D.bilans_demarrage, D.cliente)) return "";
   return `<div class="card nudge-bilan" style="margin-bottom:16px">
     <div class="nudge-title">${adr("Comment se passent tes premières séances ? 🩹","Comment se passent vos premières séances ? 🩹")}</div>
     <div class="isub nudge-sub">${adr("Un point rapide (douleurs, intensité, ce que tu aimes) pour qu'Ornella ajuste au mieux tes séances.","Un point rapide (douleurs, intensité, ce que vous aimez) pour qu'Ornella ajuste au mieux vos séances.")}</div>
@@ -885,8 +885,9 @@ async function addMyBilanDemarrage(){
 function bilanDemarrageCard(){
   const list = (D.bilans_demarrage||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
   const scale = (val,max)=> val!=null ? `${val}/${max}` : "—";
+  if (!list.length && !Calc.estNouvelle(D.cliente)) return "";
   if (!list.length){
-    const due = Calc.bilanDemarrageDue(D.accompagnement, D.seances, list);
+    const due = Calc.bilanDemarrageDue(D.accompagnement, D.seances, list, D.cliente);
     return `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold)">
       <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">🩹 Bilan de démarrage</div>
       <div class="isub" style="color:var(--text-mid);margin-top:4px">${due?adr("C'est le bon moment pour faire le point sur tes premières séances.","C'est le bon moment pour faire le point sur vos premières séances."):adr("Un point sur le ressenti de tes premières séances (douleurs, intensité…).","Un point sur le ressenti de vos premières séances (douleurs, intensité…).")}</div>
@@ -995,6 +996,7 @@ async function addMyQuestionnaireInitial(){
 // Invitation en tête d'accueil, tant que le questionnaire n'est pas rempli.
 function qiNudge(){
   if ((D.questionnaire_initial||[]).length) return "";
+  if (!Calc.estNouvelle(D.cliente)) return "";   // anciennes clientes : déjà fait avant l'espace
   return `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold);background:var(--panel);color:#fff">
     <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);font-weight:700">📋 À faire en premier</div>
     <div style="font-size:1.05rem;font-weight:600;margin-top:4px">${adr("Ton questionnaire de démarrage","Votre questionnaire de démarrage")}</div>
@@ -1005,6 +1007,7 @@ function qiNudge(){
 // Carte dans l'onglet Bilans : bouton tant que non rempli, sinon récap des réponses.
 function questionnaireInitialCard(){
   const list = (D.questionnaire_initial||[]);
+  if (!list.length && !Calc.estNouvelle(D.cliente)) return "";
   if (!list.length){
     return `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold)">
       <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">📋 Questionnaire de démarrage</div>
@@ -1061,6 +1064,7 @@ async function addMyQuestionnaireNutrition(){
 // Invitation en tête d'accueil tant que le questionnaire alimentaire n'est pas rempli.
 function qnNudge(){
   if ((D.questionnaire_nutrition||[]).length) return "";
+  if (!Calc.estNouvelle(D.cliente)) return "";   // anciennes clientes : déjà fait avant l'espace
   // On ne le propose que si une nutrition est prévue (ou déjà active) — inutile pour
   // les présentielles sans suivi alimentaire. hasNutrition() existe déjà côté cliente.
   if (typeof hasNutrition === "function" && !hasNutrition()) return "";
@@ -1074,6 +1078,7 @@ function qnNudge(){
 // Carte dans l'onglet Bilans : bouton tant que non rempli, sinon récap des réponses.
 function questionnaireNutritionCard(){
   const list = (D.questionnaire_nutrition||[]);
+  if (!list.length && !Calc.estNouvelle(D.cliente)) return "";
   if (!list.length){
     return `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold)">
       <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">🥗 Questionnaire alimentaire</div>
@@ -1134,8 +1139,12 @@ function viewPhotos(){
   if (!list.length) return empty(adr("Aucune photo partagée pour l'instant.","Aucune photo partagée pour l'instant."));
   // Comparatif avant / maintenant dès qu'il y a au moins 2 photos (vraies photos, pas de montage).
   let compare = "";
-  if (list.length >= 2){
-    const apres = list[0], avant = list[list.length-1];
+  // « Avant / Maintenant » uniquement si la photo la plus récente date d'au moins 14 jours
+  // après la 1re (sinon ce sont juste les photos de départ : pas de faux « Maintenant »).
+  const avant0 = list[list.length-1], apres0 = list[0];
+  const ecart = (avant0 && apres0) ? Math.round((new Date(apres0.date+"T12:00:00") - new Date(avant0.date+"T12:00:00"))/864e5) : 0;
+  if (list.length >= 2 && ecart >= 14){
+    const apres = apres0, avant = avant0;
     const vignette = (p, titre) => `<div>
         <div class="isub" style="text-align:center;font-weight:700;margin-bottom:4px;font-size:.74rem;white-space:nowrap">${titre} · ${Calc.fmtShort(p.date)}</div>
         <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="min-height:170px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem;background:var(--cream);border-radius:12px">chargement…</div>
@@ -1147,7 +1156,8 @@ function viewPhotos(){
         ${vignette(apres, adr("Maintenant","Maintenant"))}
       </div></div>`;
   }
-  return compare + (list.length>=2?`<h4 class="view-title" style="margin-top:0">${adr("Toutes mes photos","Toutes mes photos")}</h4>`:"") + `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
+  const titre = compare ? adr("Toutes mes photos","Toutes mes photos") : adr("Mes photos de départ","Mes photos de départ");
+  return compare + (list.length>=2?`<h4 class="view-title" style="margin-top:0">${titre}</h4>`:"") + `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
     <div class="mensu-card photo-card">
       <div class="cl-line" style="margin-bottom:8px"><strong>${Calc.fmt(p.date)}</strong></div>
       <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="min-height:140px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem;background:var(--cream);border-radius:12px">chargement…</div>

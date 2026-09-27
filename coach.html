@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=f01"></script>
+<script src="js/calc.js?v=f02"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -398,7 +398,7 @@ function renderBilansDemarrage(){
     if (done){
       const d = [...c.bilansDemarrage].sort((a,b)=>a.date<b.date?1:-1)[0];
       faits.push({ cl:c.cliente, date:d.date });
-    } else if (Calc.bilanDemarrageDue(c.accompagnement, c.seances, c.bilansDemarrage)){
+    } else if (Calc.bilanDemarrageDue(c.accompagnement, c.seances, c.bilansDemarrage, c.cliente)){
       const st = Calc.seancesStats(c.accompagnement, c.seances);
       aFaire.push({ cl:c.cliente, realisees:st.realisees });
     }
@@ -1164,7 +1164,7 @@ function openPendingLot(){
       renderStats(); renderAlerts(); renderAgenda(); renderBilansDemarrage(); renderSansSeance(); renderList();
     }
   });
-  await loadAll();
+  await Promise.all([loadAll(), Calc.initNouvellesDepuis()]);
   if (openPendingLot()) return;
   renderAll();
   setupTabs();

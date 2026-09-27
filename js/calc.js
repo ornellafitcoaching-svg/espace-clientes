@@ -795,8 +795,27 @@ window.Calc = {
   // 1 = dès la 1re séance faite (le ressenti des tout débuts est le plus utile).
   SEUIL_BILAN_DEMARRAGE: 1,
   // À demander ? (>= seuil séances réalisées ET aucun bilan de démarrage déjà rempli)
-  bilanDemarrageDue(accompagnement, seances, bilansDemarrage) {
+  // ---- Questionnaires / bilans de départ : UNIQUEMENT pour les nouvelles clientes -------
+  // (mis en place à partir d'Anne ; les clientes d'avant les ont déjà faits hors de l'espace).
+  // Nouvelle = fiche créée à partir de cette date. Côté coach, la date est avancée à la
+  // création de la fiche d'Anne si elle est plus ancienne (initNouvellesDepuis).
+  NOUVELLES_DEPUIS_DEFAUT: "2026-09-24",
+  _nouvellesDepuis: null,
+  nouvellesDepuis() {
+    return this._nouvellesDepuis || (window.APP_CONFIG && window.APP_CONFIG.NOUVELLES_CLIENTES_DEPUIS) || this.NOUVELLES_DEPUIS_DEFAUT;
+  },
+  async initNouvellesDepuis() {
+    try {
+      const { data } = await window.sb.from("clientes").select("created_at").ilike("prenom", "anne")
+        .order("created_at", { ascending: true }).limit(1);
+      const d = data && data[0] && String(data[0].created_at || "").slice(0, 10);
+      if (d && d < this.nouvellesDepuis()) this._nouvellesDepuis = d;
+    } catch (e) { console.error(e); }
+  },
+  estNouvelle(cl) { return !!cl && String(cl.created_at || "").slice(0, 10) >= this.nouvellesDepuis(); },
+  bilanDemarrageDue(accompagnement, seances, bilansDemarrage, cl) {
     if (bilansDemarrage && bilansDemarrage.length) return false;
+    if (cl && !this.estNouvelle(cl)) return false;   // anciennes clientes : pas concernées
     const s = this.seancesStats(accompagnement, seances);
     return s.realisees >= this.SEUIL_BILAN_DEMARRAGE;
   },
