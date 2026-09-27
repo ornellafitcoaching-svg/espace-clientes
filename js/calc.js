@@ -101,9 +101,18 @@ window.Calc = {
   // dernier bilan = date la plus récente ; prochain = dernier + 28 j.
   // Si aucun bilan encore : le prochain se base sur la date de début (+28 j),
   // pour qu'une cliente qui démarre ait quand même une date de prochain bilan.
-  bilanStats(bilans, dateDebut) {
+  // Date du questionnaire de démarrage = le « premier bilan » (point de départ des 4 semaines).
+  // On prend la plus ANCIENNE date de la liste (le questionnaire est rempli une fois).
+  demarrageDate(list) {
+    const dates = (list || []).map(x => x && x.date).filter(Boolean);
+    return dates.length ? dates.slice().sort()[0] : null;
+  },
+  bilanStats(bilans, dateDebut, dateDemarrage) {
     const has = bilans && bilans.length;
-    const dernier = has ? [...bilans].sort((a, b) => (a.date < b.date ? 1 : -1))[0].date : null;
+    const dernierPeriodique = has ? [...bilans].sort((a, b) => (a.date < b.date ? 1 : -1))[0].date : null;
+    // Le questionnaire de démarrage est le PREMIER bilan : il fait office de « dernier bilan »
+    // et d'ancre du prochain (à +4 semaines) tant qu'aucun bilan périodique n'a été fait.
+    const dernier = dernierPeriodique || dateDemarrage || null;
     const ancre = dernier || dateDebut || null;
     if (!ancre) return { dernier, prochain: null, joursAvant: null };
     const dt = this.parse(ancre);
@@ -299,7 +308,7 @@ window.Calc = {
     // Suivi sur le point de finir (moins d'une semaine) : on ne réclame plus de NOUVEAU
     // programme (il dépasserait la fin du suivi) — la bonne action c'est renouveler/clôturer.
     const finProche = suivi.joursRestants !== null && suivi.joursRestants < 7;
-    const b = this.bilanStats(c.bilans);
+    const b = this.bilanStats(c.bilans, null, this.demarrageDate(c.questionnaireInitial));
     if (b.joursAvant !== null && b.joursAvant <= 3) {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });
     }

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e97">
+<link rel="stylesheet" href="css/app.css?v=e98">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e97"></script>
-<script src="js/supabaseClient.js?v=e97"></script>
-<script src="js/auth.js?v=e97"></script>
-<script src="js/db.js?v=e97"></script>
-<script src="js/calc.js?v=e97"></script>
-<script src="js/ui/modal.js?v=e97"></script>
-<script src="js/ui/progress.js?v=e97"></script>
+<script src="js/config.js?v=e98"></script>
+<script src="js/supabaseClient.js?v=e98"></script>
+<script src="js/auth.js?v=e98"></script>
+<script src="js/db.js?v=e98"></script>
+<script src="js/calc.js?v=e98"></script>
+<script src="js/ui/modal.js?v=e98"></script>
+<script src="js/ui/progress.js?v=e98"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -114,8 +114,8 @@ const FILTERS = [
       const jr = Calc.daysFromToday(ech);
       return jr !== null && jr <= 7;
     } },
-  { key: "bilan_du",    label: "Bilan à venir",   test: c => { if (c.cliente.statut === "termine") return false; const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut); return b.joursAvant !== null && b.joursAvant >= 0 && b.joursAvant <= 7; } },
-  { key: "bilan_retard",label: "Bilan en retard", test: c => { if (c.cliente.statut === "termine") return false; const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut); return b.joursAvant !== null && b.joursAvant < 0; } },
+  { key: "bilan_du",    label: "Bilan à venir",   test: c => { if (c.cliente.statut === "termine") return false; const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial)); return b.joursAvant !== null && b.joursAvant >= 0 && b.joursAvant <= 7; } },
+  { key: "bilan_retard",label: "Bilan en retard", test: c => { if (c.cliente.statut === "termine") return false; const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial)); return b.joursAvant !== null && b.joursAvant < 0; } },
   { key: "echeance",    label: "Suivi bientôt fini", test: c => { if (c.cliente.statut === "termine") return false; const s = Calc.suiviStats(c.accompagnement); return s.joursRestants !== null && s.joursRestants >= 0 && s.joursRestants <= 14; } },
   { key: "prog_env",    label: "Programme à envoyer", test: c => {
       if (c.cliente.statut !== "active") return false;
@@ -307,7 +307,7 @@ function renderBilans(){
     const cl = c.cliente;
     const bilans = (c.bilans||[]).slice().sort((a,b)=> a.date<b.date?1:-1);
     const dernier = bilans[0] || null;
-    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut);
+    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial));
     const demarree = !!(c.accompagnement && c.accompagnement.date_debut);
     const aRempli = bilans.length > 0;
     // Une cliente démarrée SANS bilan saisi n'est PAS « jamais rempli » : son bilan
@@ -618,7 +618,7 @@ function renderAlerts() {
   // Priorité d'une alerte : 1 = 🔴 Urgent (en retard / risque), 2 = 🟠 À faire (bientôt).
   const tierFor = (a) => {
     const c = a.c;
-    if (a.type === "bilan"){ const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut); return (b.joursAvant!==null && b.joursAvant<0) ? 1 : 2; }
+    if (a.type === "bilan"){ const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial)); return (b.joursAvant!==null && b.joursAvant<0) ? 1 : 2; }
     if (a.type === "bilan_fin") return 1;
     if (a.type === "renouveler" || a.type === "seances") return 1;
     if (a.type === "programme"){ const s = Calc.programmeStatus(c,"sportif"); return (s && s.statut==="retard") ? 1 : 2; }
@@ -637,7 +637,7 @@ function renderAlerts() {
     if (a.type === "prevoir_seances" || a.type === "seances") return deep("addSeance=1", "Programmer 🗓️");
     // Rappel de bilan → cliquer envoie la demande à la cliente sur WhatsApp.
     if (a.type === "bilan") {
-      const b = Calc.bilanStats(a.c.bilans, a.c.accompagnement && a.c.accompagnement.date_debut);
+      const b = Calc.bilanStats(a.c.bilans, a.c.accompagnement && a.c.accompagnement.date_debut, Calc.demarrageDate(a.c.questionnaireInitial));
       const retard = b.joursAvant !== null && b.joursAvant < 0;
       const wa = Calc.waHref(cl.telephone, Calc.bilanMsg(cl, retard));
       if (wa) {
@@ -791,7 +791,7 @@ function renderList() {
   // Tri (P3) — par défaut : ordre de chargement (plus récentes). On copie avant de trier
   // pour ne pas réordonner STATE.clientes lui-même.
   if (STATE.sort) {
-    const jbilan = c => { const j = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut).joursAvant; return j==null ? 99999 : j; };
+    const jbilan = c => { const j = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial)).joursAvant; return j==null ? 99999 : j; };
     const jfin   = c => { const j = Calc.suiviStats(c.accompagnement).joursRestants; return j==null ? 99999 : j; };
     const rest   = c => Calc.seancesStats(c.accompagnement, c.seances).restantes;
     const cmp = {
@@ -834,7 +834,7 @@ function renderList() {
   cont.innerHTML = `<div class="clientes-grid">` + list.map(c => {
     const cl = c.cliente;
     const s = Calc.seancesStats(c.accompagnement, c.seances);
-    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut);
+    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial));
     const al = Calc.alertes(c);
     const dette = Calc.detteCliente(c);
     const _today = Calc.today();
