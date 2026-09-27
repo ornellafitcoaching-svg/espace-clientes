@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e91">
+<link rel="stylesheet" href="css/app.css?v=e96">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e82"></script>
-<script src="js/supabaseClient.js?v=e82"></script>
-<script src="js/auth.js?v=e82"></script>
-<script src="js/db.js?v=e89"></script>
-<script src="js/calc.js?v=e95"></script>
-<script src="js/ui/modal.js?v=e82"></script>
-<script src="js/ui/progress.js?v=e82"></script>
+<script src="js/config.js?v=e96"></script>
+<script src="js/supabaseClient.js?v=e96"></script>
+<script src="js/auth.js?v=e96"></script>
+<script src="js/db.js?v=e96"></script>
+<script src="js/calc.js?v=e96"></script>
+<script src="js/ui/modal.js?v=e96"></script>
+<script src="js/ui/progress.js?v=e96"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -957,6 +957,21 @@ async function addMyQuestionnaireInitial(){
       if (!mr.error) D.mensurations = (D.mensurations||[]).concat(mrows);
       else console.error("mensurations depuis questionnaire :", mr.error);
     }
+    // L'objectif principal saisi dans le questionnaire remonte automatiquement dans
+    // la section « Objectifs » (visible côté cliente ET côté coach). Try/catch dédié :
+    // si la policy d'insert (migration_19) n'est pas encore passée, le questionnaire
+    // reste enregistré — on ne casse rien, on loggue seulement.
+    const objTitre = (v.objectifs && String(v.objectifs).trim()) || "";
+    if (objTitre){
+      try{
+        const orow = { cliente_id:D.cliente.id, titre:objTitre,
+          description:(v.objectifs_pourquoi && String(v.objectifs_pourquoi).trim()) || null,
+          statut:"en_cours", date_creation:qdate };
+        const or = await sb.from("objectifs").insert(orow);
+        if (or.error) throw or.error;
+        D.objectifs = (D.objectifs||[]).concat([orow]);
+      }catch(oe){ console.error("objectif depuis questionnaire :", oe); }
+    }
     UI.toast("Questionnaire envoyé à Ornella ✓"); render();
     const msg = `Bonjour Ornella, c'est ${PRENOM} 🙂 J'ai rempli mon questionnaire de démarrage dans mon espace ✅`;
     const wa = waHref(msg);
@@ -1076,10 +1091,7 @@ function viewBilans(){
       <div class="isub" style="color:rgba(255,255,255,.7);margin-top:2px">On refait le point + les mensurations à chaque bilan.${b.prochain?` Prochain : <strong style="color:#fff">${Calc.fmt(b.prochain)}</strong>${b.joursAvant!=null&&b.joursAvant>=0?` (dans ${b.joursAvant} j)`:""}.`:""}</div>
       <button id="addBilanBtn" class="btn-accent btn-sm" style="margin-top:12px"><span>➕</span> Faire mon bilan</button>
     </div>`;
-  if (!list.length) return entete + questionnaireInitialCard() + questionnaireNutritionCard() + bilanDemarrageCard() + `<div class="card" style="margin-top:14px;border-left:4px solid var(--gold)">
-      <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:700;color:var(--accent-deep);margin-bottom:4px">${adr("Ton premier bilan t'attend ✨","Votre premier bilan vous attend ✨")}</div>
-      <p class="isub" style="color:var(--text-mid)">${adr("Il sera ton point de départ. Prends 2 minutes pour faire le point sur tes sensations, ton énergie et ta progression — c'est ce qui rendra tes progrès visibles au fil des semaines 💛","Il sera votre point de départ. Prenez 2 minutes pour faire le point sur vos sensations, votre énergie et votre progression — c'est ce qui rendra vos progrès visibles au fil des semaines 💛")}</p>
-    </div>`;
+  if (!list.length) return entete + questionnaireInitialCard() + questionnaireNutritionCard() + bilanDemarrageCard();
   return entete + questionnaireInitialCard() + questionnaireNutritionCard() + bilanDemarrageCard() + list.map(x=>{
     const mesures = mensuAutour(x.date);
     const mensuBlock = mesures.length ? `

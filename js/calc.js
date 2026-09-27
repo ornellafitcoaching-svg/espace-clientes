@@ -271,6 +271,11 @@ window.Calc = {
     // TOUTES les relances « à faire » (bilan, séances, fin de suivi, programmes…).
     const enPause = c.cliente && c.cliente.statut === "en_pause";
     if (enPause) return out;
+    // Cliente au statut « Terminé » : suivi clôturé (en attente d'un éventuel
+    // renouvellement) → plus AUCUNE relance « à faire » (bilan, séances, programmes…).
+    // On garde uniquement les notifs de CONSULTATION collectées plus haut.
+    const estTermine = c.cliente && c.cliente.statut === "termine";
+    if (estTermine) return out;
     const ac = c.accompagnement || null;
     const suivi = this.suiviStats(ac);
     const dateFin = ac && ac.date_fin ? ac.date_fin : null;
@@ -869,7 +874,7 @@ window.Calc = {
     { id:"douleurs_effort", q:"Déjà ressenti des gênes / douleurs à l’effort ?", type:"select", options:["Non","Oui"] },
     { id:"amenagements", q:"Besoin d’aménagements spécifiques en séance ?", type:"textarea" },
     { id:"tabac", q:"Tu fumes ? (depuis quand · combien par jour) 🚬" },
-    { id:"alcool", q:"Tu bois de l’alcool ? À quelle fréquence ? 🍷", type:"select", options:["Jamais","Rarement","Occasionnellement","Souvent"] },
+    { id:"alcool", q:"Et côté alcool ? (juste pour adapter mes conseils, aucun jugement 🙂)", type:"select", options:["Jamais","Rarement","De temps en temps","Régulièrement"] },
     { id:"complements", q:"Tu prends des compléments alimentaires ? Lesquels ?" },
 
     { section:"🍽️ Ta nutrition" },
