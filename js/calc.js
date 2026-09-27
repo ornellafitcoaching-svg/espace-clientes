@@ -245,6 +245,14 @@ window.Calc = {
       const dernier = qiCliente.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
       out.push({ type: "nouveau_questionnaire", label: "Questionnaire de démarrage rempli", icon: "🆕", date: String(dernier.created_at).slice(0, 10) });
     }
+    // Questionnaire ALIMENTAIRE (bilan nutrition) rempli par la cliente récemment (≤ 14 j).
+    const qnCliente = (c.questionnaireNutrition || []).filter((x) =>
+      (x.saisi_par === "cliente" || !x.saisi_par) && x.created_at &&
+      this.daysFromToday(String(x.created_at).slice(0, 10)) >= -14);
+    if (qnCliente.length) {
+      const dernier = qnCliente.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+      out.push({ type: "nouveau_questionnaire_nutrition", label: "Questionnaire alimentaire rempli", icon: "🥗", date: String(dernier.created_at).slice(0, 10) });
+    }
     // Mensurations saisies par la CLIENTE récemment (≤ 10 j) → à consulter côté coach.
     // On n'affiche PAS ce badge si un « nouveau bilan » OU un questionnaire est déjà signalé :
     // ils contiennent déjà ces mensurations, inutile de notifier deux fois le même moment.
@@ -907,5 +915,70 @@ window.Calc = {
     { id:"creneaux", q:"Tes jours / créneaux horaires préférés ? ⏰", type:"textarea" },
     { id:"retours_technique", q:"Prête à envoyer des retours (photos/vidéos) pour corriger ta technique ?", type:"select", options:["Oui","À voir","Non pour le moment"] },
     { id:"type_accompagnement", q:"Quel type d’accompagnement souhaites-tu ?", type:"select", options:["Coaching présentiel (à domicile)","Coaching hybride","Coaching à distance"] },
+  ],
+
+  // Questionnaire ALIMENTAIRE de départ (« bilan nutrition ») — rempli UNE FOIS,
+  // séparé du questionnaire de démarrage. Objectif : allergies (à ne surtout pas
+  // manquer), habitudes, goûts et contraintes pour un plan nutrition sur-mesure.
+  QN: [
+    { section:"🎯 Ton objectif nutrition" },
+    { id:"obj_nutrition", q:"Ton objectif principal côté alimentation ? 🎯", type:"select", options:["Perte de poids","Perdre du gras & me tonifier","Prise de muscle","Rééquilibrage & santé","Plus d’énergie au quotidien","Gérer une contrainte médicale"] },
+    { id:"poids_actuel", q:"Ton poids actuel (kg) ⚖️", type:"number" },
+    { id:"poids_objectif", q:"Ton poids qui te ferait te sentir bien (kg) ✨", type:"number" },
+    { id:"deadline_nutri", q:"Tu as une échéance en tête ?", type:"select", options:["Pas de date précise","Dans 1 à 2 mois","Dans 3 à 6 mois","Un événement précis 📅"] },
+
+    { section:"🚫 Allergies & intolérances (important)" },
+    { id:"allergies", q:"As-tu des allergies alimentaires ? ⚠️", type:"select", options:["Non, aucune","Oui (je précise juste en dessous)"] },
+    { id:"allergies_detail", q:"Si oui, lesquelles ? (arachide, fruits à coque, œuf, lait, gluten, fruits de mer, soja…)", type:"textarea" },
+    { id:"intolerances", q:"Des intolérances ?", type:"select", options:["Aucune","Lactose","Gluten","Plusieurs / autre (je précise)"] },
+    { id:"intolerances_detail", q:"Précise ton intolérance si besoin", type:"text" },
+    { id:"aliments_interdits", q:"Des aliments interdits pour raison médicale ou religieuse ? 🚫", type:"textarea" },
+
+    { section:"🍽️ Tes habitudes alimentaires" },
+    { id:"nb_repas", q:"Combien de repas par jour en général ?", type:"select", options:["1","2","3","4 et +","Ça varie"] },
+    { id:"horaires_reguliers", q:"Tes horaires de repas sont plutôt :", type:"select", options:["Réguliers","Variables","Décalés (travail de nuit, etc.)"] },
+    { id:"petit_dej_nutri", q:"Tu prends un petit-déjeuner ? 🍳", type:"select", options:["Oui, tous les jours","Parfois","Jamais"] },
+    { id:"grignotage_nutri", q:"Tu grignotes entre les repas ?", type:"select", options:["Non","Parfois","Souvent","Surtout le soir 🌙"] },
+    { id:"cuisine_maison", q:"Tu manges plutôt :", type:"select", options:["Cuisine maison","Un peu des deux","Plats préparés & livraison surtout"] },
+    { id:"temps_cuisine", q:"Combien de temps tu peux consacrer à cuisiner ? ⏱️", type:"select", options:["J’ai le temps","Un peu","Très peu → il me faut rapide"] },
+    { id:"qui_cuisine", q:"Qui cuisine à la maison ?", type:"select", options:["Moi","Mon conjoint","On partage","Personne (extérieur / livraison)"] },
+    { id:"budget_courses", q:"Ton budget courses est plutôt :", type:"select", options:["Serré","Moyen","Confortable"] },
+
+    { section:"😋 Tes goûts" },
+    { id:"aliments_aimes", q:"Les aliments que tu adores 😍", type:"textarea" },
+    { id:"aliments_detestes", q:"Ceux que tu ne mangeras JAMAIS 🚫", type:"textarea" },
+    { id:"legumes_ok", q:"Ton rapport aux légumes 🥦", type:"select", options:["J’adore","Quelques-uns seulement","Peu","Pas du tout"] },
+    { id:"proteines_pref", q:"Tes sources de protéines préférées :", type:"select", options:["Viande","Poisson","Œufs","Végétal (tofu, légumineuses)","Un peu de tout"] },
+    { id:"sucre_sale", q:"Tu es plutôt :", type:"select", options:["Sucré 🍫","Salé 🧀","Les deux"] },
+    { id:"epices", q:"Tu aimes les plats épicés ? 🌶️", type:"select", options:["Oui j’aime","Doux plutôt","Peu importe"] },
+
+    { section:"🥤 Boissons & alimentation actuelle" },
+    { id:"regime_particulier", q:"Tu suis un régime particulier ?", type:"select", options:["Aucun","Végétarien","Végan","Sans porc","Halal","Casher","Autre (je précise)"] },
+    { id:"regime_detail", q:"Précise ton régime si « autre »", type:"text" },
+    { id:"eau_jour", q:"Tu bois combien d’eau par jour ? 💧", type:"select", options:["Moins de 0,5 L","~1 L","~1,5 L","2 L et +"] },
+    { id:"boissons_sucrees", q:"Sodas / jus sucrés ?", type:"select", options:["Jamais","Parfois","Souvent"] },
+    { id:"alcool_nutri", q:"Alcool 🍷", type:"select", options:["Jamais","Occasionnel","Régulier"] },
+    { id:"fast_food", q:"Fast-food / à emporter ?", type:"select", options:["Jamais","~1 fois/semaine","Plusieurs fois/semaine"] },
+
+    { section:"🧠 Ton rapport à la nourriture" },
+    { id:"faim_emotionnelle", q:"Tu manges parfois par stress, ennui ou émotions ?", type:"select", options:["Non","Parfois","Souvent"] },
+    { id:"fringales_quand", q:"Tes fringales arrivent surtout :", type:"select", options:["Rarement","L’après-midi","Le soir","La nuit"] },
+    { id:"compulsions", q:"Des craquages / compulsions ?", type:"select", options:["Non","Parfois","Souvent"] },
+    { id:"regimes_passes", q:"Régimes déjà testés + résultat (effet yoyo ?) 📉", type:"textarea" },
+    { id:"rapport_nourriture", q:"Comment tu vis ton rapport au poids et à la nourriture ? (optionnel)", type:"textarea" },
+
+    { section:"🩺 Digestion & santé" },
+    { id:"digestion", q:"Ta digestion est plutôt :", type:"select", options:["Bonne","Ballonnements","Transit difficile","Variable"] },
+    { id:"soucis_digestifs", q:"Soucis digestifs particuliers ? (reflux, côlon irritable…)", type:"textarea" },
+    { id:"pathologies_nutri", q:"À prendre en compte : diabète, cholestérol, tension, thyroïde… ? 🩺", type:"textarea" },
+    { id:"grossesse_allaitement", q:"Concernée en ce moment par :", type:"select", options:["Non concernée","Grossesse 🤰","Allaitement 🤱"] },
+    { id:"complements_nutri", q:"Compléments alimentaires pris en ce moment ?", type:"text" },
+
+    { section:"📅 Ton programme idéal" },
+    { id:"nb_repas_souhaite", q:"Tu préfères un plan à :", type:"select", options:["3 repas","3 repas + 1 collation","2 repas","Peu importe, à toi de voir"] },
+    { id:"snacks_ok", q:"Les collations, tu en veux ?", type:"select", options:["Oui j’aime les collations","Non merci"] },
+    { id:"recettes", q:"Côté recettes :", type:"select", options:["Oui, donne-moi des idées recettes","Juste des repères simples"] },
+    { id:"batch_cooking", q:"Préparer les repas à l’avance (batch cooking) ?", type:"select", options:["Oui ça m’intéresse","Non, au jour le jour"] },
+    { id:"contraintes_nutri", q:"Contraintes à connaître ? (travail décalé, déplacements, cantine, famille…) 📌", type:"textarea" },
   ],
 };
