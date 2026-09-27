@@ -333,6 +333,11 @@ window.Calc = {
       if (avecRdv && s.restantes > 2 && programmees <= 2) {
         out.push({ type: "prevoir_seances", label: "Prévoir des séances", icon: "🗓️" });
       }
+      // Adresse manquante pour une cliente vue en personne : sans elle, l'événement
+      // agenda Apple (fichier .ics) n'a pas de lieu → on invite à la renseigner.
+      if (avecRdv && !(c.cliente.adresse && String(c.cliente.adresse).trim())) {
+        out.push({ type: "adresse", label: "Adresse à renseigner (pour l'agenda)", icon: "📍" });
+      }
     }
     // NB : le bilan de démarrage n'est PAS une alerte automatique — c'est Ornella
     // qui choisit de l'envoyer via le bouton sur la fiche (pas de notif imposée).
