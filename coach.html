@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e96">
+<link rel="stylesheet" href="css/app.css?v=e97">
 </head>
 <body>
 <header class="topbar">
@@ -82,13 +82,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e96"></script>
-<script src="js/supabaseClient.js?v=e96"></script>
-<script src="js/auth.js?v=e96"></script>
-<script src="js/db.js?v=e96"></script>
-<script src="js/calc.js?v=e96"></script>
-<script src="js/ui/modal.js?v=e96"></script>
-<script src="js/ui/progress.js?v=e96"></script>
+<script src="js/config.js?v=e97"></script>
+<script src="js/supabaseClient.js?v=e97"></script>
+<script src="js/auth.js?v=e97"></script>
+<script src="js/db.js?v=e97"></script>
+<script src="js/calc.js?v=e97"></script>
+<script src="js/ui/modal.js?v=e97"></script>
+<script src="js/ui/progress.js?v=e97"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -569,13 +569,24 @@ function renderStats() {
   const hybride    = parType("hybride");
   const aTraiter = cs.filter(c => Calc.alertes(c).length > 0).length;
   const goto = (tab) => `onclick="document.querySelector('.ctab[data-tab=&quot;${tab}&quot;]')?.click()" style="cursor:pointer"`;
+  // Clic sur une tuile de type → bascule sur l'onglet Clientes ET applique le filtre correspondant.
+  const ff = (key) => `onclick="statFilter(${key ? `'${key}'` : "null"})" style="cursor:pointer"`;
   const tile = (k, v, attrs = "") => `<div class="stat-tile" ${attrs}><div class="k">${k}</div><div class="v">${v}</div></div>`;
   box.innerHTML =
-    tile("En cours", enCours.length, goto("clientes")) +
-    tile("Présentiel", presentiel, goto("clientes")) +
-    tile("Distanciel", distanciel, goto("clientes")) +
-    (hybride ? tile("Hybride", hybride, goto("clientes")) : "") +
+    tile("En cours", enCours.length, ff(null)) +
+    tile("Présentiel", presentiel, ff("presentiel")) +
+    tile("Distanciel", distanciel, ff("distanciel")) +
+    (hybride ? tile("Hybride", hybride, ff("hybride")) : "") +
     tile("À traiter", aTraiter, aTraiter ? goto("traiter") : "");
+}
+
+// Applique un filtre de liste depuis une tuile chiffrée (bascule d'abord sur l'onglet Clientes).
+function statFilter(key){
+  const tabBtn = document.querySelector('.ctab[data-tab="clientes"]');
+  if (tabBtn) tabBtn.click();
+  STATE.filter = key || null;
+  renderFilters(); renderList();
+  window.scrollTo(0, 0);
 }
 
 // --- Notifs « 🆕 » marquables comme LUES (mémorisé sur cet appareil) -----------
@@ -757,6 +768,9 @@ function renderFilters() {
 function renderList() {
   const cont = document.getElementById("content");
   let list = STATE.clientes;
+  // Les clientes clôturées (Terminé) ne polluent plus la liste des clientes en cours :
+  // elles n'apparaissent QUE via le filtre dédié « Terminées ».
+  if (STATE.filter !== "termine") list = list.filter(c => c.cliente.statut !== "termine");
   if (STATE.q) {
     const q = STATE.q.toLowerCase();
     const qDigits = q.replace(/\D/g, ""); // recherche par téléphone tolérante au format
@@ -790,9 +804,14 @@ function renderList() {
   }
   // Raccourci global : total des séances restantes sur l'ensemble des clientes affichées.
   const totRestantes = list.reduce((n,c)=> n + Calc.seancesStats(c.accompagnement, c.seances).restantes, 0);
+  // Le compte de référence = les clientes EN COURS (hors Terminé), sauf sur le filtre « Terminées ».
+  const enCoursTotal = STATE.filter === "termine"
+    ? STATE.clientes.filter(c => c.cliente.statut === "termine").length
+    : STATE.clientes.filter(c => c.cliente.statut !== "termine").length;
+  const motCliente = STATE.filter === "termine" ? "terminée" : "en cours";
   document.getElementById("sub").textContent =
-    `${STATE.clientes.length} cliente${STATE.clientes.length>1?'s':''}` +
-    (list.length !== STATE.clientes.length ? ` · ${list.length} affichée${list.length>1?'s':''}` : "") +
+    `${enCoursTotal} cliente${enCoursTotal>1?'s':''} ${motCliente}` +
+    (list.length !== enCoursTotal ? ` · ${list.length} affichée${list.length>1?'s':''}` : "") +
     (totRestantes ? ` · ⏳ ${totRestantes} séance${totRestantes>1?'s':''} restante${totRestantes>1?'s':''} au total` : "");
 
   if (!list.length) {

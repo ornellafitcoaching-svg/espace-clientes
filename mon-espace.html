@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=e96">
+<link rel="stylesheet" href="css/app.css?v=e97">
 </head>
 <body>
 <header class="topbar">
@@ -23,13 +23,13 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e96"></script>
-<script src="js/supabaseClient.js?v=e96"></script>
-<script src="js/auth.js?v=e96"></script>
-<script src="js/db.js?v=e96"></script>
-<script src="js/calc.js?v=e96"></script>
-<script src="js/ui/modal.js?v=e96"></script>
-<script src="js/ui/progress.js?v=e96"></script>
+<script src="js/config.js?v=e97"></script>
+<script src="js/supabaseClient.js?v=e97"></script>
+<script src="js/auth.js?v=e97"></script>
+<script src="js/db.js?v=e97"></script>
+<script src="js/calc.js?v=e97"></script>
+<script src="js/ui/modal.js?v=e97"></script>
+<script src="js/ui/progress.js?v=e97"></script>
 <script>
 let D = null;          // dossier de la cliente
 let VIEW = "accueil";  // vue courante
@@ -957,11 +957,23 @@ async function addMyQuestionnaireInitial(){
       if (!mr.error) D.mensurations = (D.mensurations||[]).concat(mrows);
       else console.error("mensurations depuis questionnaire :", mr.error);
     }
-    // L'objectif principal saisi dans le questionnaire remonte automatiquement dans
-    // la section « Objectifs » (visible côté cliente ET côté coach). Try/catch dédié :
-    // si la policy d'insert (migration_19) n'est pas encore passée, le questionnaire
-    // reste enregistré — on ne casse rien, on loggue seulement.
     const objTitre = (v.objectifs && String(v.objectifs).trim()) || "";
+    // Le questionnaire renseigne AUTOMATIQUEMENT le profil : objectif principal (résumé
+    // de la fiche coach + accueil cliente) et taille (→ IMC / masse grasse). La cliente
+    // ne peut pas écrire la table `clientes` directement (RLS) → fonction SECURITY DEFINER
+    // apply_questionnaire_profile (migration_20) qui ne touche QUE son dossier, sans écraser
+    // ce qu'Ornella aurait déjà saisi. Try/catch dédié : si la migration n'est pas passée,
+    // le questionnaire reste enregistré.
+    const tailleNum = Number(String(v.taille||"").replace(",","."));
+    const pTaille = (isFinite(tailleNum) && tailleNum>0) ? tailleNum : null;
+    try{
+      const pr = await sb.rpc("apply_questionnaire_profile", { p_objectif: objTitre, p_taille: pTaille });
+      if (pr.error) throw pr.error;
+      if (objTitre && !String(D.cliente.objectif_principal||"").trim()) D.cliente.objectif_principal = objTitre;
+      if (pTaille && D.cliente.taille_cm==null) D.cliente.taille_cm = pTaille;
+    }catch(pe){ console.error("profil depuis questionnaire :", pe); }
+    // L'objectif remonte aussi dans la section « Objectifs » (visible cliente ET coach).
+    // Si la policy d'insert (migration_19) n'est pas encore passée, on loggue seulement.
     if (objTitre){
       try{
         const orow = { cliente_id:D.cliente.id, titre:objTitre,
