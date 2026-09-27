@@ -581,7 +581,13 @@ function renderStats() {
 // --- Notifs « 🆕 » marquables comme LUES (mémorisé sur cet appareil) -----------
 // Identifiant stable d'une notif = type + cliente + date → permet de la masquer une
 // fois consultée sans la faire réapparaître à chaque rechargement.
-function notifId(a){ return a.type + ":" + (a.c && a.c.cliente ? a.c.cliente.id : "") + ":" + (a.date || ""); }
+function notifId(a){
+  const cl = (a.c && a.c.cliente ? a.c.cliente.id : "");
+  // Notif d'ÉVÉNEMENT (a.date = date de l'événement, ex. bilan rempli) → masquée
+  // DÉFINITIVEMENT. Rappel de TÂCHE (sans date) → clé datée du jour = « masquer
+  // pour aujourd'hui », réapparaît demain s'il n'est pas traité (pas de todo oublié).
+  return a.type + ":" + cl + ":" + (a.date || ("jour:" + Calc.today()));
+}
 function notifReadSet(){
   try { return new Set(JSON.parse(localStorage.getItem("ofc_notif_read") || "[]")); }
   catch(_) { return new Set(); }
@@ -704,33 +710,34 @@ function renderAlerts() {
   // Les notifs « 🆕 » (bilan rempli par une cliente, nouvelles mensurations) restent
   // TOUJOURS VISIBLES en haut, hors onglets — ce sont des notifs importantes.
   const estNouveau = (a) => a.type === "nouveau_bilan" || a.type === "nouvelle_mensuration" || a.type === "nouveau_questionnaire" || a.type === "nouveau_questionnaire_nutrition";
-  // Notifs 🆕 : on masque celles déjà marquées « lues » (sur cet appareil).
+  // TOUTES les notifs sont masquables (bouton ✓). On retire celles déjà marquées
+  // « lues » sur cet appareil (les 🆕 définitivement, les rappels de tâche pour la journée).
   const READ = notifReadSet();
-  const nouveauxAll = all.filter(estNouveau);
-  const nouveaux = nouveauxAll.filter(a => !READ.has(notifId(a)));
-  const reste    = all.filter(a => !estNouveau(a)).slice(0, 60);
-  // Chaque notif 🆕 a un bouton « ✓ » pour la retirer une fois consultée.
-  const pinnedHtml = (a) => `<div style="display:flex;align-items:stretch;gap:6px">
+  const visible = all.filter(a => !READ.has(notifId(a)));
+  const nouveaux = visible.filter(estNouveau);
+  const reste    = visible.filter(a => !estNouveau(a)).slice(0, 60);
+  // Chaque notif a un bouton « ✓ » pour la retirer une fois consultée / traitée.
+  const rowWithDismiss = (a) => `<div style="display:flex;align-items:stretch;gap:6px">
       <div style="flex:1;min-width:0">${alertHtml(a)}</div>
-      <button class="notif-read" data-read="${esc(notifId(a))}" title="Marquer comme lu" aria-label="Marquer comme lu"
+      <button class="notif-read" data-read="${esc(notifId(a))}" title="Masquer cette notif" aria-label="Masquer cette notif"
         style="flex:none;border:1px solid var(--line);background:var(--white);border-radius:12px;padding:0 14px;cursor:pointer;font-size:1.1rem;color:var(--ok)">✓</button>
     </div>`;
   if (pin) pin.innerHTML = nouveaux.length
-    ? `<div style="display:flex;flex-direction:column;gap:8px;margin:10px 0 4px">${nouveaux.map(pinnedHtml).join("")}</div>`
+    ? `<div style="display:flex;flex-direction:column;gap:8px;margin:10px 0 4px">${nouveaux.map(rowWithDismiss).join("")}</div>`
     : "";
   // À traiter regroupé par priorité : 🔴 Urgent puis 🟠 À faire. Chaque ligne mène droit à l'action.
   const urgent = reste.filter(a => tierFor(a) === 1);
   const afaire = reste.filter(a => tierFor(a) === 2);
   const groupHtml = (titre, couleur, arr) => arr.length
     ? `<div class="todo-head" style="color:${couleur}">${titre} (${arr.length})</div>
-       <div style="display:flex;flex-direction:column;gap:8px;width:100%;margin-bottom:6px">${arr.map(alertHtml).join("")}</div>`
+       <div style="display:flex;flex-direction:column;gap:8px;width:100%;margin-bottom:6px">${arr.map(rowWithDismiss).join("")}</div>`
     : "";
   box.innerHTML = (urgent.length || afaire.length)
     ? groupHtml("🔴 Urgent", "#c0564b", urgent) + groupHtml("🟠 À faire", "#b87316", afaire)
     : `<div class="card" style="text-align:center;padding:22px 18px">
-         <p class="empty" style="font-style:normal;margin:0">🟢 Aucune alerte urgente — tu es à jour ✨</p></div>`;
-  // Compteur sur l'onglet « À traiter » : toutes les alertes SAUF les 🆕 déjà lues.
-  const visibleCount = all.length - (nouveauxAll.length - nouveaux.length);
+         <p class="empty" style="font-style:normal;margin:0">🟢 Rien à traiter — tu es à jour ✨</p></div>`;
+  // Compteur sur l'onglet « À traiter » : uniquement les notifs encore visibles.
+  const visibleCount = visible.length;
   if (badge){ if (visibleCount){ badge.textContent = visibleCount; badge.hidden = false; } else badge.hidden = true; }
 }
 
@@ -995,12 +1002,14 @@ function openPendingLot(){
   document.getElementById("logout").onclick = () => Auth.signOut();
   document.getElementById("q").addEventListener("input", e => { STATE.q = e.target.value.trim(); renderList(); });
   document.getElementById("sort").addEventListener("change", e => { STATE.sort = e.target.value; renderList(); });
-  // Bouton « ✓ » sur une notif 🆕 → la marquer comme lue (elle disparaît du haut).
-  document.getElementById("pinnedNotifs").addEventListener("click", (e) => {
+  // Bouton « ✓ » sur une notif (en haut OU dans « À traiter ») → la masquer.
+  const onDismiss = (e) => {
     const b = e.target.closest("[data-read]"); if (!b) return;
     e.preventDefault(); e.stopPropagation();
     notifMarkRead(b.dataset.read);
-  });
+  };
+  document.getElementById("pinnedNotifs").addEventListener("click", onDismiss);
+  document.getElementById("alerts").addEventListener("click", onDismiss);
   // Clic sur une pastille de bilan dans une carte → WhatsApp (sans naviguer vers la fiche).
   document.getElementById("content").addEventListener("click", (e) => {
     const w = e.target.closest(".dot-wa");
