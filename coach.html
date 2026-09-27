@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e82"></script>
 <script src="js/auth.js?v=e82"></script>
 <script src="js/db.js?v=e89"></script>
-<script src="js/calc.js?v=e94"></script>
+<script src="js/calc.js?v=e95"></script>
 <script src="js/ui/modal.js?v=e82"></script>
 <script src="js/ui/progress.js?v=e82"></script>
 <script>
@@ -578,6 +578,20 @@ function renderStats() {
     tile("Nouvelles · 30 j", nouvelles, goto("clientes"));
 }
 
+// --- Notifs « 🆕 » marquables comme LUES (mémorisé sur cet appareil) -----------
+// Identifiant stable d'une notif = type + cliente + date → permet de la masquer une
+// fois consultée sans la faire réapparaître à chaque rechargement.
+function notifId(a){ return a.type + ":" + (a.c && a.c.cliente ? a.c.cliente.id : "") + ":" + (a.date || ""); }
+function notifReadSet(){
+  try { return new Set(JSON.parse(localStorage.getItem("ofc_notif_read") || "[]")); }
+  catch(_) { return new Set(); }
+}
+function notifMarkRead(id){
+  const s = notifReadSet(); s.add(id);
+  try { localStorage.setItem("ofc_notif_read", JSON.stringify([...s])); } catch(_){}
+  renderAlerts();
+}
+
 function renderAlerts() {
   const box = document.getElementById("alerts");
   const all = [];
@@ -690,10 +704,19 @@ function renderAlerts() {
   // Les notifs « 🆕 » (bilan rempli par une cliente, nouvelles mensurations) restent
   // TOUJOURS VISIBLES en haut, hors onglets — ce sont des notifs importantes.
   const estNouveau = (a) => a.type === "nouveau_bilan" || a.type === "nouvelle_mensuration" || a.type === "nouveau_questionnaire" || a.type === "nouveau_questionnaire_nutrition";
-  const nouveaux = all.filter(estNouveau);
+  // Notifs 🆕 : on masque celles déjà marquées « lues » (sur cet appareil).
+  const READ = notifReadSet();
+  const nouveauxAll = all.filter(estNouveau);
+  const nouveaux = nouveauxAll.filter(a => !READ.has(notifId(a)));
   const reste    = all.filter(a => !estNouveau(a)).slice(0, 60);
+  // Chaque notif 🆕 a un bouton « ✓ » pour la retirer une fois consultée.
+  const pinnedHtml = (a) => `<div style="display:flex;align-items:stretch;gap:6px">
+      <div style="flex:1;min-width:0">${alertHtml(a)}</div>
+      <button class="notif-read" data-read="${esc(notifId(a))}" title="Marquer comme lu" aria-label="Marquer comme lu"
+        style="flex:none;border:1px solid var(--line);background:var(--white);border-radius:12px;padding:0 14px;cursor:pointer;font-size:1.1rem;color:var(--ok)">✓</button>
+    </div>`;
   if (pin) pin.innerHTML = nouveaux.length
-    ? `<div style="display:flex;flex-direction:column;gap:8px;margin:10px 0 4px">${nouveaux.map(alertHtml).join("")}</div>`
+    ? `<div style="display:flex;flex-direction:column;gap:8px;margin:10px 0 4px">${nouveaux.map(pinnedHtml).join("")}</div>`
     : "";
   // À traiter regroupé par priorité : 🔴 Urgent puis 🟠 À faire. Chaque ligne mène droit à l'action.
   const urgent = reste.filter(a => tierFor(a) === 1);
@@ -706,8 +729,9 @@ function renderAlerts() {
     ? groupHtml("🔴 Urgent", "#c0564b", urgent) + groupHtml("🟠 À faire", "#b87316", afaire)
     : `<div class="card" style="text-align:center;padding:22px 18px">
          <p class="empty" style="font-style:normal;margin:0">🟢 Aucune alerte urgente — tu es à jour ✨</p></div>`;
-  // Compteur sur l'onglet « À traiter » (toutes les alertes, y compris les 🆕).
-  if (badge){ if (all.length){ badge.textContent = all.length; badge.hidden = false; } else badge.hidden = true; }
+  // Compteur sur l'onglet « À traiter » : toutes les alertes SAUF les 🆕 déjà lues.
+  const visibleCount = all.length - (nouveauxAll.length - nouveaux.length);
+  if (badge){ if (visibleCount){ badge.textContent = visibleCount; badge.hidden = false; } else badge.hidden = true; }
 }
 
 // ---- Filtres ----
@@ -971,6 +995,12 @@ function openPendingLot(){
   document.getElementById("logout").onclick = () => Auth.signOut();
   document.getElementById("q").addEventListener("input", e => { STATE.q = e.target.value.trim(); renderList(); });
   document.getElementById("sort").addEventListener("change", e => { STATE.sort = e.target.value; renderList(); });
+  // Bouton « ✓ » sur une notif 🆕 → la marquer comme lue (elle disparaît du haut).
+  document.getElementById("pinnedNotifs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-read]"); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    notifMarkRead(b.dataset.read);
+  });
   // Clic sur une pastille de bilan dans une carte → WhatsApp (sans naviguer vers la fiche).
   document.getElementById("content").addEventListener("click", (e) => {
     const w = e.target.closest(".dot-wa");
