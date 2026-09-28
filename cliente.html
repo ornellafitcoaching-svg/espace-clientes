@@ -29,7 +29,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=f02"></script>
+<script src="js/calc.js?v=f03"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -59,7 +59,7 @@ function render(focusTitle){
   const prevY = window.scrollY;
   const cl = D.cliente, ac = D.accompagnement;
   const s = Calc.seancesStats(ac, D.seances);
-  const b = Calc.bilanStats(D.bilans, ac && ac.date_debut, Calc.demarrageDate(D.questionnaire_initial));
+  const b = Calc.bilanStats(D.bilans, ac && ac.date_debut, Calc.demarrageDate(D.questionnaire_initial), Calc.checkinClienteDate(D.mensurations));
   const suivi = Calc.suiviStats(ac);
   const sport = lastProg("sportif"), nutri = lastProg("nutrition");
   const pay = Calc.paiementsStats(D.paiements, ac);
@@ -399,7 +399,7 @@ function sectionProgrammes(){
 function sectionBilans(){
   const list = D.bilans||[];
   const cl = D.cliente;
-  const b = Calc.bilanStats(list, D.accompagnement && D.accompagnement.date_debut, Calc.demarrageDate(D.questionnaire_initial));
+  const b = Calc.bilanStats(list, D.accompagnement && D.accompagnement.date_debut, Calc.demarrageDate(D.questionnaire_initial), Calc.checkinClienteDate(D.mensurations));
   const retard = b.joursAvant !== null && b.joursAvant < 0;
   const wa = Calc.waHref(cl.telephone, Calc.bilanMsg(cl, retard));
   // Bouton « Demander son bilan » (WhatsApp, connexion 1 clic à son espace).

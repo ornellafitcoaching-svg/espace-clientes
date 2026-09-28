@@ -107,12 +107,26 @@ window.Calc = {
     const dates = (list || []).map(x => x && x.date).filter(Boolean);
     return dates.length ? dates.slice().sort()[0] : null;
   },
-  bilanStats(bilans, dateDebut, dateDemarrage) {
+  // Dernière prise de mesures faite par la CLIENTE elle-même = son « check-in » des 4 semaines.
+  // Quand une cliente saisit ses mensurations, ça VAUT bilan : le cycle des 4 semaines repart
+  // de cette date (elle sort de « À traiter » et le prochain bilan avance) — même sans remplir
+  // le formulaire « bilan » (ressenti/évolution). On ne compte QUE les mesures saisies par la
+  // cliente (pas celles que la coach relève en présentiel, saisi_par='coach').
+  checkinClienteDate(mensurations) {
+    const dates = (mensurations || [])
+      .filter(m => m && m.saisi_par === "cliente" && m.date)
+      .map(m => m.date);
+    return dates.length ? dates.slice().sort().slice(-1)[0] : null;
+  },
+  bilanStats(bilans, dateDebut, dateDemarrage, dateCheckin) {
     const has = bilans && bilans.length;
     const dernierPeriodique = has ? [...bilans].sort((a, b) => (a.date < b.date ? 1 : -1))[0].date : null;
-    // Le questionnaire de démarrage est le PREMIER bilan : il fait office de « dernier bilan »
-    // et d'ancre du prochain (à +4 semaines) tant qu'aucun bilan périodique n'a été fait.
-    const dernier = dernierPeriodique || dateDemarrage || null;
+    // Ancres possibles du « dernier point » : le dernier bilan formel OU le dernier check-in
+    // (mensurations saisies par la cliente). On prend la plus RÉCENTE des deux.
+    // Le questionnaire de démarrage est le PREMIER bilan : point de départ tant qu'aucun bilan
+    // périodique ni check-in n'a eu lieu.
+    const anchors = [dernierPeriodique, dateCheckin].filter(Boolean).sort();
+    const dernier = anchors.length ? anchors[anchors.length - 1] : (dateDemarrage || null);
     const ancre = dernier || dateDebut || null;
     if (!ancre) return { dernier, prochain: null, joursAvant: null };
     const dt = this.parse(ancre);
@@ -308,7 +322,7 @@ window.Calc = {
     // Suivi sur le point de finir (moins d'une semaine) : on ne réclame plus de NOUVEAU
     // programme (il dépasserait la fin du suivi) — la bonne action c'est renouveler/clôturer.
     const finProche = suivi.joursRestants !== null && suivi.joursRestants < 7;
-    const b = this.bilanStats(c.bilans, null, this.demarrageDate(c.questionnaireInitial));
+    const b = this.bilanStats(c.bilans, null, this.demarrageDate(c.questionnaireInitial), this.checkinClienteDate(c.mensurations));
     if (b.joursAvant !== null && b.joursAvant <= 3) {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });
     }
