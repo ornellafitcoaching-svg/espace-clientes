@@ -136,6 +136,36 @@ window.Calc = {
     return { dernier, prochain, joursAvant: this.daysFromToday(prochain) };
   },
 
+  // ===== SOURCE UNIQUE de l'état « bilan » d'une cliente (coach, fiche, espace cliente) =====
+  // Accepte le dossier du dashboard (questionnaireInitial / bilansDemarrage) ou le dossier
+  // complet (questionnaire_initial / bilans_demarrage). Compte comme un « point bilan » :
+  //   • un bilan mensuel,  • le questionnaire de démarrage,  • le bilan de démarrage,
+  //   • des mensurations (saisies par elle OU par toi).
+  // Le plus récent relance le compte à rebours de 4 semaines. Aucun point → date de début.
+  // Renvoie { dernier, prochain, joursAvant, source, parElle, statut }
+  //   statut = "retard" | "bientot" (≤ 7 j) | "ajour" | null (pas démarrée).
+  BILAN_SOURCES: { bilan: "bilan", questionnaire: "questionnaire de démarrage", demarrage: "bilan de démarrage", mensurations: "mensurations" },
+  bilanEtat(c) {
+    if (!c) return { dernier: null, prochain: null, joursAvant: null, source: null, parElle: false, statut: null };
+    const lists = {
+      bilan: c.bilans || [],
+      questionnaire: c.questionnaireInitial || c.questionnaire_initial || [],
+      demarrage: c.bilansDemarrage || c.bilans_demarrage || [],
+      mensurations: c.mensurations || [],
+    };
+    let best = null;
+    Object.keys(lists).forEach(src => lists[src].forEach(x => {
+      const d = this.dateEffective(x);
+      // À date égale, on préfère afficher « bilan » (ordre des clés).
+      if (d && (!best || d > best.d)) best = { d, src, parElle: x.saisi_par === "cliente" };
+    }));
+    const ac = c.accompagnement;
+    const b = this.bilanStats([], ac && ac.date_debut, best ? best.d : null);
+    const j = b.joursAvant;
+    const statut = j === null ? null : j < 0 ? "retard" : j <= 7 ? "bientot" : "ajour";
+    return { ...b, source: best ? best.src : null, parElle: !!(best && best.parElle), statut };
+  },
+
   // Date de fin prévisionnelle = date de début + nb de mois (null si incomplet).
   dateFin(dateDebut, nbMois) {
     if (!dateDebut || !nbMois) return null;
@@ -324,7 +354,8 @@ window.Calc = {
     if (termine) {
       // Bilan de FIN : une seule fois, tant qu'aucun bilan n'est enregistré depuis la date
       // de fin (uniquement si la date de fin est connue).
-      const bilanDeFinFait = (c.bilans || []).some(x => x.date && dateFin && x.date >= dateFin);
+      const dernierPoint = this.bilanEtat(c).dernier;
+      const bilanDeFinFait = !!(dernierPoint && dateFin && dernierPoint >= dateFin);
       if (dateFin && !bilanDeFinFait) out.push({ type: "bilan_fin", label: "Bilan de fin à faire", icon: "🏁" });
       out.push({ type: "fin_termine", label: dateFin ? ("Suivi terminé le " + this.fmt(dateFin) + " → à renouveler") : "Suivi à renouveler", icon: "⏳" });
       return out;
@@ -332,8 +363,9 @@ window.Calc = {
     // Suivi sur le point de finir (moins d'une semaine) : on ne réclame plus de NOUVEAU
     // programme (il dépasserait la fin du suivi) — la bonne action c'est renouveler/clôturer.
     const finProche = suivi.joursRestants !== null && suivi.joursRestants < 7;
-    const b = this.bilanStats(c.bilans, null, this.demarrageDate(c.questionnaireInitial, c.bilansDemarrage));
-    if (b.joursAvant !== null && b.joursAvant <= 3) {
+    const b = this.bilanEtat(c);
+    // Même seuil que la liste « Bilan à faire » du dashboard (retard ou ≤ 7 j) → compteurs cohérents.
+    if (b.statut === "retard" || b.statut === "bientot") {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });
     }
     const s = this.seancesStats(ac, c.seances);
