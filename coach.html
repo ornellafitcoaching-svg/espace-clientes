@@ -86,7 +86,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=f02"></script>
+<script src="js/calc.js?v=f03"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -114,8 +114,8 @@ const FILTERS = [
       const jr = Calc.daysFromToday(ech);
       return jr !== null && jr <= 7;
     } },
-  { key: "bilan_du",    label: "Bilan à venir",   test: c => { if (c.cliente.statut === "termine") return false; const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial)); return b.joursAvant !== null && b.joursAvant >= 0 && b.joursAvant <= 7; } },
-  { key: "bilan_retard",label: "Bilan en retard", test: c => { if (c.cliente.statut === "termine") return false; const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial)); return b.joursAvant !== null && b.joursAvant < 0; } },
+  { key: "bilan_du",    label: "Bilan à venir",   test: c => { if (c.cliente.statut === "termine") return false; const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial, c.bilansDemarrage)); return b.joursAvant !== null && b.joursAvant >= 0 && b.joursAvant <= 7; } },
+  { key: "bilan_retard",label: "Bilan en retard", test: c => { if (c.cliente.statut === "termine") return false; const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial, c.bilansDemarrage)); return b.joursAvant !== null && b.joursAvant < 0; } },
   { key: "echeance",    label: "Suivi bientôt fini", test: c => { if (c.cliente.statut === "termine") return false; const s = Calc.suiviStats(c.accompagnement); return s.joursRestants !== null && s.joursRestants >= 0 && s.joursRestants <= 14; } },
   { key: "prog_env",    label: "Programme à envoyer", test: c => {
       if (c.cliente.statut !== "active") return false;
@@ -308,7 +308,7 @@ function renderBilans(){
     const cl = c.cliente;
     const bilans = (c.bilans||[]).slice().sort((a,b)=> a.date<b.date?1:-1);
     const dernier = bilans[0] || null;
-    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial));
+    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial, c.bilansDemarrage));
     const demarree = !!(c.accompagnement && c.accompagnement.date_debut);
     const aRempli = bilans.length > 0;
     // Une cliente démarrée SANS bilan saisi n'est PAS « jamais rempli » : son bilan
@@ -455,7 +455,7 @@ async function loadAll() {
     sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois,prix,montant_du"),
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
-    sb.from("bilans_demarrage").select("cliente_id,date"),
+    sb.from("bilans_demarrage").select("cliente_id,date,saisi_par,created_at"),
     sb.from("programmes").select("cliente_id,kind,envoye,date_envoi,date_fin,created_at"),
     sb.from("mensurations").select("cliente_id,type,saisi_par,created_at,date"),
     sb.from("paiements").select("cliente_id,montant,date,mode"),
@@ -619,7 +619,7 @@ function renderAlerts() {
   // Priorité d'une alerte : 1 = 🔴 Urgent (en retard / risque), 2 = 🟠 À faire (bientôt).
   const tierFor = (a) => {
     const c = a.c;
-    if (a.type === "bilan"){ const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial)); return (b.joursAvant!==null && b.joursAvant<0) ? 1 : 2; }
+    if (a.type === "bilan"){ const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial, c.bilansDemarrage)); return (b.joursAvant!==null && b.joursAvant<0) ? 1 : 2; }
     if (a.type === "bilan_fin") return 1;
     if (a.type === "renouveler" || a.type === "seances") return 1;
     if (a.type === "programme"){ const s = Calc.programmeStatus(c,"sportif"); return (s && s.statut==="retard") ? 1 : 2; }
@@ -638,7 +638,7 @@ function renderAlerts() {
     if (a.type === "prevoir_seances" || a.type === "seances") return deep("addSeance=1", "Programmer 🗓️");
     // Rappel de bilan → cliquer envoie la demande à la cliente sur WhatsApp.
     if (a.type === "bilan") {
-      const b = Calc.bilanStats(a.c.bilans, a.c.accompagnement && a.c.accompagnement.date_debut, Calc.demarrageDate(a.c.questionnaireInitial));
+      const b = Calc.bilanStats(a.c.bilans, a.c.accompagnement && a.c.accompagnement.date_debut, Calc.demarrageDate(a.c.questionnaireInitial, a.c.bilansDemarrage));
       const retard = b.joursAvant !== null && b.joursAvant < 0;
       const wa = Calc.waHref(cl.telephone, Calc.bilanMsg(cl, retard));
       if (wa) {
@@ -694,6 +694,13 @@ function renderAlerts() {
          <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span>${quand?` · <span style="color:var(--text-light)">le ${quand}</span>`:""}</span>
          <span class="alert-cta">Voir 👀</span></a>`;
     }
+    // Bilan de démarrage (ressenti des 1res séances) rempli par la cliente → à consulter.
+    if (a.type === "nouveau_bilan_demarrage") {
+      const quand = a.date ? Calc.fmt(a.date) : "";
+      return `<a class="alert alert-action" href="cliente.html?id=${cl.id}" style="border-left:4px solid var(--ok)">
+         <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span>${quand?` · <span style="color:var(--text-light)">le ${quand}</span>`:""}</span>
+         <span class="alert-cta">Voir 🩹</span></a>`;
+    }
     // Questionnaire de démarrage rempli par la cliente → le « 1er bilan complet », mis en avant.
     if (a.type === "nouveau_questionnaire") {
       const quand = a.date ? Calc.fmt(a.date) : "";
@@ -721,7 +728,7 @@ function renderAlerts() {
   };
   // Les notifs « 🆕 » (bilan rempli par une cliente, nouvelles mensurations) restent
   // TOUJOURS VISIBLES en haut, hors onglets — ce sont des notifs importantes.
-  const estNouveau = (a) => a.type === "nouveau_bilan" || a.type === "nouvelle_mensuration" || a.type === "nouveau_questionnaire" || a.type === "nouveau_questionnaire_nutrition";
+  const estNouveau = (a) => a.type === "nouveau_bilan" || a.type === "nouveau_bilan_demarrage" || a.type === "nouvelle_mensuration" || a.type === "nouveau_questionnaire" || a.type === "nouveau_questionnaire_nutrition";
   // TOUTES les notifs sont masquables (bouton ✓). On retire celles déjà marquées
   // « lues » sur cet appareil (les 🆕 définitivement, les rappels de tâche pour la journée).
   const READ = notifReadSet();
@@ -792,7 +799,7 @@ function renderList() {
   // Tri (P3) — par défaut : ordre de chargement (plus récentes). On copie avant de trier
   // pour ne pas réordonner STATE.clientes lui-même.
   if (STATE.sort) {
-    const jbilan = c => { const j = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial)).joursAvant; return j==null ? 99999 : j; };
+    const jbilan = c => { const j = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial, c.bilansDemarrage)).joursAvant; return j==null ? 99999 : j; };
     const jfin   = c => { const j = Calc.suiviStats(c.accompagnement).joursRestants; return j==null ? 99999 : j; };
     const rest   = c => Calc.seancesStats(c.accompagnement, c.seances).restantes;
     const cmp = {
@@ -835,7 +842,7 @@ function renderList() {
   cont.innerHTML = `<div class="clientes-grid">` + list.map(c => {
     const cl = c.cliente;
     const s = Calc.seancesStats(c.accompagnement, c.seances);
-    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial));
+    const b = Calc.bilanStats(c.bilans, c.accompagnement && c.accompagnement.date_debut, Calc.demarrageDate(c.questionnaireInitial, c.bilansDemarrage));
     const al = Calc.alertes(c);
     const dette = Calc.detteCliente(c);
     const _today = Calc.today();

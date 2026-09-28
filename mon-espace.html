@@ -27,7 +27,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=f02"></script>
+<script src="js/calc.js?v=f03"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -90,7 +90,7 @@ function motOrnella(){
 // Carte « nudge » quand c'est le moment du bilan (ou premier bilan à faire).
 function bilanNudge(){
   const ac = D.accompagnement;
-  const b = Calc.bilanStats(D.bilans, ac && ac.date_debut, Calc.demarrageDate(D.questionnaire_initial));
+  const b = Calc.bilanStats(D.bilans, ac && ac.date_debut, Calc.demarrageDate(D.questionnaire_initial, D.bilans_demarrage));
   const has = (D.bilans||[]).length;
   let titre = "", sub = "";
   if (b.joursAvant !== null && b.joursAvant <= 3){
@@ -358,7 +358,7 @@ function prochaineSeanceBanner(compact){
   }
   // Pas de séance planifiée : pour les distanciel, on affiche plutôt le prochain bilan.
   if (D.cliente && D.cliente.type === "distanciel"){
-    const b = Calc.bilanStats(D.bilans, D.accompagnement && D.accompagnement.date_debut, Calc.demarrageDate(D.questionnaire_initial));
+    const b = Calc.bilanStats(D.bilans, D.accompagnement && D.accompagnement.date_debut, Calc.demarrageDate(D.questionnaire_initial, D.bilans_demarrage));
     if (b.prochain){
       const txt = adr("Ton prochain bilan","Votre prochain bilan") + " : " + fmtJourLong(b.prochain);
       return `<button type="button" class="${cls}" data-view="bilans" style="background:#F5EFE6;color:#1B3A2D">
@@ -404,7 +404,7 @@ function programmeDispoCard(){
 function viewAccueil(){
   const cl = D.cliente, ac = D.accompagnement;
   const s = Calc.seancesStats(ac, D.seances);
-  const b = Calc.bilanStats(D.bilans, ac && ac.date_debut, Calc.demarrageDate(D.questionnaire_initial));
+  const b = Calc.bilanStats(D.bilans, ac && ac.date_debut, Calc.demarrageDate(D.questionnaire_initial, D.bilans_demarrage));
   const w = weightSeries();
   const sport = lastProg("sportif");
   const nextSeance = (D.seances||[]).filter(x=>x.statut==="prevue" && x.date>=Calc.today()).sort((a,b)=>a.date<b.date?-1:1)[0];
@@ -1101,7 +1101,7 @@ function questionnaireNutritionCard(){
 }
 function viewBilans(){
   const list = (D.bilans||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
-  const b = Calc.bilanStats(D.bilans, D.accompagnement && D.accompagnement.date_debut, Calc.demarrageDate(D.questionnaire_initial));
+  const b = Calc.bilanStats(D.bilans, D.accompagnement && D.accompagnement.date_debut, Calc.demarrageDate(D.questionnaire_initial, D.bilans_demarrage));
   const entete = `<div class="card" style="background:var(--panel);color:#fff">
       <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);font-weight:700">${adr("Ton rythme","Votre rythme")}</div>
       <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:700">Un bilan toutes les 4 semaines 📋</div>

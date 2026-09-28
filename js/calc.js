@@ -103,16 +103,31 @@ window.Calc = {
   // pour qu'une cliente qui démarre ait quand même une date de prochain bilan.
   // Date du questionnaire de démarrage = le « premier bilan » (point de départ des 4 semaines).
   // On prend la plus ANCIENNE date de la liste (le questionnaire est rempli une fois).
-  demarrageDate(list) {
-    const dates = (list || []).map(x => x && x.date).filter(Boolean);
-    return dates.length ? dates.slice().sort()[0] : null;
+  // Date EFFECTIVE d'un bilan / questionnaire : sa date, ou le jour où la CLIENTE l'a
+  // envoyé si c'est plus récent (created_at). Une date saisie dans le passé par erreur
+  // ne laisse donc plus un faux « bilan en retard » côté coach.
+  dateEffective(x) {
+    if (!x) return null;
+    let d = x.date || null;
+    if (x.created_at && (x.saisi_par === "cliente" || !x.saisi_par)) {
+      const c = String(x.created_at).slice(0, 10);
+      if (!d || c > d) d = c;
+    }
+    return d;
+  },
+  // Dernier point fait HORS bilan mensuel (questionnaire de démarrage, bilan de démarrage…) :
+  // date la plus RÉCENTE sur toutes les listes passées. Remplir l'un d'eux compte comme
+  // un bilan → le compte à rebours des 4 semaines repart de là.
+  demarrageDate(...lists) {
+    const dates = lists.flatMap(l => (l || []).map(x => this.dateEffective(x))).filter(Boolean);
+    return dates.length ? dates.sort()[dates.length - 1] : null;
   },
   bilanStats(bilans, dateDebut, dateDemarrage) {
-    const has = bilans && bilans.length;
-    const dernierPeriodique = has ? [...bilans].sort((a, b) => (a.date < b.date ? 1 : -1))[0].date : null;
-    // Le questionnaire de démarrage est le PREMIER bilan : il fait office de « dernier bilan »
-    // et d'ancre du prochain (à +4 semaines) tant qu'aucun bilan périodique n'a été fait.
-    const dernier = dernierPeriodique || dateDemarrage || null;
+    const dates = (bilans || []).map(x => this.dateEffective(x)).filter(Boolean).sort();
+    const dernierPeriodique = dates.length ? dates[dates.length - 1] : null;
+    // Dernier bilan = le plus RÉCENT entre bilan mensuel et questionnaire / bilan de démarrage
+    // (avant : le questionnaire était ignoré dès qu'un ancien bilan existait → faux retard).
+    const dernier = [dernierPeriodique, dateDemarrage].filter(Boolean).sort().pop() || null;
     const ancre = dernier || dateDebut || null;
     if (!ancre) return { dernier, prochain: null, joursAvant: null };
     const dt = this.parse(ancre);
@@ -254,6 +269,15 @@ window.Calc = {
       const dernier = qiCliente.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
       out.push({ type: "nouveau_questionnaire", label: "Questionnaire de démarrage rempli", icon: "🆕", date: String(dernier.created_at).slice(0, 10) });
     }
+    // Bilan de DÉMARRAGE (ressenti des 1res séances) rempli par la cliente récemment (≤ 14 j).
+    // Avant, aucune notif : Ornella ne voyait pas qu'il avait été rempli.
+    const bdCliente = (c.bilansDemarrage || []).filter((x) =>
+      (x.saisi_par === "cliente" || !x.saisi_par) && x.created_at &&
+      this.daysFromToday(String(x.created_at).slice(0, 10)) >= -14);
+    if (bdCliente.length) {
+      const dernier = bdCliente.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+      out.push({ type: "nouveau_bilan_demarrage", label: "Bilan de démarrage rempli", icon: "🆕", date: String(dernier.created_at).slice(0, 10) });
+    }
     // Questionnaire ALIMENTAIRE (bilan nutrition) rempli par la cliente récemment (≤ 14 j).
     const qnCliente = (c.questionnaireNutrition || []).filter((x) =>
       (x.saisi_par === "cliente" || !x.saisi_par) && x.created_at &&
@@ -308,7 +332,7 @@ window.Calc = {
     // Suivi sur le point de finir (moins d'une semaine) : on ne réclame plus de NOUVEAU
     // programme (il dépasserait la fin du suivi) — la bonne action c'est renouveler/clôturer.
     const finProche = suivi.joursRestants !== null && suivi.joursRestants < 7;
-    const b = this.bilanStats(c.bilans, null, this.demarrageDate(c.questionnaireInitial));
+    const b = this.bilanStats(c.bilans, null, this.demarrageDate(c.questionnaireInitial, c.bilansDemarrage));
     if (b.joursAvant !== null && b.joursAvant <= 3) {
       out.push({ type: "bilan", label: b.joursAvant < 0 ? "Bilan en retard" : "Bilan à faire", icon: "🔔" });
     }
