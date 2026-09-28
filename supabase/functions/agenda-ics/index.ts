@@ -42,6 +42,42 @@ function nowStampUTC(): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
 }
+// ---- Helpers dates (échéances : bilans / renouvellements de programmes) -----
+const todayYMD = (): string => new Date().toISOString().slice(0, 10);
+// "YYYY-MM-DD" -> "YYYYMMDD" (pour un événement "journée entière")
+const dateOnly = (ymd: string): string => ymd.replace(/-/g, "");
+// Décale une date de N jours (renvoie "YYYY-MM-DD").
+function addDays(ymd: string, n: number): string {
+  const [Y, M, D] = ymd.split("-").map(Number);
+  const d = new Date(Date.UTC(Y, M - 1, D));
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+// Décale une date de N mois (renvoie "YYYY-MM-DD"), comme Calc.dateFin côté front.
+function addMonths(ymd: string, n: number): string {
+  const [Y, M, D] = ymd.split("-").map(Number);
+  const d = new Date(Date.UTC(Y, M - 1, D));
+  d.setUTCMonth(d.getUTCMonth() + n);
+  return d.toISOString().slice(0, 10);
+}
+const maxDate = (a: string | null, b: string | null): string | null =>
+  !a ? b : !b ? a : (a >= b ? a : b);
+// Émet un VEVENT "journée entière" pour une échéance (bilan / renouvellement).
+// UID stable → l'agenda déplace l'événement quand la date se recalcule (pas de doublon).
+// Rappel la veille à 9h pour anticiper ("demain, X").
+function echeanceVEVENT(uid: string, ymd: string, summary: string, dtstamp: string): string[] {
+  return [
+    "BEGIN:VEVENT",
+    `UID:${uid}@ornellafitcoaching`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;VALUE=DATE:${dateOnly(ymd)}`,
+    `DTEND;VALUE=DATE:${dateOnly(addDays(ymd, 1))}`,
+    `SUMMARY:${esc(summary)}`,
+    "STATUS:TENTATIVE",
+    "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:À prévoir", "TRIGGER:-PT15H", "END:VALARM",
+    "END:VEVENT",
+  ];
+}
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
@@ -122,6 +158,74 @@ Deno.serve(async (req) => {
       L.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Séance", "TRIGGER:-PT2H", "END:VALARM");
     }
     L.push("END:VEVENT");
+  }
+
+  // ---- Échéances (agenda COACH uniquement) : prochains bilans + renouvellements ----
+  // On les calcule ici pour qu'Ornella les voie dans le même agenda que les séances,
+  // sans rien réinstaller. Absent du flux d'une cliente (?code=) : ce sont des tâches coach.
+  if (!clienteId) {
+    const today = todayYMD();
+    // On ne réclame plus rien pour une cliente terminée / en pause (filtré côté code
+    // pour rester robuste aux statuts vides, qu'un NOT IN SQL exclurait à tort).
+    const actives = ((await supabase
+      .from("clientes")
+      .select("id,prenom,type,statut")).data ?? [])
+      .filter((c: any) => c.statut !== "termine" && c.statut !== "en_pause");
+    const ids = actives.map((c: any) => c.id);
+    if (ids.length) {
+      const [accR, bilR, menR, qiR, progR] = await Promise.all([
+        supabase.from("accompagnements").select("cliente_id,date_debut,nutrition_active").in("cliente_id", ids),
+        supabase.from("bilans").select("cliente_id,date,saisi_par").in("cliente_id", ids),
+        supabase.from("mensurations").select("cliente_id,date,saisi_par").in("cliente_id", ids),
+        supabase.from("questionnaire_initial").select("cliente_id,date").in("cliente_id", ids),
+        supabase.from("programmes").select("cliente_id,kind,envoye,date_envoi,date_fin,created_at").in("cliente_id", ids),
+      ]);
+      const acc: Record<string, any> = {};
+      (accR.data ?? []).forEach((a: any) => { acc[a.cliente_id] = a; });
+      const grp = (rows: any[]): Record<string, any[]> => {
+        const m: Record<string, any[]> = {};
+        (rows ?? []).forEach((r: any) => { (m[r.cliente_id] ||= []).push(r); });
+        return m;
+      };
+      const bilBy = grp(bilR.data ?? []), menBy = grp(menR.data ?? []),
+            qiBy = grp(qiR.data ?? []), progBy = grp(progR.data ?? []);
+      // Dernière échéance d'un programme (date_fin saisie sinon dernier envoi + 1 mois).
+      const progEcheance = (cid: string, kind: string): string | null => {
+        const progs = (progBy[cid] ?? []).filter((p: any) => p.kind === kind && p.envoye);
+        if (!progs.length) return null; // jamais envoyé → pas de date (visible dans « À traiter »)
+        const d = progs.slice().sort((a: any, b: any) =>
+          ((a.date_envoi || a.created_at || "") < (b.date_envoi || b.created_at || "") ? 1 : -1))[0];
+        const dernier = d.date_envoi || (d.created_at ? String(d.created_at).slice(0, 10) : null);
+        return d.date_fin || (dernier ? addMonths(dernier, 1) : null);
+      };
+
+      for (const c of actives as any[]) {
+        const a = acc[c.id] || {};
+        // Prochain bilan = dernier point (bilan OU mensurations saisies par la cliente) + 28 j.
+        const dernierBilan = (bilBy[c.id] ?? []).map((x: any) => x.date).filter(Boolean).sort().slice(-1)[0] || null;
+        const checkin = (menBy[c.id] ?? []).filter((m: any) => m.saisi_par === "cliente" && m.date)
+          .map((m: any) => m.date).sort().slice(-1)[0] || null;
+        const demarrage = (qiBy[c.id] ?? []).map((x: any) => x.date).filter(Boolean).sort()[0] || null;
+        const ancre = maxDate(dernierBilan, checkin) || demarrage || a.date_debut || null;
+        if (ancre) {
+          let dBilan = addDays(ancre, 28);
+          if (dBilan < today) dBilan = today; // en retard → épinglé à aujourd'hui (reste visible)
+          // Présentiel/hybride = mensurations prises en séance ; distanciel = à demander.
+          const verbe = c.type === "distanciel" ? "à demander" : "mensurations";
+          L.push(...echeanceVEVENT(`echeance-bilan-${c.id}`, dBilan, `📊 Bilan ${c.prenom} (${verbe})`, dtstamp));
+        }
+        // Renouvellement programme entraînement (distanciel / hybride).
+        if (c.type === "distanciel" || c.type === "hybride") {
+          let e = progEcheance(c.id, "sportif");
+          if (e) { if (e < today) e = today; L.push(...echeanceVEVENT(`echeance-prog-sportif-${c.id}`, e, `📤 Programme entraînement — ${c.prenom}`, dtstamp)); }
+        }
+        // Renouvellement nutrition (clientes avec suivi nutrition actif).
+        if (a.nutrition_active) {
+          let e = progEcheance(c.id, "nutrition");
+          if (e) { if (e < today) e = today; L.push(...echeanceVEVENT(`echeance-prog-nutrition-${c.id}`, e, `🥗 Nutrition à renouveler — ${c.prenom}`, dtstamp)); }
+        }
+      }
+    }
   }
 
   L.push("END:VCALENDAR");
