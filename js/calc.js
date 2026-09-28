@@ -122,6 +122,11 @@ window.Calc = {
     const dates = lists.flatMap(l => (l || []).map(x => this.dateEffective(x))).filter(Boolean);
     return dates.length ? dates.sort()[dates.length - 1] : null;
   },
+  // Dernière prise de mesures faite par la CLIENTE = son « check-in » (gardé pour compatibilité).
+  checkinClienteDate(mensurations) {
+    const dates = (mensurations || []).filter(m => m && m.saisi_par === "cliente" && m.date).map(m => m.date);
+    return dates.length ? dates.slice().sort().slice(-1)[0] : null;
+  },
   bilanStats(bilans, dateDebut, dateDemarrage) {
     const dates = (bilans || []).map(x => this.dateEffective(x)).filter(Boolean).sort();
     const dernierPeriodique = dates.length ? dates[dates.length - 1] : null;
@@ -140,7 +145,7 @@ window.Calc = {
   // Accepte le dossier du dashboard (questionnaireInitial / bilansDemarrage) ou le dossier
   // complet (questionnaire_initial / bilans_demarrage). Compte comme un « point bilan » :
   //   • un bilan mensuel,  • le questionnaire de démarrage,  • le bilan de démarrage,
-  //   • des mensurations (saisies par elle OU par toi).
+  //   • des mensurations saisies par ELLE (check-in ; pas celles relevées par la coach).
   // Le plus récent relance le compte à rebours de 4 semaines. Aucun point → date de début.
   // Renvoie { dernier, prochain, joursAvant, source, parElle, statut }
   //   statut = "retard" | "bientot" (≤ 7 j) | "ajour" | null (pas démarrée).
@@ -151,7 +156,9 @@ window.Calc = {
       bilan: c.bilans || [],
       questionnaire: c.questionnaireInitial || c.questionnaire_initial || [],
       demarrage: c.bilansDemarrage || c.bilans_demarrage || [],
-      mensurations: c.mensurations || [],
+      // Mensurations : seules celles saisies par la CLIENTE valent check-in (pas celles
+      // relevées par la coach en présentiel).
+      mensurations: (c.mensurations || []).filter(m => m && m.saisi_par === "cliente"),
     };
     let best = null;
     Object.keys(lists).forEach(src => lists[src].forEach(x => {
