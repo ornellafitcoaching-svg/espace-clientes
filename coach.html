@@ -623,9 +623,36 @@ function renderAlerts() {
   // Rendu d'UNE alerte (action DIRECTE selon le type : WhatsApp ou deep-link vers l'action).
   const alertHtml = (a) => {
     const cl = a.c.cliente;
+    const ac = a.c.accompagnement || null;
+    const echeance = (date, jours, libelle) => {
+      if (!date) return "";
+      if (jours === 0) return `${libelle} aujourd’hui (${Calc.fmt(date)})`;
+      if (jours > 0) return `${libelle} le ${Calc.fmt(date)} · dans ${jours} j`;
+      return `${libelle} le ${Calc.fmt(date)} · dépassée de ${Math.abs(jours)} j`;
+    };
+    let detail = "";
+    if (a.type === "bilan") {
+      const b = Calc.bilanEtat(a.c);
+      detail = echeance(b.prochain, b.joursAvant, "Bilan prévu");
+    } else if (a.type === "programme" || a.type === "nutrition_mensuelle") {
+      const p = Calc.programmeStatus(a.c, a.type === "programme" ? "sportif" : "nutrition");
+      detail = p && !p.jamais ? echeance(p.prochain, p.joursAvant, "Échéance") : "";
+    } else if (a.type === "prevoir_seances" || a.type === "seances") {
+      const prochaines = (a.c.seances || []).filter(s => s.statut === "prevue" && s.date && s.date >= Calc.today()).sort((x,y) => x.date < y.date ? -1 : 1);
+      const stats = Calc.seancesStats(ac, a.c.seances);
+      const aProgrammer = Math.max(0, stats.restantes - prochaines.length);
+      detail = prochaines.length
+        ? `Prochaine séance le ${Calc.fmt(prochaines[0].date)} · ${aProgrammer} à programmer`
+        : `${aProgrammer} séance(s) à programmer`;
+    } else if (a.type === "fin" || a.type === "bilan_fin") {
+      const fin = ac && (ac.date_fin || Calc.dateFin(ac.date_debut, ac.nb_mois));
+      detail = fin ? echeance(fin, Calc.daysFromToday(fin), "Fin du suivi") : "";
+    }
+    const detailHtml = detail ? `<small style="display:block;color:var(--text-light);font-size:.76rem;margin-top:2px">${esc(detail)}</small>` : "";
+    const titre = `<span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span>${detailHtml}</span>`;
     // « Faire maintenant » qui mène DROIT à l'action (pas juste à la fiche).
     const deep = (params, label) => `<a class="alert" href="cliente.html?id=${cl.id}&${params}">
-         <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+         ${titre}
          <span class="alert-cta go">${label}</span></a>`;
     if (a.type === "programme")           return deep("prog=sportif", "Envoyer 📤");
     if (a.type === "nutrition_mensuelle") return deep("prog=nutrition", "Envoyer 🥗");
@@ -637,12 +664,12 @@ function renderAlerts() {
       const wa = Calc.waHref(cl.telephone, Calc.bilanMsg(cl, retard));
       if (wa) {
         return `<a class="alert alert-action" href="${wa}" target="_blank" rel="noopener">
-           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           ${titre}
            <span class="alert-cta">Demander le bilan 📲</span></a>`;
       }
       // Pas de numéro enregistré → renvoie vers la fiche pour l'ajouter.
       return `<a class="alert" href="cliente.html?id=${cl.id}" title="Ajoute son numéro de téléphone dans sa fiche pour demander le bilan en un clic">
-           <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
+           ${titre}
            <span class="alert-cta muted">☎️ n° manquant</span></a>`;
     }
     // Bilan de démarrage → cliquer envoie la demande à la cliente sur WhatsApp.
