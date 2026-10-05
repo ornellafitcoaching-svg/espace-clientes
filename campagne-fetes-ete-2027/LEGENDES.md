@@ -2,10 +2,13 @@
 
 Formules : Domicile dès 260 €/mois (91/92) · Hybride dès 99 €/mois · Distanciel dès 89 €/mois.
 Mot-clé unique sur toute la campagne : **GO** (en DM). Il te permet de compter les leads par visuel.
+Ce qu'elles gagnent à écrire GO : ton **bilan gratuit de 30 min** (déjà proposé sur ton site). Termine chaque légende par ça.
 
 ---
 
-## 1. Post Louise (`01-post-louise.png`)
+## 1. Post Louise (`01-post-louise.png`, ou variante A/B `01b-post-louise-variante-noel.png`)
+
+La variante « Noël dernier, elle a commencé. » colle à la photo (sapin en fond). Publie l'une en post et teste l'autre en story : garde celle qui ramène le plus de « GO ».
 
 Les fêtes arrivent.
 Et chaque année c'est la même histoire : « je reprends en janvier ».
@@ -20,7 +23,7 @@ Pas de régime extrême. Un programme fait pour SA vie de maman, et moi qui vien
 
 Si tu commences maintenant, tu passes les fêtes sans reprendre ET tu arrives à l'été 2027 avec 3 mois d'avance.
 
-Écris **GO** en message et je te dis quelle formule te correspond.
+Écris **GO** en message : je t'offre ton bilan de 30 min et je te dis quelle formule te correspond.
 Domicile (91/92) dès 260 €/mois · Hybride dès 99 €/mois · Distanciel dès 89 €/mois
 
 #coachsportive #coachsportif91 #coachsportif92 #pertedepoids #mamanactive #ventreplat #avantapres
@@ -39,7 +42,7 @@ Regarde le profil. C'est ça, 8 semaines bien faites.
 
 Imagine ce que donnent 8 mois.
 
-Écris **GO** en message et je te dis par où commencer.
+Écris **GO** en message : bilan gratuit de 30 min pour savoir par où commencer.
 Hybride dès 99 €/mois.
 
 #fessiers #booty #coachsportive #mamanactive #objectifete #avantapres
@@ -58,7 +61,7 @@ C'est exactement ce que j'applique avec mes clientes aujourd'hui, en tant que co
 
 Si je l'ai fait, tu peux le faire.
 
-Écris **GO** en message et on regarde ensemble ton point de départ.
+Écris **GO** en message : on fait ton bilan gratuit de 30 min et on regarde ton point de départ.
 
 #postpartum #apresbebe #mamanactive #retouràlaforme #coachsportive #grossesse
 
@@ -81,7 +84,7 @@ Domicile (91/92) dès 260 €/mois
 Hybride dès 99 €/mois
 Distanciel dès 89 €/mois
 
-Tu ne sais pas laquelle choisir ? Écris **GO** en message.
+Tu ne sais pas laquelle choisir ? Écris **GO** en message : bilan gratuit de 30 min, on choisit ensemble.
 
 Enregistre ce post pour le jour où tu te diras « j'aurais dû commencer avant ».
 
@@ -96,7 +99,7 @@ Les fêtes arrivent. Louise, maman de 2 enfants, a commencé 4 mois avant.
 Résultat : −9 cm de tour de taille, avec un coaching à domicile et un programme fait pour son quotidien.
 
 Tu veux passer les fêtes sans reprendre et préparer ton été 2027 en avance ?
-Écris GO en message : je te dis quelle formule te correspond.
+Écris GO en message : bilan gratuit de 30 min pour choisir ta formule.
 
 Coach diplômée d'État · Domicile (91/92), hybride ou en ligne.
 *Résultat individuel, variable selon les personnes.*
