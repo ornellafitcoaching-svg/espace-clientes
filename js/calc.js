@@ -248,8 +248,14 @@ window.Calc = {
   // « prochaine échéance »), sinon repli sur « dernier envoi + 1 mois ».
   programmeStatus(c, kind) {
     const cl = c.cliente, ac = c.accompagnement;
+    // Cas particulier : une cliente PRÉSENTIEL peut suivre un vrai programme salle
+    // structuré (ex. Sophie) qu'on renouvelle tous les mois. On ne l'inclut QUE si elle
+    // a déjà un programme sportif envoyé AVEC une date de fin (= programme daté, voulu) —
+    // sinon les présentiel « coachés en direct » restent exclus comme avant.
+    const presentielSportif = kind === "sportif" && cl && cl.type === "presentiel"
+      && (c.programmes || []).some(p => p.kind === "sportif" && p.envoye && p.date_fin);
     const concerne = kind === "sportif"
-      ? !!(cl && (cl.type === "distanciel" || cl.type === "hybride"))
+      ? !!(cl && (cl.type === "distanciel" || cl.type === "hybride")) || presentielSportif
       : !!(ac && ac.nutrition_active);
     if (!concerne) return null;
     const progs = (c.programmes || []).filter((p) => p.kind === kind && p.envoye);
@@ -419,9 +425,17 @@ window.Calc = {
     if (active && !finProche) {
       const ps = this.programmeStatus(c, "sportif");
       if (ps) {
-        if (ps.jamais) out.push({ type: "programme", label: "Programme de séance à envoyer", icon: "📤" });
-        else if (ps.statut === "retard" || ps.statut === "bientot")
-          out.push({ type: "programme", label: "Programme de séance à renvoyer", icon: "📤" });
+        const presSport = c.cliente && c.cliente.type === "presentiel";
+        // Présentiel (ex. Sophie) : on ne réclame jamais un 1er programme (pas de "jamais"
+        // ici car exige déjà un programme daté), mais on rappelle de le RENOUVELER à échéance,
+        // calée sur la fin du programme (≈ toutes les 4 semaines, après le bilan).
+        if (ps.jamais) {
+          if (!presSport) out.push({ type: "programme", label: "Programme de séance à envoyer", icon: "📤" });
+        } else if (ps.statut === "retard" || ps.statut === "bientot") {
+          out.push(presSport
+            ? { type: "programme", label: "Programme salle à mettre à jour (après le bilan)", icon: "🏋️" }
+            : { type: "programme", label: "Programme de séance à renvoyer", icon: "📤" });
+        }
       }
       const pn = this.programmeStatus(c, "nutrition");
       if (pn) {
