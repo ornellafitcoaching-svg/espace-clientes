@@ -13,6 +13,7 @@
 // (email_perso), sinon par prénom + nom. Introuvable → tâche « paiement à rattacher »
 // dans l'espace coach. Idempotent : un même paiement n'est jamais ajouté deux fois.
 // Le « montant dû » saisi à la main est diminué d'autant (jamais en dessous de 0).
+// Import de l'historique : POST ?import=AAAA-MM-JJ (&dry=1 pour un aperçu), header x-cron-secret.
 // ============================================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -33,6 +34,7 @@ async function hmac(secretKey: string, body: string) {
 }
 const norm = (s: string) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 
+let DRY = false;   // mode « aperçu » de l'import historique (rien n'est écrit)
 // ---- Rattachement à une cliente + enregistrement ---------------------------
 async function enregistrer(p: {
   ref: string; montant: number; date: string; mode: string; email?: string; prenom?: string; nom?: string; libelle?: string;
@@ -47,12 +49,13 @@ async function enregistrer(p: {
     if (data && data.length === 1) cl = data[0];
   }
   if (!cl && p.prenom) {
-    const { data } = await supa.from("clientes").select("id,prenom,nom").neq("statut", "termine");
+    const { data } = await supa.from("clientes").select("id,prenom,nom");   // toutes (historique compris)
     const cand = (data || []).filter((c) => norm(c.prenom) === norm(p.prenom!) && (!p.nom || !c.nom || norm(c.nom) === norm(p.nom)));
     if (cand.length === 1) cl = cand[0];
   }
   const qui = [p.prenom, p.nom].filter(Boolean).join(" ") || p.email || "?";
   if (!cl) {
+    if (DRY) return { introuvable: qui, montant: p.montant, date: p.date };
     await supa.from("taches_coach").insert({
       titre: `💳 Paiement reçu à rattacher : ${p.montant} € — ${qui} (${p.mode})`,
       echeance: p.date, priorite: "haute",
@@ -60,6 +63,14 @@ async function enregistrer(p: {
     });
     return { a_rattacher: true };
   }
+  // Déjà saisi à la main (même cliente, même montant, à ±6 jours, mode GoCardless) ? → on ne double pas.
+  const d0 = new Date(p.date + "T00:00:00Z");
+  const de = new Date(d0.getTime() - 6 * 864e5).toISOString().slice(0, 10);
+  const a = new Date(d0.getTime() + 6 * 864e5).toISOString().slice(0, 10);
+  const { data: manuels } = await supa.from("paiements").select("id,note").eq("cliente_id", cl.id).eq("montant", p.montant)
+    .gte("date", de).lte("date", a).ilike("mode", "%gocardless%");
+  if ((manuels || []).some((m) => !String(m.note || "").includes("réf "))) return { deja_saisi_main: cl.prenom, montant: p.montant, date: p.date };
+  if (DRY) return { a_ajouter: cl.prenom, montant: p.montant, date: p.date };
   await supa.from("paiements").insert({
     cliente_id: cl.id, date: p.date, montant: p.montant, mode: p.mode,
     note: `${p.libelle || "Paiement automatique"} · réf ${p.ref}`,
@@ -82,8 +93,43 @@ async function gc(path: string, token: string) {
   return await r.json();
 }
 
+// Import de l'HISTORIQUE GoCardless (paiements encaissés depuis une date).
+async function importer(depuis: string, token: string) {
+  const out: unknown[] = [];
+  let after = "";
+  for (let page = 0; page < 20; page++) {
+    const q = new URLSearchParams({ limit: "200", "charge_date[gte]": depuis });
+    if (after) q.set("after", after);
+    const j = await gc("/payments?" + q, token);
+    for (const pay of j.payments || []) {
+      if (!["confirmed", "paid_out"].includes(pay.status)) continue;
+      try {
+        const mandate = (await gc("/mandates/" + pay.links.mandate, token)).mandates;
+        const cust = (await gc("/customers/" + mandate.links.customer, token)).customers;
+        out.push(await enregistrer({
+          ref: pay.id, montant: Number(pay.amount) / 100, date: pay.charge_date,
+          mode: "GoCardless", email: cust.email, prenom: cust.given_name, nom: cust.family_name,
+          libelle: pay.description || "Prélèvement GoCardless",
+        }));
+      } catch (e) { out.push({ erreur: String(e), paiement: pay.id }); }
+    }
+    after = j.meta?.cursors?.after || "";
+    if (!after) break;
+  }
+  return out;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("ok");
+  DRY = false;   // jamais d'aperçu par défaut (le webhook enregistre toujours)
+  const url = new URL(req.url);
+  if (url.searchParams.get("import")) {
+    const CRON = await secret("CRON_SECRET", "cron_secret");
+    if (!CRON || req.headers.get("x-cron-secret") !== CRON) return new Response("Forbidden", { status: 403 });
+    DRY = url.searchParams.get("dry") === "1";
+    const TOK = await secret("GOCARDLESS_ACCESS_TOKEN", "gocardless_access_token");
+    return Response.json({ dry: DRY, resultats: await importer(url.searchParams.get("import")!, TOK) });
+  }
   const raw = await req.text();
   const WH = await secret("GOCARDLESS_WEBHOOK_SECRET", "gocardless_webhook_secret");
   const TOKEN = await secret("GOCARDLESS_ACCESS_TOKEN", "gocardless_access_token");
