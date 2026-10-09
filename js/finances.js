@@ -49,6 +49,8 @@ async function renderFinances(){
 
   const charges = F.filter(f => f.kind === "charge");
   const totalCharges = r2(charges.reduce((s,f)=>s+Number(f.montant||0),0));
+  // Ce qui part en prélèvement sur le compte CIC (= le virement Revolut → CIC à faire chaque mois)
+  const totalCIC = r2(charges.filter(f => f.pro).reduce((s,f)=>s+Number(f.montant||0),0));
 
   // ---- Mois affichés : depuis janvier 2026 (ou 1er paiement) jusqu'à +2 mois -----
   const mois = [];
@@ -69,10 +71,10 @@ async function renderFinances(){
 
   // ---- Virement Revolut → CIC du mois -------------------------------------
   const vir = F.find(f => f.kind === "virement" && ym(f.mois) === now);
-  const virHtml = totalCharges > 0
+  const virHtml = totalCIC > 0
     ? (vir && vir.fait
         ? `<div class="card" style="margin-top:10px;padding:10px 14px;border-left:4px solid #4a8b5c">✅ <strong>Virement Revolut → CIC fait</strong> pour ${libM(now)} (${euro(vir.montant)}) <button class="btn-ghost" data-fin-virundo="${vir.id}" style="float:right;padding:2px 8px;font-size:.75rem">Annuler</button></div>`
-        : `<div class="card" style="margin-top:10px;padding:10px 14px;border-left:4px solid var(--accent)">🏦 <strong>À virer de Revolut vers CIC ce mois-ci : ${euro(totalCharges)}</strong><br><span class="isub">Le total de tes prélèvements fixes CIC.</span><div style="margin-top:8px"><button class="btn-accent" data-fin-virok="1">✅ C'est fait</button></div></div>`)
+        : `<div class="card" style="margin-top:10px;padding:10px 14px;border-left:4px solid var(--accent)">🏦 <strong>À virer de Revolut vers CIC ce mois-ci : ${euro(totalCIC)}</strong><br><span class="isub">Le total de tes prélèvements sur le compte CIC.</span><div style="margin-top:8px"><button class="btn-accent" data-fin-virok="1">✅ C'est fait</button></div></div>`)
     : `<div class="card" style="margin-top:10px;padding:10px 14px;border-left:4px solid var(--gold)">🏦 Ajoute tes <strong>prélèvements fixes CIC</strong> (plus bas) : je calculerai ce que tu dois virer de Revolut vers CIC chaque mois.</div>`;
 
   // ---- Tuiles du mois en cours ----------------------------------------------
@@ -115,7 +117,7 @@ async function renderFinances(){
   // ---- Autres revenus + charges fixes --------------------------------------
   const autres = F.filter(f => f.kind === "revenu" && ym(f.mois) >= addM(now,-2)).sort((a,b)=>a.mois<b.mois?1:-1);
   const ligneSimple = f => `<div class="cl-line" style="padding:7px 0;align-items:center;gap:8px;border-top:1px solid var(--line-soft)">
-      <span style="flex:1;min-width:0"><strong>${esc(f.libelle)}</strong>${f.kind==="revenu"?`<span class="isub"> · ${cap(libM(ym(f.mois)))}${f.pro?" · pro":""}</span>`:""}${f.note?`<span class="isub"> · ${esc(f.note)}</span>`:""}</span>
+      <span style="flex:1;min-width:0"><strong>${esc(f.libelle)}</strong>${f.kind==="charge"&&f.pro?` <span class="badge">CIC</span>`:""}${f.kind==="revenu"?`<span class="isub"> · ${cap(libM(ym(f.mois)))}${f.pro?" · pro":""}</span>`:""}${f.note?`<span class="isub"> · ${esc(f.note)}</span>`:""}</span>
       <strong style="white-space:nowrap">${euro(f.montant)}</strong>
       <button class="btn-ghost" data-fin-edit="${f.id}" title="Modifier" style="padding:2px 7px;font-size:.74rem">✏️</button>
       <button class="btn-ghost" data-fin-del="${f.id}" title="Supprimer" style="padding:2px 7px;font-size:.74rem">🗑</button></div>`;
@@ -123,8 +125,8 @@ async function renderFinances(){
       ${autres.length?autres.map(ligneSimple).join(""):`<p class="isub" style="padding:8px 0">Vinted, LinkedIn… note ici ce qui rentre à côté pour voir ton vrai total du mois.</p>`}
       <div style="margin:10px 0 4px"><button class="btn-ghost" data-fin-add="revenu">＋ Autre revenu</button></div></div>`;
   const blocCharges = `<div class="card" style="margin-top:6px;padding:6px 12px">
-      ${charges.length?charges.map(ligneSimple).join("")+`<div class="cl-line" style="padding:8px 0;border-top:2px solid var(--line-soft)"><strong>Total par mois</strong><strong>${euro(totalCharges)}</strong></div>`:`<p class="isub" style="padding:8px 0">Aucun prélèvement noté. Regarde ton relevé CIC et ajoute chaque prélèvement fixe (loyer, assurance, téléphone, crédit…).</p>`}
-      <div style="margin:10px 0 4px"><button class="btn-ghost" data-fin-add="charge">＋ Prélèvement fixe CIC</button></div></div>`;
+      ${charges.length?charges.map(ligneSimple).join("")+`<div class="cl-line" style="padding:8px 0;border-top:2px solid var(--line-soft)"><strong>Total par mois</strong><strong>${euro(totalCharges)}</strong></div><div class="cl-line" style="padding:0 0 8px"><span>dont prélevé sur CIC</span><span>${euro(totalCIC)}</span></div>`:`<p class="isub" style="padding:8px 0">Aucun prélèvement noté. Regarde ton relevé CIC et ajoute chaque prélèvement fixe (loyer, assurance, téléphone, crédit…).</p>`}
+      <div style="margin:10px 0 4px"><button class="btn-ghost" data-fin-add="charge">＋ Charge mensuelle</button></div></div>`;
 
   const titre = t => `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent);margin:16px 2px 2px">${t}</div>`;
   box.innerHTML = `<div class="section-block" style="margin:14px 0">
@@ -133,7 +135,7 @@ async function renderFinances(){
     ${titre("📅 Mois par mois")}${tableau}
     ${titre("⏳ Rentrées prévues")}${blocPrevu}
     ${titre("🛍 Autres revenus (Vinted, LinkedIn…)")}${blocAutres}
-    ${titre("🏦 Prélèvements fixes CIC")}${blocCharges}
+    ${titre("🏦 Mes charges du mois")}${blocCharges}
   </div>`;
 
   // ---- Actions -------------------------------------------------------------
@@ -163,15 +165,17 @@ async function renderFinances(){
     } else {
       champs.push({ name:"libelle", label:"Prélèvement", required:true, value:f?f.libelle:"", placeholder:"Ex. Loyer, assurance, téléphone…" });
       champs.push({ name:"montant", label:"Montant par mois (€)", type:"text", required:true, value:f?f.montant:"" });
+      champs.push({ name:"note", label:"Note", value:f?f.note||"":"", placeholder:"Ex. le 5 du mois" });
+      champs.push({ name:"pro", label:"Prélevé sur mon compte CIC", type:"checkbox", value:f?f.pro:true });
     }
-    const titres = { prevu:"Rentrée prévue", revenu:"Autre revenu", charge:"Prélèvement fixe CIC" };
+    const titres = { prevu:"Rentrée prévue", revenu:"Autre revenu", charge:"Charge mensuelle" };
     const v = await UI.form({ title:(f?"Modifier — ":"")+titres[kind], submit:"Enregistrer", fields:champs });
     if (!v) return;
     const montant = Number(String(v.montant).replace(",", "."));
     if (!(montant > 0)) { UI.toast("Montant invalide", "error"); return; }
     const row = { kind, libelle:String(v.libelle||"").trim() || titres[kind], montant: r2(montant) };
     if (kind !== "charge"){ if (!/^\d{4}-\d{2}$/.test(v.mois||"")) { UI.toast("Mois invalide", "error"); return; } row.mois = v.mois + "-01"; }
-    else row.mensuel = true;
+    else { row.mensuel = true; row.note = v.note || null; row.pro = !!v.pro; }
     if (kind === "prevu") row.cliente_id = v.cliente_id || null;
     if (kind === "revenu"){ row.note = v.note || null; row.pro = !!v.pro; }
     try {
@@ -220,8 +224,8 @@ async function renderFinances(){
       }
       if (d.finUnfait){ const { error } = await sb.from("finances").update({ fait:false }).eq("id", d.finUnfait); if (error) throw error; return refresh(); }
       if (d.finVirok){
-        const row = { kind:"virement", libelle:"Virement Revolut → CIC", montant: totalCharges, mois: now+"-01", fait:true };
-        const { error } = vir ? await sb.from("finances").update({ fait:true, montant: totalCharges }).eq("id", vir.id) : await sb.from("finances").insert(row);
+        const row = { kind:"virement", libelle:"Virement Revolut → CIC", montant: totalCIC, mois: now+"-01", fait:true };
+        const { error } = vir ? await sb.from("finances").update({ fait:true, montant: totalCIC }).eq("id", vir.id) : await sb.from("finances").insert(row);
         if (error) throw error; UI.toast("Virement noté ✅"); return refresh();
       }
       if (d.finVirundo){ const { error } = await sb.from("finances").update({ fait:false }).eq("id", d.finVirundo); if (error) throw error; return refresh(); }
