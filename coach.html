@@ -78,6 +78,7 @@
   <!-- Onglet COMPTES -->
   <section class="panel" data-panel="comptes" role="tabpanel" hidden>
     <div id="comptes"></div>
+    <div id="sources"></div>
   </section>
 </main>
 
@@ -453,7 +454,7 @@ async function loadAll() {
     sb.from("programmes").select("cliente_id,kind,envoye,date_envoi,date_fin,created_at"),
     sb.from("mensurations").select("cliente_id,type,saisi_par,created_at,date"),
     sb.from("paiements").select("cliente_id,montant,date,mode"),
-    sb.from("questionnaire_initial").select("cliente_id,date,saisi_par,created_at"),
+    sb.from("questionnaire_initial").select("cliente_id,date,saisi_par,created_at,source:reponses->>source,parrainage:reponses->>parrainage"),
     sb.from("questionnaire_nutrition").select("cliente_id,date,saisi_par,created_at"),
   ]), 18000, "Chargement du tableau de bord");
   // Si la requête principale (clientes) échoue, on ARRÊTE tout : mieux vaut un écran
@@ -546,6 +547,36 @@ function renderComptes(){
     <summary><span class="chev">▸</span>💰 Comptes${totalReste>0?`<span class="count" style="background:var(--accent);color:#fff">${euro(totalReste)} dû</span>`:""}</summary>
     <div class="section-body">${tuiles}${listeReste}
       <p class="isub" style="color:var(--text-light);margin-top:10px">Deux façons de suivre ce qu'on te doit : soit tu tapes un <strong>« Montant dû »</strong> directement sur la fiche (bouton « Modifier »), soit tu renseignes le <strong>prix du forfait</strong> et l'espace calcule le reste (prix − paiements reçus). Le montant dû saisi à la main est prioritaire. Remets-le à 0 (ou vide) quand c'est réglé.</p>
+    </div></details>`;
+}
+
+// ---- D'où viennent mes clientes ? (réponse « Comment m'as-tu connue ? ») ----
+function renderSources(){
+  const box = document.getElementById("sources");
+  if (!box) return;
+  const counts = {}; const parrains = []; let total = 0; const sans = [];
+  STATE.clientes.forEach(c => {
+    const q = (c.questionnaireInitial||[]).slice().sort((a,b)=>a.created_at<b.created_at?1:-1).find(x=>x.source);
+    if (!q){ if (Calc.estNouvelle(c.cliente)) sans.push(c.cliente); return; }
+    // « Facebook (groupe ou page) — Groupe Boulogne » → canal = avant le tiret
+    const canal = String(q.source).split(" — ")[0].trim();
+    counts[canal] = (counts[canal]||0) + 1; total++;
+    if (q.parrainage) parrains.push({ cl:c.cliente, par:q.parrainage });
+  });
+  if (!total && !sans.length){ box.innerHTML = ""; return; }
+  const rows = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const max = rows.length ? rows[0][1] : 1;
+  const bars = rows.map(([k,n]) => `<div style="margin:8px 0">
+      <div style="display:flex;justify-content:space-between;font-size:.85rem"><span>${esc(k)}</span><strong>${n} <span style="color:var(--text-light);font-weight:400">(${Math.round(n*100/total)} %)</span></strong></div>
+      <div style="height:8px;background:var(--line-soft);border-radius:6px;margin-top:4px"><div style="height:100%;width:${Math.max(6,Math.round(n*100/max))}%;background:linear-gradient(90deg,var(--gold),var(--accent));border-radius:6px"></div></div>
+    </div>`).join("");
+  const par = parrains.length ? `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent);margin:14px 2px 4px">💛 Recommandées par</div>`
+    + parrains.map(p=>`<div class="isub" style="margin:3px 0"><a href="cliente.html?id=${p.cl.id}" style="color:inherit"><strong>${esc(p.cl.prenom)}</strong></a> ← ${esc(p.par)}</div>`).join("") : "";
+  const att = sans.length ? `<p class="isub" style="color:var(--text-light);margin-top:12px">En attente de réponse (questionnaire pas encore rempli) : ${sans.map(c=>esc(c.prenom)).join(", ")}</p>` : "";
+  box.innerHTML = `<details class="section-block" style="margin:14px 0">
+    <summary><span class="chev">▸</span>🔎 D'où viennent mes clientes<span class="count">${total}</span></summary>
+    <div class="section-body">${bars || '<p class="empty">Aucune réponse pour l’instant.</p>'}${par}${att}
+      <p class="isub" style="color:var(--text-light);margin-top:10px">D'après la question « Comment m'as-tu connue ? » du questionnaire de démarrage. Mets ton énergie et ton budget pub là où ça rapporte le plus.</p>
     </div></details>`;
 }
 
@@ -1000,7 +1031,7 @@ function renderLoadWarn(){
 function renderAll(){
   const safe = (fn, name) => { try { fn(); } catch(e){ console.error("render "+name, e); } };
   safe(renderLoadWarn,"loadWarn"); safe(renderStats,"stats"); safe(renderAlerts,"alerts");
-  safe(renderAgenda,"agenda"); safe(renderComptes,"comptes"); safe(renderProgrammes,"programmes");
+  safe(renderAgenda,"agenda"); safe(renderComptes,"comptes"); safe(renderSources,"sources"); safe(renderProgrammes,"programmes");
   safe(renderBilans,"bilans"); safe(renderBilansDemarrage,"bilansDemarrage"); safe(renderSansSeance,"sansSeance");
   safe(renderFilters,"filters"); safe(renderList,"list");
 }
