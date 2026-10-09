@@ -95,7 +95,7 @@ async function renderFinances(){
     const depenses = m > now ? depEstimee : (m === now ? Math.max(depMois(m), depEstimee) : depMois(m));
     const reste = r2(dispoPro - totCIC + autres - depenses);
     // Pour t'en sortir : ce qu'il faut encaisser (déclaré) pour que « il te reste » = 0.
-    const besoin = r2((totPro + totCIC + depenses - autres) / (1 - FIN.TAUX_URSSAF));
+    const besoin = Math.max(0, r2((totPro + totCIC + depenses - autres) / (1 - FIN.TAUX_URSSAF)));
     const manque = reste < 0 ? r2(-reste / (1 - FIN.TAUX_URSSAF)) : 0;
     const aVendre = manque ? OFFRES.map(o => `${Math.ceil(manque / o.prix)} ${o.n}${Math.ceil(manque / o.prix) > 1 ? "s" : ""} à ${o.prix} €`.replace("séance à l'unités","séances à l'unité").replace("forfait 1 séance/semaines","forfaits 1 séance/semaine").replace("programme à distances","programmes à distance")) : [];
     return { m, recus, recusSansCliente, revPro, aRecevoir, recu, attendu, totalPro, baseUrssaf, urssaf, dispoPro, autres, depenses, reste, besoin, manque, aVendre };
@@ -146,7 +146,8 @@ async function renderFinances(){
       <div class="isub">Ça paie tout ce qui sort de ton compte CIC : loyer, crédits, assurances, voiture, abonnements perso.</div>
 
       <div style="font-size:.95rem;font-weight:700;margin:16px 0 6px">2️⃣ Pour t'en sortir en ${moisSeul(now).toLowerCase()}</div>
-      ${L("Il te faut encaisser", euro(c.besoin), { big:true })}
+      ${L("Il te faut encaisser en coaching", euro(c.besoin), { big:true })}
+      ${c.autres ? `<div class="isub" style="margin-top:-2px">en comptant ${euro(c.autres)} d'autres rentrées (France Travail, Vinted…)</div>` : ""}
       ${L("Tu as (reçu + à recevoir)", euro(c.totalPro), { big:true, color: okMois ? vert : rouge })}
       ${okMois ? `<div style="padding:6px 0;color:${vert};font-weight:600">✅ C'est bon ce mois-ci, il te reste ${euro(c.reste)}.</div>`
                : `<div style="padding:6px 0;color:${rouge};font-weight:600">❌ Il te manque ${euro(c.manque)}.</div>`}
@@ -190,7 +191,7 @@ async function renderFinances(){
       <div style="font-weight:700;margin:16px 0 2px">🏠 Compte perso (CIC)</div>
       ${L("− Virement vers CIC", "−"+euro(totCIC))}
       ${L(`− Dépenses du mois${c.depenses > depMois(now) ? " (moyenne)" : ""}`, "−"+euro(c.depenses))}
-      ${c.autres ? L("+ Autres rentrées (Vinted, Leboncoin…)", "+"+euro(c.autres)) : ""}
+      ${c.autres ? L("+ Autres rentrées (France Travail, Vinted…)", "+"+euro(c.autres)) : ""}
       ${L("= Il te reste", euro(c.reste), { top:true, color: signe(c.reste), big:true })}
       ${totEpargne ? L(`Si tu mets ${euro(totEpargne)} en épargne`, euro(r2(c.reste - totEpargne)), { small:true, color: signe(c.reste - totEpargne) }) : ""}
       <p class="isub" style="margin-top:8px">Décoche « URSSAF » sur un paiement que tu ne déclares pas : il ne compte plus dans les 26 %.</p>
@@ -243,7 +244,7 @@ async function renderFinances(){
     ${titre("🔮 Les 3 prochains mois")}${blocProchains}
     ${titre(`🔎 Le détail du mois (${moisSeul(now).toLowerCase()})`)}${blocDetail}
     ${titre("⛽ Mes dépenses du mois")}${blocDep}
-    ${titre("🛍 Autres rentrées (Vinted, Leboncoin, LinkedIn…)")}${blocAutres}
+    ${titre("🛍 Autres rentrées (France Travail, Vinted, Leboncoin…)")}${blocAutres}
     ${titre("🧾 Mes charges fixes")}${blocCharges}
     ${titre("📊 Ce que j'ai encaissé (coaching)")}${blocHist}
   </div>`;
@@ -274,7 +275,7 @@ async function renderFinances(){
       champs.push({ name:"note", label:"Note (facultatif)", value:f?f.note||"":"", placeholder:"Ex. à sa séance, par virement" });
       if (!f) champs.push({ name:"repeter", label:"Tous les mois pendant combien de mois ?", type:"number", value:1, hint:"Ex. 3 pour un parcours de 3 mois payé chaque mois" });
     } else if (kind === "revenu"){
-      const src = ["Vinted","Leboncoin","LinkedIn","Vente programme en ligne (Stripe)","Autre"];
+      const src = ["France Travail","Vinted","Leboncoin","LinkedIn","Vente programme en ligne (Stripe)","Autre"];
       champs.push({ name:"libelle", label:"Source", type:"select", value:f?f.libelle:"Vinted", options:src.map(x=>({value:x,label:x})).concat(f&&!src.includes(f.libelle)?[{value:f.libelle,label:f.libelle}]:[]) });
       champs.push({ name:"montant", label:"Montant (€)", type:"text", required:true, half:true, value:f?f.montant:"", placeholder:"ex. 99,50" });
       champs.push({ name:"mois", label:"Mois", type:"month", required:true, half:true, value:moisVal(f&&f.mois) });
