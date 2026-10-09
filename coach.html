@@ -147,7 +147,7 @@ function renderAgenda(){
     // On garde aussi les séances déjà "réalisées" (à partir d'aujourd'hui) pour qu'une séance
     // cochée « faite » NE disparaisse PAS : elle reste visible, marquée ✅.
     if ((s.statut==="prevue"||s.statut==="realisee") && s.date && s.date>=today)
-      items.push({ id:s.id, date:s.date, type:s.type, heure:s.heure, statut:s.statut, cl:c.cliente });
+      items.push({ id:s.id, date:s.date, type:s.type, heure:s.heure, statut:s.statut, lieu:s.lieu, duree:s.duree, objectif:s.objectif, cl:c.cliente });
   }));
   if (!items.length){
     box.innerHTML = addBtn + `<details class="section-block" open style="margin:14px 0">
@@ -160,7 +160,11 @@ function renderAgenda(){
   // Rendu d'UNE séance (ligne).
   const line = (it) => {
     const hh = Calc.fmtHeure(it.heure);
-    const nom = `<a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;flex:1 1 100%;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.type?` · ${esc(it.type)}`:""}</a>`;
+    // Lieu : celui de la séance (ex. salle On Air), sinon l'adresse de la cliente (domicile).
+    const lieu = it.lieu || it.cl.adresse || "";
+    const maps = lieu ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lieu)}` : "";
+    const nom = `<a href="cliente.html?id=${it.cl.id}" style="text-decoration:none;color:inherit;flex:1 1 100%;min-width:0"><strong>${esc(it.cl.prenom)} ${esc(it.cl.nom||"")}</strong>${hh?` · ${hh}`:""}${it.duree?` (${it.duree} min)`:""}${it.type?` · ${esc(it.type)}`:""}</a>
+      <div style="flex:1 1 100%;font-size:.8rem;color:var(--text-mid);margin-top:2px">📍 ${lieu ? `<a href="${maps}" target="_blank" rel="noopener" style="color:inherit">${esc(lieu)}</a>${it.lieu?"":" <span style='color:var(--text-light)'>(domicile)</span>"}` : `<span style="color:var(--accent)">Lieu à préciser</span> — <a href="cliente.html?id=${it.cl.id}&editSeance=${it.id}" style="color:inherit">ajouter</a>`}${it.objectif?`<br>🎯 ${esc(it.objectif)}`:""}</div>`;
     if (it.statut==="realisee"){
       return `<div class="cl-line" style="padding:5px 0;opacity:.6">${nom}
         <span class="tag tag-done" style="cursor:default">✅ Fait</span></div>`;
@@ -450,7 +454,7 @@ async function loadAll() {
   const [clientes, accomp, seances, bilans, bilansDem, programmes, mensu, paiements, qinit, qnut] = await window.withTimeout(Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
     sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois,prix,montant_du,formule"),
-    sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
+    sb.from("seances").select("id,cliente_id,statut,date,type,heure,lieu,duree,objectif"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("bilans_demarrage").select("cliente_id,date,saisi_par,created_at"),
     sb.from("programmes").select("cliente_id,kind,envoye,date_envoi,date_fin,created_at"),
