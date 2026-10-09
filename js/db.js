@@ -99,7 +99,9 @@ window.DB = {
         this.list("notes_privees", clienteId, { col: "date", asc: false }),
         this.list("paiements", clienteId, { col: "date", asc: false }),
       ]), 18000, "Chargement du dossier");
-    return { cliente, accompagnement, seances, bilans, bilans_demarrage, questionnaire_initial, questionnaire_nutrition, mensurations, objectifs, programmes, photos, notes, paiements };
+    // Les paiements marqués ⚠️ (doublons / erreurs) ne comptent nulle part.
+    const paiementsOk = (paiements || []).filter(p => !String(p.note || "").startsWith("⚠️"));
+    return { cliente, accompagnement, seances, bilans, bilans_demarrage, questionnaire_initial, questionnaire_nutrition, mensurations, objectifs, programmes, photos, notes, paiements: paiementsOk };
   },
 
   async deleteCliente(clienteId) {

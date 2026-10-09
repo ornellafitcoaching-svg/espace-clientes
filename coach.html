@@ -87,11 +87,11 @@
 <script src="js/config.js?v=e99"></script>
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
-<script src="js/db.js?v=e99"></script>
+<script src="js/db.js?v=e100"></script>
 <script src="js/calc.js?v=q4"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
-<script src="js/finances.js?v=f5"></script>
+<script src="js/finances.js?v=f6"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -499,7 +499,7 @@ async function loadAll() {
       bilans: bilMap[cl.id]||[],
       bilansDemarrage: bilDemMap[cl.id]||[],
       programmes: proMap[cl.id]||[],
-      paiements: payMap[cl.id]||[],
+      paiements: (payMap[cl.id]||[]).filter(p => !String(p.note||"").startsWith("⚠️")),
       mensurations: mensMap[cl.id]||[],
       questionnaireInitial: qiMap[cl.id]||[],
       questionnaireNutrition: qnMap[cl.id]||[],

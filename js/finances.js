@@ -7,7 +7,8 @@
 //                       l'URSSAF à mettre de côté, les abonnements pro.
 //   🏠 PERSO (CIC)    : le virement Revolut → CIC qui paie les prélèvements perso,
 //                       les dépenses du mois (essence, courses, Luciana…), l'épargne.
-// Bouton « avec / sans URSSAF » pour voir les deux calculs.
+// URSSAF : case à cocher sur CHAQUE paiement (cochée = déclaré = 26 % mis de côté).
+// En haut : l'essentiel du mois = combien virer sur CIC, combien encaisser pour s'en sortir, quoi vendre.
 //
 // Données (table finances) :
 //   prevu    = paiement attendu d'une cliente, à une DATE précise (colonne mois = la date)
@@ -28,16 +29,14 @@ async function renderFinances(){
   try {
     const [a, b] = await Promise.all([
       sb.from("finances").select("*").order("mois",{ascending:true}).order("created_at",{ascending:true}),
-      sb.from("paiements").select("id,cliente_id,montant,date,mode,note"),
+      sb.from("paiements").select("id,cliente_id,montant,date,mode,note,urssaf"),
     ]);
     if (a.error) throw a.error; if (b.error) throw b.error;
-    F = a.data || []; P = (b.data || []).filter(p => !String(p.note||"").startsWith("⚠️"));
+    F = (a.data || []).filter(f => !f.masque); P = (b.data || []).filter(p => !String(p.note||"").startsWith("⚠️"));
   } catch(e){
     box.innerHTML = `<div class="card" style="margin-top:14px;color:var(--accent)">Finances indisponibles : ${esc(UI.errText ? UI.errText(e) : String(e))}</div>`;
     return;
   }
-  let avecUrssaf = true;
-  try { avecUrssaf = localStorage.getItem("fin_urssaf") !== "sans"; } catch(e) {}
 
   const nom = id => { const c = (STATE.clientes||[]).find(x => String(x.cliente.id) === String(id)); return c ? String(c.cliente.prenom||"").trim() : ""; };
   const ym = d => String(d||"").slice(0,7);
@@ -77,6 +76,9 @@ async function renderFinances(){
   const depEstimee = moisAvecDep.length ? r2(moisAvecDep.reduce((s,m)=>s+depMois(m),0) / moisAvecDep.length) : 0;
 
   // ---- Calcul d'un mois ------------------------------------------------------
+  // URSSAF : calculée paiement par paiement (case « URSSAF » cochée = déclaré = 26 % mis de côté).
+  const declare = x => x.urssaf !== false;
+  const OFFRES = [ { n:"forfait 1 séance/semaine", prix:300 }, { n:"séance à l'unité", prix:65 }, { n:"programme à distance", prix:79 } ];
   const calc = m => {
     const recus = P.filter(p => ym(p.date) === m).sort((a,b)=>a.date<b.date?-1:1);
     const recusSansCliente = prevus.filter(f => ym(f.mois) === m && f.fait && !f.cliente_id);
@@ -86,100 +88,122 @@ async function renderFinances(){
     const recu = r2(sum(recus) + sum(recusSansCliente) + sum(revPro));
     const attendu = sum(aRecevoir);
     const totalPro = r2(recu + attendu);
-    const urssaf = avecUrssaf ? r2(totalPro * FIN.TAUX_URSSAF) : 0;
+    const baseUrssaf = r2(sum(recus.filter(declare)) + sum(recusSansCliente.filter(declare)) + sum(revPro.filter(declare)) + sum(aRecevoir.filter(declare)));
+    const urssaf = r2(baseUrssaf * FIN.TAUX_URSSAF);
     const dispoPro = r2(totalPro - urssaf - totPro);
     const autres = sum(revPerso);
-    const depenses = m > now ? depEstimee : depMois(m);
+    const depenses = m > now ? depEstimee : (m === now ? Math.max(depMois(m), depEstimee) : depMois(m));
     const reste = r2(dispoPro - totCIC + autres - depenses);
-    const resteApresEpargne = r2(reste - totEpargne);
-    return { m, recus, recusSansCliente, revPro, aRecevoir, recu, attendu, totalPro, urssaf, dispoPro, autres, depenses, reste, resteApresEpargne };
+    // Pour t'en sortir : ce qu'il faut encaisser (déclaré) pour que « il te reste » = 0.
+    const besoin = r2((totPro + totCIC + depenses - autres) / (1 - FIN.TAUX_URSSAF));
+    const manque = reste < 0 ? r2(-reste / (1 - FIN.TAUX_URSSAF)) : 0;
+    const aVendre = manque ? OFFRES.map(o => `${Math.ceil(manque / o.prix)} ${o.n}${Math.ceil(manque / o.prix) > 1 ? "s" : ""} à ${o.prix} €`.replace("séance à l'unités","séances à l'unité").replace("forfait 1 séance/semaines","forfaits 1 séance/semaine").replace("programme à distances","programmes à distance")) : [];
+    return { m, recus, recusSansCliente, revPro, aRecevoir, recu, attendu, totalPro, baseUrssaf, urssaf, dispoPro, autres, depenses, reste, besoin, manque, aVendre };
   };
 
   // ---- Styles communs -------------------------------------------------------
   const L = (label, val, opt={}) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;${opt.top?"border-top:1px solid var(--line-soft);margin-top:4px;padding-top:8px;":""}${opt.small?"font-size:.82rem;color:var(--text-light);":""}">
-      <span>${label}</span><strong style="white-space:nowrap;${opt.color?`color:${opt.color};`:""}${opt.big?"font-size:1.05rem;":""}">${val}</strong></div>`;
+      <span>${label}</span><strong style="white-space:nowrap;${opt.color?`color:${opt.color};`:""}${opt.big?"font-size:1.08rem;":""}">${val}</strong></div>`;
   const vert = "#2f7a46", rouge = "var(--accent)";
   const signe = n => n < 0 ? rouge : vert;
-  const titre = t => `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent);margin:18px 2px 4px">${t}</div>`;
+  const titre = t => `<div style="font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent);margin:20px 2px 4px">${t}</div>`;
   const carte = (inner, couleur) => `<div class="card" style="margin-top:6px;padding:10px 14px;${couleur?`border-left:4px solid ${couleur};`:""}">${inner}</div>`;
+  const caseUrssaf = (attr, id, on) => `<label style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;color:var(--text-light);cursor:pointer;white-space:nowrap"><input type="checkbox" ${attr}="${id}" ${on?"checked":""} style="width:15px;height:15px;margin:0">URSSAF</label>`;
 
   const nomPrevu = f => {
     const n = f.cliente_id ? nom(f.cliente_id) : "";
     return n && !sansAccent(f.libelle).startsWith(sansAccent(n)) ? `${esc(n)} — ${esc(f.libelle)}` : esc(f.libelle);
   };
-  const lignePrevu = (f, actions) => `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line-soft)">
+  const lignePrevu = f => `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--line-soft)">
       <div style="flex:1;min-width:0">
-        <div><span style="font-size:.78rem;color:var(--text-light)">${jour(f.mois)} · </span>${f._recu?"✅ ":""}<strong style="font-weight:600">${nomPrevu(f)}</strong></div>
+        <div><span style="font-size:.78rem;color:var(--text-light)">${jour(f.mois)} · </span><strong style="font-weight:600">${nomPrevu(f)}</strong></div>
         ${f.note?`<div class="isub" style="font-size:.78rem">${esc(f.note)}</div>`:""}
       </div>
       <div style="text-align:right;white-space:nowrap">
         <strong>${euro(f.montant)}</strong>
-        ${actions ? `<div style="display:flex;gap:4px;justify-content:flex-end;margin-top:4px">${f._recu ? "" : `<button class="btn-accent" data-fin-recu="${f.id}" style="padding:2px 8px;font-size:.72rem">Reçu</button>`}<button class="btn-ghost" data-fin-edit="${f.id}" title="Modifier" style="padding:1px 5px;font-size:.72rem">✏️</button><button class="btn-ghost" data-fin-del="${f.id}" title="Supprimer" style="padding:1px 5px;font-size:.72rem">🗑</button></div>` : ""}
+        <div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;margin-top:4px">${caseUrssaf("data-fin-urs-prevu", f.id, declare(f))}<button class="btn-accent" data-fin-recu="${f.id}" style="padding:2px 8px;font-size:.72rem">Reçu</button><button class="btn-ghost" data-fin-edit="${f.id}" title="Modifier" style="padding:1px 5px;font-size:.72rem">✏️</button><button class="btn-ghost" data-fin-del="${f.id}" title="Supprimer" style="padding:1px 5px;font-size:.72rem">🗑</button></div>
       </div>
     </div>`;
-  const ligneRecu = p => `<div style="display:flex;gap:8px;padding:4px 0;font-size:.85rem">
-      <span style="min-width:52px;color:var(--text-light)">${jour(p.date)}</span><span style="flex:1">${esc(nom(p.cliente_id) || "—")}${p.mode?` <span class="isub">· ${esc(p.mode)}</span>`:""}</span><span>${euro(p.montant)}</span></div>`;
+  const ligneRecu = (p, editable) => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line-soft);font-size:.88rem">
+      <span style="min-width:50px;color:var(--text-light);font-size:.78rem">${jour(p.date)}</span>
+      <span style="flex:1;min-width:0">${esc(p._qui || nom(p.cliente_id) || "—")}${p.mode?` <span class="isub">· ${esc(p.mode)}</span>`:""}</span>
+      <strong style="white-space:nowrap">${euro(p.montant)}</strong>
+      ${editable ? caseUrssaf(editable, p.id, declare(p)) : ""}</div>`;
+  const recusDuMois = x => x.recus.map(p => ligneRecu(p, "data-fin-urs-pay")).join("")
+    + x.revPro.map(f => ligneRecu({ id:f.id, date:f.mois, _qui:f.libelle, montant:f.montant, urssaf:f.urssaf }, "data-fin-urs-prevu")).join("")
+    + x.recusSansCliente.map(f => ligneRecu({ id:f.id, date:f.mois, _qui:f.libelle, montant:f.montant, urssaf:f.urssaf }, "data-fin-urs-prevu")).join("");
 
-  // ---- Bouton avec / sans URSSAF ---------------------------------------------
-  const bascule = `<div style="display:flex;gap:6px;margin:10px 0 2px">
-      <button class="${avecUrssaf?"btn-accent":"btn-ghost"}" data-fin-urssaf="avec" style="flex:1;padding:7px 8px;font-size:.82rem">Avec URSSAF (26 %)</button>
-      <button class="${!avecUrssaf?"btn-accent":"btn-ghost"}" data-fin-urssaf="sans" style="flex:1;padding:7px 8px;font-size:.82rem">Sans URSSAF</button></div>
-    <p class="isub" style="margin:2px 2px 0">${avecUrssaf?"26 % de tout ce que tu encaisses en coaching est mis de côté pour l'URSSAF : c'est le calcul prudent.":"Calcul sans URSSAF : ce que tu aurais si tu ne déclarais rien. À utiliser seulement pour comparer."}</p>`;
-
-  // ---- CE MOIS-CI -------------------------------------------------------------
+  // ---- 1. L'ESSENTIEL DU MOIS -------------------------------------------------
   const c = calc(now);
   const vir = F.find(f => f.kind === "virement" && ym(f.mois) === now);
-  const listeRecus = c.recus.map(ligneRecu).join("") + c.recusSansCliente.map(f => ligneRecu({ date:f.mois, cliente_id:null, montant:f.montant, mode:f.libelle })).join("")
-    + c.revPro.map(f => ligneRecu({ date:f.mois, cliente_id:null, montant:f.montant, mode:f.libelle })).join("");
-  const blocPro = carte(`
-      <div style="font-weight:700;margin-bottom:4px">💼 Compte pro (Revolut)</div>
-      ${L("Déjà reçu", euro(c.recu))}
-      <details style="margin:-2px 0 4px"><summary class="isub" style="cursor:pointer">Voir qui a payé et quand (${c.recus.length + c.recusSansCliente.length + c.revPro.length})</summary>${listeRecus || `<p class="isub">Rien encore ce mois-ci.</p>`}</details>
-      ${L("Encore à recevoir", euro(c.attendu), { color: c.attendu ? rouge : "" })}
-      ${c.aRecevoir.map(f => lignePrevu(f, true)).join("")}
-      ${L("Total coaching du mois", euro(c.totalPro), { top:true })}
-      ${avecUrssaf ? L("− URSSAF à mettre de côté (26 %)", "−"+euro(c.urssaf)) : ""}
-      ${L(`− Abonnements pro (${chPro.map(f=>esc(f.libelle.replace(/\s*\(.*\)/,""))).join(", ") || "aucun"})`, "−"+euro(totPro))}
-      ${L("= Disponible sur le compte pro", euro(c.dispoPro), { top:true, color: signe(c.dispoPro), big:true })}
-    `, "var(--gold)");
-  const blocPerso = carte(`
-      <div style="font-weight:700;margin-bottom:4px">🏠 Compte perso (CIC)</div>
-      ${L("Virement Revolut → CIC à faire", euro(totCIC))}
-      <div class="isub" style="margin:-2px 0 6px">Il paie tes prélèvements CIC (loyer, crédits, assurances, voiture…).</div>
-      ${vir && vir.fait
-        ? `<div style="padding:6px 0">✅ <strong>Virement fait</strong> (${euro(vir.montant)}) <button class="btn-ghost" data-fin-virundo="${vir.id}" style="padding:2px 8px;font-size:.75rem;margin-left:6px">Annuler</button></div>`
-        : `<button class="btn-accent" data-fin-virok="1" style="margin:2px 0 6px">✅ J'ai fait le virement</button>`}
-      ${L("Dépenses du mois (essence, courses, Luciana…)", "−"+euro(c.depenses))}
-      ${c.autres ? L("+ Autres rentrées (Vinted, Leboncoin…)", "+"+euro(c.autres)) : ""}
-    `, "var(--accent)");
-  const blocBilan = carte(`
-      ${L("Disponible pro", euro(c.dispoPro))}
-      ${L("− Virement vers CIC", "−"+euro(totCIC))}
-      ${L("− Dépenses du mois", "−"+euro(c.depenses))}
-      ${c.autres ? L("+ Autres rentrées", "+"+euro(c.autres)) : ""}
-      ${L("= Il te reste", euro(c.reste), { top:true, color: signe(c.reste), big:true })}
-      ${totEpargne ? L(`Après l'épargne (${euro(totEpargne)})`, euro(c.resteApresEpargne), { small:true, color: signe(c.resteApresEpargne) }) : ""}
-    `, signe(c.reste));
+  const okMois = c.reste >= 0;
+  const blocEssentiel = carte(`
+      <div style="font-size:.95rem;font-weight:700;margin-bottom:6px">1️⃣ À virer de Revolut vers CIC</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <strong style="font-size:1.35rem">${euro(totCIC)}</strong>
+        ${vir && vir.fait ? `<span>✅ fait <button class="btn-ghost" data-fin-virundo="${vir.id}" style="padding:2px 8px;font-size:.72rem">annuler</button></span>` : `<button class="btn-accent" data-fin-virok="1" style="padding:6px 12px">J'ai fait le virement</button>`}
+      </div>
+      <div class="isub">Ça paie tout ce qui sort de ton compte CIC : loyer, crédits, assurances, voiture, abonnements perso.</div>
 
-  // ---- MOIS SUIVANTS ----------------------------------------------------------
-  const suivants = [1,2,3].map(k => calc(addM(now,k))).map(x => carte(`
-      <div style="display:flex;justify-content:space-between;align-items:baseline"><strong>${moisSeul(x.m)}</strong><span class="isub">prévu</span></div>
-      ${x.aRecevoir.map(f => lignePrevu(f, true)).join("") || `<p class="isub" style="padding:6px 0">Aucun paiement prévu pour l'instant.</p>`}
-      ${L("Total à recevoir", euro(x.totalPro), { top:true })}
-      ${avecUrssaf ? L("− URSSAF (26 %)", "−"+euro(x.urssaf), { small:true }) : ""}
-      ${L("− Abonnements pro", "−"+euro(totPro), { small:true })}
-      ${L("− Virement vers CIC", "−"+euro(totCIC), { small:true })}
-      ${L(`− Dépenses${depEstimee?" (moyenne)":""}`, "−"+euro(x.depenses), { small:true })}
-      ${L("= Il te resterait", euro(x.reste), { top:true, color: signe(x.reste), big:true })}
-    `)).join("");
+      <div style="font-size:.95rem;font-weight:700;margin:16px 0 6px">2️⃣ Pour t'en sortir en ${moisSeul(now).toLowerCase()}</div>
+      ${L("Il te faut encaisser", euro(c.besoin), { big:true })}
+      ${L("Tu as (reçu + à recevoir)", euro(c.totalPro), { big:true, color: okMois ? vert : rouge })}
+      ${okMois ? `<div style="padding:6px 0;color:${vert};font-weight:600">✅ C'est bon ce mois-ci, il te reste ${euro(c.reste)}.</div>`
+               : `<div style="padding:6px 0;color:${rouge};font-weight:600">❌ Il te manque ${euro(c.manque)}.</div>`}
+
+      <div style="font-size:.95rem;font-weight:700;margin:16px 0 6px">3️⃣ Ce qu'il faut vendre</div>
+      ${okMois ? `<div class="isub">Rien d'obligatoire ce mois-ci. Concentre-toi sur les mois suivants (plus bas).</div>`
+               : `<div>Pour combler ${euro(c.manque)}, il te faut <strong>une</strong> de ces options :</div><ul style="margin:6px 0 0 18px;padding:0">${c.aVendre.map(t => `<li>${t}</li>`).join("")}</ul>`}
+    `, okMois ? vert : rouge);
+
+  // ---- 2. LES PROCHAINS MOIS (tableau simple) -------------------------------
+  const prochains = [1,2,3].map(k => calc(addM(now,k)));
+  const th = `style="text-align:left;padding:6px 4px;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-light)"`;
+  const blocProchains = carte(`
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.86rem">
+        <thead><tr><th ${th}>Mois</th><th ${th}>Déjà prévu</th><th ${th}>Il faut</th><th ${th}>Il manque</th></tr></thead>
+        <tbody>${prochains.map(x => `<tr style="border-top:1px solid var(--line-soft)">
+          <td style="padding:7px 4px"><strong>${moisSeul(x.m)}</strong></td>
+          <td style="padding:7px 4px">${euro(x.totalPro)}</td>
+          <td style="padding:7px 4px">${euro(x.besoin)}</td>
+          <td style="padding:7px 4px;font-weight:700;color:${x.manque?rouge:vert}">${x.manque?euro(x.manque):"✅ 0 €"}</td></tr>`).join("")}</tbody>
+      </table></div>
+      ${prochains.filter(x => x.manque).map(x => `<div style="margin-top:8px;font-size:.86rem"><strong>${moisSeul(x.m)} :</strong> vendre ${x.aVendre.join(" <em>ou</em> ")}</div>`).join("")}
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">Voir les paiements prévus mois par mois</summary>
+        ${prochains.map(x => `<div style="margin-top:10px;font-weight:700">${moisSeul(x.m)}</div>${x.aRecevoir.map(lignePrevu).join("") || `<p class="isub">Aucun paiement prévu.</p>`}`).join("")}
+      </details>
+      <div style="margin-top:10px"><button class="btn-ghost" data-fin-add="prevu">＋ Ajouter un paiement attendu</button></div>
+    `);
+
+  // ---- 3. LE DÉTAIL DU MOIS ---------------------------------------------------
+  const blocDetail = carte(`
+      <div style="font-weight:700;margin-bottom:2px">💼 Compte pro (Revolut)</div>
+      ${L("Déjà reçu", euro(c.recu))}
+      ${recusDuMois(c) || `<p class="isub">Rien encore ce mois-ci.</p>`}
+      ${L("Encore à recevoir", euro(c.attendu), { top:true, color: c.attendu ? rouge : "" })}
+      ${c.aRecevoir.map(lignePrevu).join("")}
+      ${L("Total du mois", euro(c.totalPro), { top:true })}
+      ${L(`− URSSAF (26 % des paiements cochés « URSSAF »)`, "−"+euro(c.urssaf))}
+      ${L(`− Abonnements pro`, "−"+euro(totPro))}
+      ${L("= Disponible sur le compte pro", euro(c.dispoPro), { top:true, color: signe(c.dispoPro) })}
+
+      <div style="font-weight:700;margin:16px 0 2px">🏠 Compte perso (CIC)</div>
+      ${L("− Virement vers CIC", "−"+euro(totCIC))}
+      ${L(`− Dépenses du mois${c.depenses > depMois(now) ? " (moyenne)" : ""}`, "−"+euro(c.depenses))}
+      ${c.autres ? L("+ Autres rentrées (Vinted, Leboncoin…)", "+"+euro(c.autres)) : ""}
+      ${L("= Il te reste", euro(c.reste), { top:true, color: signe(c.reste), big:true })}
+      ${totEpargne ? L(`Si tu mets ${euro(totEpargne)} en épargne`, euro(r2(c.reste - totEpargne)), { small:true, color: signe(c.reste - totEpargne) }) : ""}
+      <p class="isub" style="margin-top:8px">Décoche « URSSAF » sur un paiement que tu ne déclares pas : il ne compte plus dans les 26 %.</p>
+    `);
 
   // ---- HISTORIQUE (encaissé coaching, sans déduction) -------------------------
   const hist = [];
   for (let m = "2026-01"; m < now; m = addM(m,1)){ const x = calc(m); if (x.recu) hist.push(x); }
   const blocHist = carte(hist.reverse().map(x => `<details style="padding:4px 0;border-top:1px solid var(--line-soft)">
       <summary style="display:flex;justify-content:space-between;cursor:pointer;list-style:none"><span>${cap(libM(x.m))}</span><strong>${euro(x.recu)}</strong></summary>
-      ${x.recus.map(ligneRecu).join("")}${x.revPro.map(f => ligneRecu({ date:f.mois, cliente_id:null, montant:f.montant, mode:f.libelle })).join("")}
-    </details>`).join("") + `<p class="isub" style="margin-top:6px">Tout ce que les clientes t'ont payé, avant URSSAF. Touche un mois pour voir le détail.</p>`);
+      ${recusDuMois(x)}
+      ${L("URSSAF sur ce mois (paiements cochés)", euro(x.urssaf), { small:true })}
+    </details>`).join("") + `<p class="isub" style="margin-top:6px">Tout ce que les clientes t'ont payé. Touche un mois pour voir qui, quand, et cocher/décocher « URSSAF ».</p>`);
 
   // ---- GESTION : dépenses, autres rentrées, charges ---------------------------
   const catsDep = ["Essence","Courses","Luciana","Achat revente","Autre"];
@@ -215,10 +239,9 @@ async function renderFinances(){
 
   box.innerHTML = `<div class="section-block" style="margin:14px 0">
     <h2 style="font-size:1.1rem;margin:4px 2px 0">💰 Mes finances <span class="isub" style="font-weight:400">· visible uniquement par toi</span></h2>
-    ${bascule}
-    ${titre(`📅 ${moisSeul(now)} — ce mois-ci`)}${blocPro}${blocPerso}${blocBilan}
-    ${titre("🔮 Les prochains mois")}${suivants}
-    <div style="margin:8px 0 0"><button class="btn-ghost" data-fin-add="prevu">＋ Ajouter un paiement attendu</button></div>
+    ${titre(`🎯 L'essentiel — ${moisSeul(now)}`)}${blocEssentiel}
+    ${titre("🔮 Les 3 prochains mois")}${blocProchains}
+    ${titre(`🔎 Le détail du mois (${moisSeul(now).toLowerCase()})`)}${blocDetail}
     ${titre("⛽ Mes dépenses du mois")}${blocDep}
     ${titre("🛍 Autres rentrées (Vinted, Leboncoin, LinkedIn…)")}${blocAutres}
     ${titre("🧾 Mes charges fixes")}${blocCharges}
@@ -284,11 +307,20 @@ async function renderFinances(){
     } catch(e){ err(e); }
   }
 
+  box.onchange = async (e) => {
+    const t = e.target; if (!t || t.type !== "checkbox") return;
+    try {
+      if (t.dataset.finUrsPay){ const { error } = await sb.from("paiements").update({ urssaf: t.checked }).eq("id", t.dataset.finUrsPay); if (error) throw error; }
+      else if (t.dataset.finUrsPrevu){ const { error } = await sb.from("finances").update({ urssaf: t.checked }).eq("id", t.dataset.finUrsPrevu); if (error) throw error; }
+      else return;
+      UI.toast(t.checked ? "Compté pour l'URSSAF" : "Retiré de l'URSSAF"); refresh();
+    } catch(err2){ err(err2); t.checked = !t.checked; }
+  };
+
   box.onclick = async (e) => {
     const t = e.target.closest("button"); if (!t) return;
     const d = t.dataset;
     try {
-      if (d.finUrssaf){ try { localStorage.setItem("fin_urssaf", d.finUrssaf); } catch(_) {} avecUrssaf = d.finUrssaf !== "sans"; return refresh(); }
       if (d.finAdd) return formulaire(d.finAdd);
       if (d.finDep) return formulaire("depense", null, d.finDep);
       if (d.finEdit){ const f = byId(d.finEdit); if (f) return formulaire(f.kind, f); return; }
