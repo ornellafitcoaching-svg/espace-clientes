@@ -195,6 +195,7 @@ button{font-family:inherit;cursor:pointer}
   white-space:nowrap;font-family:inherit;transition:.12s}
 .jchip:hover{border-color:var(--rose-deep);color:var(--dark)}
 .jchip:active{transform:scale(.95)}
+.jnav-lbl{flex:none;align-self:center;font-size:.72rem;color:var(--text-light);padding-left:4px;white-space:nowrap}
 .jchip-accent{background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff;border:none}
 .jchip-accent:hover{color:#fff}
 

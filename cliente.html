@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=f01">
+<link rel="stylesheet" href="css/app.css?v=f02">
 </head>
 <body>
 <header class="topbar">
@@ -165,7 +165,7 @@ function render(focusTitle){
   if (prevOpen.length === secs.length) secs.forEach((d, i) => { d.open = prevOpen[i]; });
   if (focusTitle) {
     // Après un ajout : ouvrir la section concernée et y descendre pour voir l'élément ajouté.
-    const sec = [...secs].find(d => { const s = d.querySelector('summary'); return s && s.textContent.trim().startsWith(focusTitle); });
+    const sec = [...secs].find(d => d.dataset.title === focusTitle);
     if (sec) { sec.open = true; sec.scrollIntoView({ behavior:"smooth", block:"start" }); }
   } else if (prevY) {
     window.scrollTo(0, prevY);
@@ -215,14 +215,15 @@ function jumpNav(){
     ["Objectifs","Objectifs"], ["Notes","Notes privées"],
   ];
   return `<nav class="jumpnav" aria-label="Aller à une section">
-    <button type="button" class="jchip jchip-accent" data-act="add-seance">＋ Séance</button>
+    <button type="button" class="jchip jchip-accent" data-act="add-seance">＋ Ajouter une séance</button>
+    <span class="jnav-lbl">Aller à :</span>
     ${items.map(([lbl,t])=>`<button type="button" class="jchip" data-jump="${esc(t)}">${lbl}</button>`).join("")}
   </nav>`;
 }
 // Ouvre la section visée et y défile (en tenant compte des barres collées en haut).
 function jumpToSection(title){
   const sec = [...document.querySelectorAll('#main .section-block')]
-    .find(d => { const s = d.querySelector('summary'); return s && s.textContent.trim().startsWith(title); });
+    .find(d => d.dataset.title === title);
   if (!sec) return;
   sec.open = true;
   const y = sec.getBoundingClientRect().top + window.scrollY - 112;
@@ -231,7 +232,7 @@ function jumpToSection(title){
 
 // ============================ SECTIONS ============================
 function block(title, count, body, open){
-  return `<details class="section-block" ${open?"open":""}>
+  return `<details class="section-block" data-title="${esc(title)}" ${open?"open":""}>
     <summary><span class="chev">▸</span>${title}${count!=null?`<span class="count">${count}</span>`:""}</summary>
     <div class="section-body">${body}</div></details>`;
 }
