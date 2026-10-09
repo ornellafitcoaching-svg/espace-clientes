@@ -79,6 +79,26 @@ async function renderFinances(cache){
   // URSSAF : calculée paiement par paiement (case « URSSAF » cochée = déclaré = 26 % mis de côté).
   const declare = x => x.urssaf !== false;
   const OFFRES = [ { n:"forfait 1 séance/semaine", prix:300 }, { n:"séance à l'unité", prix:65 }, { n:"programme à distance", prix:79 } ];
+  // ---- Packs payés d'avance : l'argent reçu d'un coup est « lissé » sur les mois des séances ----
+  // Exemple : pack 1 300 € pour 24 séances à 2/semaine → 12 semaines → environ 3 mois.
+  // Le mois du paiement, l'argent (après URSSAF) est mis de côté ; chaque mois tu reprends la part des séances faites.
+  const packs = F.filter(f => f.kind === "pack" && f.seances > 0 && f.par_semaine > 0);
+  const addJours = (d, n) => { const x = new Date(String(d).slice(0,10)+"T12:00:00Z"); x.setUTCDate(x.getUTCDate()+n); return x.toISOString().slice(0,10); };
+  const repartition = pk => {            // { "AAAA-MM": nb de séances }
+    const out = {}; let reste = Number(pk.seances), w = 0;
+    while (reste > 0 && w < 260){ const n = Math.min(Number(pk.par_semaine), reste); const mo = ym(addJours(pk.debut || pk.mois, 7*w)); out[mo] = (out[mo]||0) + n; reste -= n; w++; }
+    return out;
+  };
+  const packNet = pk => r2(Number(pk.montant) * (declare(pk) ? 1 - FIN.TAUX_URSSAF : 1));
+  const packMois = pk => { const rep = repartition(pk), net = packNet(pk); const ms = Object.keys(rep).sort(); let deja = 0;
+    return ms.map((mo, i) => { const v = i < ms.length-1 ? r2(net * rep[mo] / pk.seances) : r2(net - deja); deja = r2(deja + v); return { m: mo, seances: rep[mo], montant: v }; }); };
+  const packAjust = m => {
+    let misDeCote = 0, repris = 0;
+    packs.forEach(pk => { if (ym(pk.mois) === m) misDeCote += packNet(pk); const x = packMois(pk).find(y => y.m === m); if (x) repris += x.montant; });
+    return { misDeCote: r2(misDeCote), repris: r2(repris) };
+  };
+  const reserveAujourdhui = () => r2(packs.reduce((s, pk) => s + (ym(pk.mois) <= now ? packMois(pk).filter(x => x.m > now).reduce((t,x)=>t+x.montant,0) : 0), 0));
+
   const calc = m => {
     const recus = P.filter(p => ym(p.date) === m).sort((a,b)=>a.date<b.date?-1:1);
     const recusSansCliente = prevus.filter(f => ym(f.mois) === m && f.fait && !f.cliente_id);
@@ -93,12 +113,13 @@ async function renderFinances(cache){
     const dispoPro = r2(totalPro - urssaf - totPro);
     const autres = sum(revPerso);
     const depenses = m > now ? depEstimee : (m === now ? Math.max(depMois(m), depEstimee) : depMois(m));
-    const reste = r2(dispoPro - totCIC + autres - depenses);
+    const pa = packAjust(m);
+    const reste = r2(dispoPro - totCIC + autres - depenses - pa.misDeCote + pa.repris);
     // Pour t'en sortir : ce qu'il faut encaisser (déclaré) pour que « il te reste » = 0.
-    const besoin = Math.max(0, r2((totPro + totCIC + depenses - autres) / (1 - FIN.TAUX_URSSAF)));
+    const besoin = Math.max(0, r2((totPro + totCIC + depenses - autres - pa.repris + pa.misDeCote) / (1 - FIN.TAUX_URSSAF)));
     const manque = reste < 0 ? r2(-reste / (1 - FIN.TAUX_URSSAF)) : 0;
     const aVendre = manque ? OFFRES.map(o => `${Math.ceil(manque / o.prix)} ${o.n}${Math.ceil(manque / o.prix) > 1 ? "s" : ""} à ${o.prix} €`.replace("séance à l'unités","séances à l'unité").replace("forfait 1 séance/semaines","forfaits 1 séance/semaine").replace("programme à distances","programmes à distance")) : [];
-    return { m, recus, recusSansCliente, revPro, aRecevoir, recu, attendu, totalPro, baseUrssaf, urssaf, dispoPro, autres, depenses, reste, besoin, manque, aVendre };
+    return { m, recus, recusSansCliente, revPro, aRecevoir, recu, attendu, totalPro, baseUrssaf, urssaf, dispoPro, autres, depenses, pa, reste, besoin, manque, aVendre };
   };
 
   // ---- Styles communs -------------------------------------------------------
@@ -166,6 +187,8 @@ async function renderFinances(cache){
         ${c.autres ? ligneT("France Travail, Vinted… (autres rentrées)", "+"+euro(c.autres)) : ""}
         ${ligneT("Virement vers CIC (loyer, crédits, assurances…)", "−"+euro(totCIC))}
         ${ligneT(`Dépenses (essence, courses, Luciana)${c.depenses > depMois(now) ? " — moyenne" : ""}`, "−"+euro(c.depenses))}
+        ${c.pa.misDeCote ? ligneT("📦 Pack reçu ce mois : mis de côté pour les mois des séances", "−"+euro(c.pa.misDeCote)) : ""}
+        ${c.pa.repris ? ligneT("📦 Ta part des packs pour ce mois (séances faites)", "+"+euro(c.pa.repris)) : ""}
         ${ligneT("Il te reste pour vivre", euro(c.reste), { fort:true, color: signe(c.reste) })}
         ${totEpargne ? ligneT(`Si tu mets ${euro(totEpargne)} en épargne`, euro(r2(c.reste - totEpargne)), { color: signe(c.reste - totEpargne) }) : ""}
       </table>
@@ -188,7 +211,20 @@ async function renderFinances(cache){
       <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">Voir les paiements prévus mois par mois</summary>
         ${prochains.map(x => `<div style="margin-top:12px;font-weight:700">${moisSeul(x.m)}</div>${tablePaiements(x)}`).join("")}
       </details>
-      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"><button class="btn-accent" data-fin-pack="1">🧮 Étaler un pack sur plusieurs mois</button><button class="btn-ghost" data-fin-add="prevu">＋ Ajouter un paiement attendu</button></div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"><button class="btn-ghost" data-fin-add="prevu">＋ Ajouter un paiement attendu</button></div>
+    `);
+
+  // ---- PACKS PAYÉS D'AVANCE --------------------------------------------------
+  const blocPacks = carte(`
+      <p style="margin:0 0 8px">Quand une cliente te paie un gros pack d'un coup, cet argent doit te faire vivre <strong>pendant tous les mois des séances</strong>, pas seulement le mois où il arrive. Ici, chaque pack est réparti mois par mois.</p>
+      ${packs.length ? packs.map(pk => { const lm = packMois(pk); return `<div style="border-top:1px solid var(--line-soft);padding:8px 0">
+          <div style="display:flex;justify-content:space-between;gap:8px"><strong>${esc(pk.cliente_id ? nom(pk.cliente_id)+" — " : "")}${esc(pk.libelle)}</strong><strong>${euro(pk.montant)}</strong></div>
+          <div class="isub">Payé le ${jour(pk.mois)} · ${pk.seances} séances à ${pk.par_semaine}/semaine · ${euro(r2(pk.montant/pk.seances))} la séance${declare(pk)?" · URSSAF "+euro(r2(pk.montant*FIN.TAUX_URSSAF))+" gardée tout de suite":""}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:.85rem;margin-top:4px">${lm.map(x => `<tr style="border-top:1px solid var(--line-soft);${x.m===now?"font-weight:700":""}"><td style="padding:4px">${moisSeul(x.m)} ${x.m.slice(0,4)}</td><td style="padding:4px">${x.seances} séance${x.seances>1?"s":""}</td><td style="padding:4px;text-align:right">${euro(x.montant)}</td></tr>`).join("")}</table>
+          <div style="display:flex;gap:6px;margin-top:6px"><button class="btn-ghost" data-fin-pack-edit="${pk.id}" style="padding:2px 8px;font-size:.74rem">✏️ Modifier</button><button class="btn-ghost" data-fin-del="${pk.id}" style="padding:2px 8px;font-size:.74rem">🗑</button></div></div>`; }).join("")
+        + L("Encore de côté aujourd'hui (pour les mois à venir)", euro(reserveAujourdhui()), { top:true })
+        : `<p class="isub">Aucun pack enregistré.</p>`}
+      <div style="margin-top:8px"><button class="btn-accent" data-fin-pack="1">🧮 Répartir un pack payé d'avance</button></div>
     `);
 
   // ---- HISTORIQUE (encaissé coaching, sans déduction) -------------------------
@@ -237,6 +273,7 @@ async function renderFinances(cache){
     ${titre(`📋 ${moisSeul(now)} — ton mois en un tableau`)}${blocMois}
     ${titre(`💶 ${moisSeul(now)} — les paiements de tes clientes`)}${blocPaiementsMois}
     ${titre("🔮 Les 3 prochains mois")}${blocProchains}
+    ${titre("📦 Packs payés d'avance")}${blocPacks}
     ${titre("⛽ Mes dépenses du mois")}${blocDep}
     ${titre("🛍 Autres rentrées (France Travail, Vinted, Leboncoin…)")}${blocAutres}
     ${titre("🧾 Mes charges fixes")}${blocCharges}
@@ -302,30 +339,38 @@ async function renderFinances(cache){
     } catch(e){ err(e); }
   }
 
-  // 🧮 Étaler un pack : prix total − acompte, réparti en N paiements mensuels (le dernier absorbe les centimes).
-  async function etalerPack(){
-    const v = await UI.form({ title:"🧮 Étaler un pack sur plusieurs mois", submit:"Créer les paiements", fields:[
-      { name:"cliente_id", label:"Cliente", type:"select", options:clientesOpts, value:"" },
-      { name:"libelle", label:"Nom du pack", required:true, placeholder:"Ex. Pack 12 séances" },
-      { name:"total", label:"Prix total du pack (€)", type:"text", required:true, half:true, placeholder:"ex. 650" },
-      { name:"acompte", label:"Acompte déjà payé (€)", type:"text", half:true, value:"0" },
-      { name:"mois", label:"Sur combien de mois ?", type:"number", required:true, half:true, value:3 },
-      { name:"date", label:"Date du 1er paiement", type:"date", required:true, half:true, value:today },
-      { name:"note", label:"Comment elle paie", value:"prélèvement GoCardless", placeholder:"Ex. prélèvement GoCardless, virement…" },
+  // 🧮 Répartir un pack payé d'avance (enregistre la répartition ; peut aussi noter le paiement dans la fiche).
+  async function repartirPack(pk){
+    const v = await UI.form({ title: pk ? "Modifier le pack" : "📦 Répartir un pack payé d'avance", submit: pk ? "Enregistrer" : "Voir la répartition", fields:[
+      { name:"cliente_id", label:"Cliente", type:"select", options:clientesOpts, value: pk ? String(pk.cliente_id||"") : "" },
+      { name:"libelle", label:"Nom du pack", required:true, value: pk ? pk.libelle : "", placeholder:"Ex. Pack 24 séances" },
+      { name:"montant", label:"Prix payé (€)", type:"text", required:true, half:true, value: pk ? pk.montant : "", placeholder:"ex. 1300" },
+      { name:"mois", label:"Payé le", type:"date", required:true, half:true, value: pk ? String(pk.mois).slice(0,10) : today },
+      { name:"seances", label:"Nombre de séances", type:"number", required:true, half:true, value: pk ? pk.seances : 24 },
+      { name:"par_semaine", label:"Séances par semaine", type:"number", required:true, half:true, value: pk ? pk.par_semaine : 2 },
+      { name:"debut", label:"Date de la 1re séance", type:"date", required:true, value: pk ? String(pk.debut||pk.mois).slice(0,10) : today },
+      { name:"urssaf", label:"Déclaré à l'URSSAF (26 % mis de côté)", type:"checkbox", value: pk ? declare(pk) : true },
+      ...(pk ? [] : [{ name:"noter", label:"Noter aussi le paiement dans sa fiche (seulement s'il n'y est pas déjà : virement, espèces)", type:"checkbox", value:false }]),
     ]});
     if (!v) return;
-    const num = x => Number(String(x||"0").replace(",", "."));
-    const total = num(v.total), acompte = num(v.acompte), n = Math.min(24, Math.max(1, parseInt(v.mois,10) || 1));
-    const reste = r2(total - acompte);
-    if (!(total > 0) || !(reste > 0)) { UI.toast("Vérifie le prix et l'acompte", "error"); return; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date||"")) { UI.toast("Date invalide", "error"); return; }
-    const base = Math.floor(reste / n * 100) / 100;
-    const montants = Array.from({length:n}, (_,i) => i < n-1 ? base : r2(reste - base*(n-1)));
-    const ok = await UI.confirm(`${esc(v.libelle)} : ${euro(total)}${acompte?` − acompte ${euro(acompte)}`:""} = ${euro(reste)} → ${n} paiement${n>1?"s":""} de ${euro(montants[0])}${montants[n-1]!==montants[0]?` (le dernier ${euro(montants[n-1])})`:""}, chaque mois à partir du ${jour(v.date)} — on crée ?`);
+    const row = { kind:"pack", cliente_id: v.cliente_id || null, libelle: String(v.libelle).trim(), montant: r2(Number(String(v.montant).replace(",", "."))),
+      mois: v.mois, debut: v.debut || v.mois, seances: parseInt(v.seances,10), par_semaine: Number(String(v.par_semaine).replace(",", ".")), urssaf: !!v.urssaf };
+    if (!(row.montant > 0) || !(row.seances > 0) || !(row.par_semaine > 0)) { UI.toast("Vérifie le prix, les séances et le rythme", "error"); return; }
+    const lignes = packMois(row);
+    const ok = await UI.confirm(`<div style="font-weight:400;font-size:.9rem;text-align:left">
+      <strong>${esc(row.libelle)} — ${euro(row.montant)}</strong><br>${row.seances} séances à ${row.par_semaine}/semaine = ${euro(r2(row.montant/row.seances))} la séance, sur ${lignes.length} mois.<br>
+      ${row.urssaf ? `URSSAF à garder tout de suite : ${euro(r2(row.montant*FIN.TAUX_URSSAF))}.<br>` : ""}
+      <table style="width:100%;margin-top:8px;border-collapse:collapse">${lignes.map(x => `<tr style="border-top:1px solid #eee"><td style="padding:4px 0">${moisSeul(x.m)} ${x.m.slice(0,4)}</td><td>${x.seances} séance${x.seances>1?"s":""}</td><td style="text-align:right"><strong>${euro(x.montant)}</strong></td></tr>`).join("")}</table>
+      <div style="margin-top:6px">= ce que tu peux te verser chaque mois. Le reste reste de côté.</div></div>`);
     if (!ok) return;
-    const rows = montants.map((m, i) => ({ kind:"prevu", cliente_id: v.cliente_id || null, libelle: `${String(v.libelle).trim()} (${i+1}/${n})`, montant: m, mois: addMDate(v.date, i), note: v.note || null }));
-    try { const { error } = await sb.from("finances").insert(rows); if (error) throw error; UI.toast(`${n} paiement${n>1?"s":""} créé${n>1?"s":""} ✅`); refresh(); }
-    catch(e){ err(e); }
+    try {
+      if (pk){ const { error } = await sb.from("finances").update(row).eq("id", pk.id); if (error) throw error; }
+      else {
+        const { error } = await sb.from("finances").insert(row); if (error) throw error;
+        if (v.noter && row.cliente_id){ const r = await sb.from("paiements").insert({ cliente_id: row.cliente_id, date: row.mois, montant: row.montant, mode: "Virement", note: row.libelle, urssaf: row.urssaf }); if (r.error) throw r.error; }
+      }
+      UI.toast("Pack enregistré ✅"); refresh();
+    } catch(e){ err(e); }
   }
 
   box.onchange = async (e) => {
@@ -349,7 +394,8 @@ async function renderFinances(cache){
     const d = t.dataset;
     try {
       if (d.finAdd) return formulaire(d.finAdd);
-      if (d.finPack) return etalerPack();
+      if (d.finPack) return repartirPack();
+      if (d.finPackEdit){ const pk = byId(d.finPackEdit); if (pk) return repartirPack(pk); return; }
       if (d.finDep) return formulaire("depense", null, d.finDep);
       if (d.finEdit){ const f = byId(d.finEdit); if (f) return formulaire(f.kind, f); return; }
       if (d.finDel){
