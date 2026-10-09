@@ -23,12 +23,13 @@
 </main>
 
 <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
+<input type="file" id="devisInput" accept="application/pdf,image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=e99"></script>
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
-<script src="js/db.js?v=e100"></script>
+<script src="js/db.js?v=e101"></script>
 <script src="js/calc.js?v=q5"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
@@ -116,6 +117,7 @@ function render(focusTitle){
       <button class="qbtn" data-act="add-photo"><span class="i">📸</span> Photo</button>
       <button class="qbtn" data-act="add-objectif"><span class="i">🎯</span> Objectif</button>
       <button class="qbtn" data-act="add-paiement"><span class="i">💶</span> Paiement</button>
+      <button class="qbtn" data-act="add-devis"><span class="i">📄</span> Devis</button>
       <button class="qbtn" data-act="montant-du"><span class="i">💳</span> Montant dû</button>
       <button class="qbtn" data-act="add-note"><span class="i">🔒</span> Note privée</button>
       <button class="qbtn" data-act="prog-sportif"><span class="i">📤</span> Prog. sportif envoyé</button>
@@ -145,6 +147,7 @@ function render(focusTitle){
     ${sectionCoordonnees()}
     ${sectionAccompagnement(ac, s, suivi)}
     ${sectionPaiements()}
+    ${sectionDevis()}
     ${sectionSeances()}
     ${sectionProgrammes()}
     ${sectionBilans()}
@@ -208,7 +211,7 @@ function santeBanner(cl){
 function jumpNav(){
   const items = [
     ["Séances","Séances"], ["Bilans","Bilans"], ["Mensu","Mensurations & évolution"],
-    ["Photos","Photos de progression"], ["Prog","Programmes"], ["Paiements","Paiements"],
+    ["Photos","Photos de progression"], ["Prog","Programmes"], ["Paiements","Paiements"], ["Devis","Devis"],
     ["Objectifs","Objectifs"], ["Notes","Notes privées"],
   ];
   return `<nav class="jumpnav" aria-label="Aller à une section">
@@ -339,6 +342,131 @@ function sectionPaiements(){
         </div>${delEdit("paiement",p.id)}</div>`).join("") : `<p class="empty">Aucun paiement enregistré.</p>`) +
     `<div style="margin-top:10px"><button class="link" data-act="add-paiement">＋ Ajouter un paiement</button></div>`;
   return block("Paiements", list.length, body, false);
+}
+
+// ============================ DEVIS (privé coach) ============================
+// Fichier rangé dans le bucket privé « devis » (coach seulement) ; échéances = paiements prévus.
+const DEVIS_ST = { brouillon:"📝 Brouillon", envoye:"📨 Envoyé", signe:"✅ Signé", refuse:"❌ Refusé", expire:"⏰ Expiré", remplace:"♻️ Remplacé" };
+function devisEcheances(dv){ return Array.isArray(dv && dv.echeances) ? dv.echeances : []; }
+function sectionDevis(){
+  const list = D.devis || [];
+  const today = Calc.today();
+  const body = `<p class="isub" style="color:var(--text-light);margin-bottom:8px">🔒 Visible uniquement par toi. Jamais côté cliente.</p>` +
+    (list.length ? list.map(dv=>{
+      const ech = devisEcheances(dv);
+      const aExpirer = dv.statut==="envoye" && dv.validite && dv.validite < today;
+      const st = aExpirer ? `<span class="tag" style="color:var(--danger)">⏰ Plus valable depuis le ${Calc.fmt(dv.validite)}</span>` : `<span class="tag">${DEVIS_ST[dv.statut]||dv.statut}</span>`;
+      const echTxt = ech.length ? `<div class="isub" style="margin-top:4px">💶 ${ech.map(e=>`${Calc.fmtShort(e.date)} : ${Calc.euro(Number(e.montant))}`).join(" · ")}</div>` : "";
+      const actions = [
+        dv.storage_path ? `<button class="link" data-act="open-devis" data-id="${dv.id}">📄 Ouvrir le PDF</button>` : `<button class="link" data-act="file-devis" data-id="${dv.id}">📎 Joindre le PDF</button>`,
+        (dv.statut==="signe" && ech.length && !dv.paiements_crees) ? `<button class="link" data-act="devis-paiements" data-id="${dv.id}" style="font-weight:700">➕ Mettre les paiements dans Finances</button>` : "",
+        dv.paiements_crees ? `<span class="isub" style="color:var(--ok)">✓ Paiements dans Finances</span>` : "",
+      ].filter(Boolean).join(" &nbsp;·&nbsp; ");
+      return `<div class="item"><div class="idate">${Calc.fmtShort(dv.date_emission)}</div>
+        <div class="ibody"><div class="ititle">${dv.numero?`N° ${esc(dv.numero)} · `:""}${dv.montant!=null?Calc.euro(Number(dv.montant)):""} ${st}</div>
+          ${dv.titre?`<div class="isub">${esc(dv.titre)}</div>`:""}
+          <div class="isub">${dv.validite?`Valable jusqu'au ${Calc.fmt(dv.validite)}`:""}${dv.date_signature?` · signé le ${Calc.fmt(dv.date_signature)}`:""}</div>
+          ${echTxt}${dv.note?`<div class="isub">${esc(dv.note)}</div>`:""}
+          <div style="margin-top:6px">${actions}</div>
+        </div>${delEdit("devis",dv.id)}</div>`;
+    }).join("") : `<p class="empty">Aucun devis.</p>`) +
+    `<div style="margin-top:10px"><button class="link" data-act="add-devis">＋ Ajouter un devis</button></div>`;
+  return block("Devis", list.length, body, false);
+}
+function parseEcheances(txt){
+  const out = [];
+  for (const raw of String(txt||"").split(/\n|;/)){
+    const l = raw.trim(); if (!l) continue;
+    const m = l.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\s*[:\-–]?\s*([\d\s]+(?:[.,]\d{1,2})?)\s*€?/);
+    if (!m) throw new Error(`Échéance illisible : « ${l} » (format : 23/10/2026 150)`);
+    let y = m[3].length===2 ? "20"+m[3] : m[3];
+    const date = `${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+    const montant = Number(m[4].replace(/\s/g,"").replace(",","."));
+    if (!(montant>0) || isNaN(Date.parse(date))) throw new Error(`Échéance illisible : « ${l} »`);
+    out.push({ date, montant });
+  }
+  return out.sort((a,b)=>a.date<b.date?-1:1);
+}
+function echeancesTxt(dv){ return devisEcheances(dv).map(e=>`${e.date.slice(8,10)}/${e.date.slice(5,7)}/${e.date.slice(0,4)} ${String(e.montant).replace(".",",")}`).join("\n"); }
+async function editDevis(dv){
+  const fields = [
+    { name:"numero", label:"N° du devis", half:true, value:dv?dv.numero||"":"", placeholder:"ex. 2026-020" },
+    { name:"montant", label:"Montant total (€)", type:"text", half:true, value:dv&&dv.montant!=null?String(dv.montant).replace(".",","):"", placeholder:"ex. 900" },
+    { name:"titre", label:"Quoi ?", value:dv?dv.titre||"":"", placeholder:"ex. Forfait 1 séance/semaine + nutrition, 3 périodes" },
+    { name:"date_emission", label:"Date du devis", type:"date", half:true, required:true, value:dv?dv.date_emission:Calc.today() },
+    { name:"validite", label:"Valable jusqu'au", type:"date", half:true, value:dv?dv.validite||"":"" },
+    { name:"statut", label:"Statut", type:"select", half:true, value:dv?dv.statut:"envoye", options:Object.entries(DEVIS_ST).map(([value,label])=>({value,label})) },
+    { name:"date_signature", label:"Signé le", type:"date", half:true, value:dv?dv.date_signature||"":"" },
+    { name:"echeances", label:"Paiements prévus (une ligne par paiement : date puis montant)", type:"textarea", value:dv?echeancesTxt(dv):"", placeholder:"29/09/2026 150\n23/10/2026 150" },
+    { name:"note", label:"Note (facultatif)", value:dv?dv.note||"":"" },
+  ];
+  if (!dv) fields.push({ name:"joindre", label:"Joindre le PDF du devis maintenant", type:"checkbox", value:true });
+  const v = await UI.form({ title:dv?"Modifier le devis":"Nouveau devis", submit:"Enregistrer", fields });
+  if (!v) return;
+  let echeances;
+  try { echeances = parseEcheances(v.echeances); } catch(e){ UI.toast(e.message,"err"); return; }
+  const montant = v.montant ? Number(String(v.montant).replace(/\s/g,"").replace(",",".")) : null;
+  if (v.montant && !(montant>=0)) { UI.toast("Montant invalide","err"); return; }
+  const row = { numero:v.numero||null, titre:v.titre||null, montant, date_emission:v.date_emission, validite:v.validite||null,
+    statut:v.statut, date_signature:v.date_signature||(v.statut==="signe"&&!(dv&&dv.date_signature)?Calc.today():null), echeances, note:v.note||null };
+  if (dv && JSON.stringify(devisEcheances(dv)) !== JSON.stringify(echeances) && dv.paiements_crees)
+    UI.toast("Les paiements déjà mis dans Finances ne changent pas : corrige-les dans 💰 Finances.");
+  try{
+    if (dv){ await DB.update("devis", dv.id, row); UI.toast("Devis mis à jour ✓"); await reload("Devis"); }
+    else {
+      const ins = await DB.insert("devis", { cliente_id:CID, ...row });
+      const nouveau = Array.isArray(ins) ? ins[0] : ins;
+      UI.toast("Devis ajouté ✓"); await reload("Devis");
+      if (v.joindre && nouveau && nouveau.id) pickDevisFile(nouveau);
+    }
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
+}
+function pickDevisFile(dv){
+  if (!dv) return;
+  const input = document.getElementById("devisInput");
+  input.value = "";
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    try{
+      UI.toast("Envoi du devis…");
+      const ext = (file.name.split(".").pop()||"pdf").toLowerCase();
+      const path = `${CID}/${dv.id}-${uuid()}.${ext}`;
+      const up = await sb.storage.from("devis").upload(path, file, { upsert:false, contentType:file.type||undefined });
+      if (up.error) throw up.error;
+      const old = dv.storage_path;
+      await DB.update("devis", dv.id, { storage_path:path });
+      if (old) { try{ await sb.storage.from("devis").remove([old]); }catch(_){} }
+      UI.toast("PDF joint ✓"); reload("Devis");
+    }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
+  };
+  input.click();
+}
+async function openDevis(dv){
+  if (!dv || !dv.storage_path) return;
+  const w = window.open("", "_blank");   // ouvert tout de suite (sinon bloqué sur iPhone)
+  const { data, error } = await sb.storage.from("devis").createSignedUrl(dv.storage_path, 600);
+  if (error || !data) { if (w) w.close(); UI.toast("Impossible d'ouvrir le devis","err"); return; }
+  if (w) w.location.href = data.signedUrl; else location.href = data.signedUrl;
+}
+// Devis signé → ses échéances deviennent des « paiements attendus » dans 💰 Finances (sans doublon).
+async function devisPaiements(dv){
+  const ech = devisEcheances(dv); if (!dv || !ech.length) return;
+  const prenom = (D.cliente && D.cliente.prenom) || "Cliente";
+  try{
+    const { data: deja, error: e1 } = await sb.from("finances").select("mois,montant,note").eq("kind","prevu").eq("cliente_id", CID);
+    if (e1) throw e1;
+    const existe = (e) => (deja||[]).some(f => String(f.mois).slice(0,10)===e.date && Math.abs(Number(f.montant)-Number(e.montant))<0.01 && !String(f.note||"").startsWith("⚠️"))
+      || (D.paiements||[]).some(p => p.date===e.date && Math.abs(Number(p.montant)-Number(e.montant))<0.01);
+    const n = ech.length;
+    const rows = ech.map((e,i)=>({ e, i })).filter(({e})=>!existe(e)).map(({e,i})=>({
+      kind:"prevu", cliente_id:CID, mois:e.date, montant:Number(e.montant),
+      libelle:`${prenom} — devis${dv.numero?" "+dv.numero:""} (${i+1}/${n})`, note:`devis${dv.numero?" "+dv.numero:""}` }));
+    const skip = n - rows.length;
+    if (!(await UI.confirm(`${rows.length} paiement${rows.length>1?"s":""} prévu${rows.length>1?"s":""} vont être ajoutés dans 💰 Finances${skip?` (${skip} déjà présent${skip>1?"s":""}, ignoré${skip>1?"s":""})`:""}. On y va ?`))) return;
+    if (rows.length){ const { error } = await sb.from("finances").insert(rows); if (error) throw error; }
+    await DB.update("devis", dv.id, { paiements_crees:true });
+    UI.toast("Paiements ajoutés dans Finances ✓"); reload("Devis");
+  }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
 }
 
 function sectionSeances(){
@@ -883,12 +1011,12 @@ const ENT = {
 };
 function findRec(entity,id){
   const map = {seance:"seances",bilan:"bilans",bilan_demarrage:"bilans_demarrage",mensuration:"mensurations",objectif:"objectifs",
-               note:"notes",programme:"programmes",paiement:"paiements"};
+               note:"notes",programme:"programmes",paiement:"paiements",devis:"devis"};
   return (D[map[entity]]||[]).find(r=>r.id===id);
 }
 // entity → nom de la table Supabase (partagé suppression simple + en lot).
 const TBL = {seance:"seances",bilan:"bilans",bilan_demarrage:"bilans_demarrage",mensuration:"mensurations",objectif:"objectifs",
-             note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements"};
+             note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements",devis:"devis"};
 
 // Saisie COMPLÈTE des mensurations : toutes les mesures d'un coup, une date.
 const MENSU_PRESETS = [
@@ -1368,6 +1496,11 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="add-paiement") return addOrEdit("paiement");
   if (act==="montant-du") return editMontantDu();
   if (act==="add-note") return addOrEdit("note");
+  if (act==="add-devis") return editDevis();
+  if (act==="edit-devis") return editDevis(findRec("devis", id));
+  if (act==="open-devis") return openDevis(findRec("devis", id));
+  if (act==="file-devis") return pickDevisFile(findRec("devis", id));
+  if (act==="devis-paiements") return devisPaiements(findRec("devis", id));
   if (act==="add-photo") return addPhoto();
   if (act==="prog-sportif") return progEnvoye("sportif");
   if (act==="prog-nutrition") return progEnvoye("nutrition");
@@ -1517,11 +1650,12 @@ document.getElementById("main").addEventListener("click", async (e)=>{
     const entity = el.dataset.entity;
     if (!(await UI.confirm("Supprimer cet élément ?"))) return;
     const tbl = {seance:"seances",bilan:"bilans",bilan_demarrage:"bilans_demarrage",mensuration:"mensurations",objectif:"objectifs",
-                 note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements"}[entity];
+                 note:"notes_privees",programme:"programmes",photo:"photos",paiement:"paiements",devis:"devis"}[entity];
     // On garde une copie complète AVANT suppression → permet le "retour arrière".
     const backup = entity!=="photo" ? findRec(entity, id) : null;
     try{
       if (entity==="photo" && el.dataset.path) await sb.storage.from("photos").remove([el.dataset.path]);
+      if (entity==="devis" && backup && backup.storage_path){ try{ await sb.storage.from("devis").remove([backup.storage_path]); backup.storage_path=null; }catch(_){} }
       await DB.remove(tbl, id);
       reload();
       if (backup) showUndo(tbl, backup); else UI.toast("Supprimé");

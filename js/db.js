@@ -79,7 +79,7 @@ window.DB = {
 
   // ---- Bundle : tout le dossier d'une cliente en 1 aller-retour groupé -----
   async dossier(clienteId) {
-    const [cliente, accompagnement, seances, bilans, bilans_demarrage, questionnaire_initial, questionnaire_nutrition, mensurations, objectifs, programmes, photos, notes, paiements] =
+    const [cliente, accompagnement, seances, bilans, bilans_demarrage, questionnaire_initial, questionnaire_nutrition, mensurations, objectifs, programmes, photos, notes, paiements, devis] =
       await window.withTimeout(Promise.all([
         this.cliente(clienteId),
         this.accompagnement(clienteId),
@@ -98,10 +98,12 @@ window.DB = {
         this.list("photos", clienteId, { col: "date", asc: false }),
         this.list("notes_privees", clienteId, { col: "date", asc: false }),
         this.list("paiements", clienteId, { col: "date", asc: false }),
+        // Devis (migration devis_coach) : résilient si la table n'existe pas.
+        this.list("devis", clienteId, { col: "date_emission", asc: false }).catch(() => []),
       ]), 18000, "Chargement du dossier");
     // Les paiements marqués ⚠️ (doublons / erreurs) ne comptent nulle part.
     const paiementsOk = (paiements || []).filter(p => !String(p.note || "").startsWith("⚠️"));
-    return { cliente, accompagnement, seances, bilans, bilans_demarrage, questionnaire_initial, questionnaire_nutrition, mensurations, objectifs, programmes, photos, notes, paiements: paiementsOk };
+    return { cliente, accompagnement, seances, bilans, bilans_demarrage, questionnaire_initial, questionnaire_nutrition, mensurations, objectifs, programmes, photos, notes, paiements: paiementsOk, devis: devis || [] };
   },
 
   async deleteCliente(clienteId) {
