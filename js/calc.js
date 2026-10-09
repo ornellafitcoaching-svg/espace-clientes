@@ -1202,12 +1202,11 @@ window.Calc = {
     { id:"cardio", q:"Ton cardio :", type:"choice", options:["Je m’essouffle vite","Ça va","J’ai une bonne endurance"] },
     { id:"seance_marquante", q:"Une séance ou un sport que tu as adoré… ou détesté ? Pourquoi ? (facultatif)", type:"textarea" },
 
-    { section:"💛 Ce que tu aimes" },
+    { section:"💛 Ce que tu aimes & ton suivi" },
     { id:"aime", q:"Ce que tu aimes faire 😍", type:"multi", options:["Le renforcement musculaire","Le cardio / HIIT","Les circuits rapides","Pilates / gainage","Soulever lourd","Les séances courtes et efficaces","Varier souvent"] },
     { id:"aime_pas", q:"Ce que tu n’aimes pas 🙅‍♀️", type:"multi", options:["Rien, je suis ouverte","Les sauts","Le cardio","Les abdos","Les pompes","Les séances longues","Les exercices au sol"] },
     { id:"zones_prio", q:"Les zones à travailler en priorité 🎯", type:"multi", options:["Ventre","Fessiers","Cuisses","Bras","Dos / posture","Silhouette globale"] },
 
-    { section:"📲 Ton suivi" },
     { id:"videos_ok", q:"Tu pourras m’envoyer des vidéos de tes exercices pour que je corrige ta technique ?", type:"choice", options:["Oui 👍","De temps en temps","Pas pour le moment"] },
     { id:"commentaire", q:"Autre chose à me dire ? (facultatif)", type:"textarea" },
   ],
@@ -1233,7 +1232,7 @@ window.Calc = {
     { id:"budget_courses", q:"Budget courses", type:"choice", options:["Serré","Moyen","Confortable"] },
     { id:"journee_repas", q:"Décris-moi une journée type de repas 🍽️", hint:"Ce que tu manges vraiment, pas ce que tu « devrais » manger 😉", type:"textarea", ph:"Matin : café + tartines · Midi : sandwich · 16 h : biscuits · Soir : pâtes…" },
 
-    { section:"😋 Tes goûts" },
+    { section:"😋 Tes goûts & boissons" },
     { id:"proteines_pref", q:"Tes protéines préférées", type:"multi", options:["Poulet / dinde","Bœuf","Poisson","Thon / sardines","Œufs","Fromage blanc / skyr","Tofu","Lentilles / pois chiches"] },
     { id:"feculents_pref", q:"Tes féculents préférés", type:"multi", options:["Riz","Pâtes","Pommes de terre","Patate douce","Pain","Quinoa / boulgour","Semoule","Légumineuses"] },
     { id:"legumes_ok", q:"Les légumes et toi 🥦", type:"choice", options:["J’adore","Quelques-uns seulement","Peu","Pas du tout"] },
@@ -1241,7 +1240,6 @@ window.Calc = {
     { id:"aliments_detestes", q:"Les aliments que tu ne mangeras JAMAIS 🚫", type:"text", ph:"ex. champignons, brocolis…" },
     { id:"aliments_aimes", q:"Tes plats ou aliments préférés 😍 (facultatif)", type:"text" },
 
-    { section:"🥤 Boissons" },
     { id:"eau_jour", q:"L’eau, par jour 💧", type:"choice", options:["Moins de 0,5 L","~1 L","~1,5 L","2 L et +"] },
     { id:"boissons_sucrees", q:"Sodas / jus sucrés", type:"choice", options:["Jamais","Parfois","Souvent"] },
     { id:"alcool_nutri", q:"Alcool 🍷", type:"choice", options:["Jamais","Occasionnel","Régulier"] },

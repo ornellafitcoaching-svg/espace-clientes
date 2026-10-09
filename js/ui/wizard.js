@@ -113,7 +113,7 @@ textarea.wz-in{min-height:76px;resize:vertical}
         const s = steps[idx];
         ov.querySelector(".wz-st").textContent = `Étape ${idx + 1} sur ${steps.length}`;
         const left = steps.length - idx - 1;
-        ov.querySelector(".wz-pc").textContent = left === 0 ? "Dernière étape 🎉" : (left === 1 ? "Encore 1 étape" : "Encore " + left + " étapes");
+        ov.querySelector(".wz-pc").textContent = left === 0 ? "Dernière étape 🎉" : (left === 1 ? "Plus qu’1 étape" : (left <= 3 ? "Plus que " + left + " étapes" : "Tu avances bien 💪"));
         ov.querySelector(".wz-bar i").style.width = Math.max(4, Math.round(((idx + 1) / steps.length) * 100)) + "%";
         ov.querySelector(".wz-prev").style.visibility = idx === 0 ? "hidden" : "visible";
         ov.querySelector(".wz-next").innerHTML = idx === steps.length - 1 ? esc(opts.submit || "Envoyer") + " ✓" : "Suivant →";
