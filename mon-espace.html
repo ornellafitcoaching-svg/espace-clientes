@@ -18,7 +18,7 @@
   <button class="btn-ghost btn-sm" id="logout">Déconnexion</button>
 </header>
 
-<main class="wrap wrap-narrow" id="main">
+<main class="wrap wrap-narrow" id="main" style="padding-bottom:96px">
   <div class="loader"><div class="spin"></div></div>
 </main>
 
@@ -119,6 +119,35 @@ function bilanDemarrageNudge(){
   </div>`;
 }
 
+
+// ---- Libellés lisibles côté cliente (jamais de mot technique brut) ----
+const MENSU_NOMS = { poids:"Poids", tour_taille:"Tour de taille", tour_hanches:"Tour de hanches", tour_fessiers:"Tour de fessiers",
+  tour_cuisse:"Tour de cuisse", tour_bras:"Tour de bras", tour_mollet:"Tour de mollet", tour_dos:"Tour de dos",
+  poitrine:"Tour de poitrine", sous_poitrine:"Sous la poitrine", masse_grasse:"Masse grasse" };
+function mNom(t){ const k=String(t||""); if (MENSU_NOMS[k]) return MENSU_NOMS[k]; const x=k.replace(/_/g," "); return x.charAt(0).toUpperCase()+x.slice(1); }
+// Nombre à la française : 94,8 (et pas 94.8).
+function nf(v){ return v==null||v==="" ? "" : String(v).replace(".", ","); }
+function avecUnite(v,u){ const uu=String(u||"").trim(); return nf(v)+(uu?" "+uu:""); }
+// Couleur d'une variation vue par la CLIENTE : selon son objectif, et jamais en rouge (pas décourageant).
+function toneCliente(type, diff){
+  const obj = String((D && D.cliente && (D.cliente.objectif_principal||"")) || "").toLowerCase();
+  if (!diff) return "neutral";
+  if (/perte|poids|mincir|minceur|affiner|ventre|maigrir/.test(obj) && /^tour_|poitrine|masse_grasse|poids/.test(type) && type!=="tour_fessiers")
+    return diff < 0 ? "good" : "neutral";
+  const t = Calc.mensuTone(type, diff);
+  return t === "bad" ? "neutral" : t;
+}
+// Type de séance lisible : à domicile / en salle / à distance.
+function seanceNom(x){
+  const txt = ((x.lieu||"")+" "+(x.commentaire||"")).toLowerCase(), ty = String(x.type||"").toLowerCase();
+  if (/domicile/.test(txt)) return "Séance à domicile";
+  if (/salle|on air|fitness|club/.test(txt)) return "Séance en salle";
+  if (/distanc|visio/.test(ty)) return "Séance à distance";
+  if (/hybride/.test(ty)) return "Séance (hybride)";
+  return "Séance";
+}
+const STATUT_NOMS = { realisee:"✅ Faite", prevue:"À venir", annulee:"Annulée", reportee:"Reportée", absente:"Absence" };
+
 // Carte « temps restant » : combien de temps il reste sur le programme.
 // S'affiche dès qu'une date de fin est connue (ou déductible de début + durée).
 function tempsRestantCard(){
@@ -134,19 +163,19 @@ function tempsRestantCard(){
     const sem = Math.floor(jr/7), j = jr%7;
     const label = jr >= 14 ? `${sem} semaine${sem>1?"s":""}${j?` et ${j} j`:""}` : `${jr} jour${jr>1?"s":""}`;
     titre = adr(`Il te reste ${label} 💪`, `Il vous reste ${label} 💪`);
-    sub = `Programme jusqu'au ${Calc.fmt(finLe)}`;
+    sub = `Votre accompagnement jusqu'au ${Calc.fmt(finLe)}`;
   } else if (jr === 0){
-    titre = adr("C'est le dernier jour de ton programme 🎉","C'est le dernier jour de votre programme 🎉");
+    titre = adr("C'est le dernier jour de ton accompagnement 🎉","C'est le dernier jour de votre accompagnement 🎉");
     sub = adr("Bravo pour tout ce chemin ! On fait le bilan ?","Bravo pour tout ce chemin ! On fait le bilan ?");
   } else {
-    titre = adr("Ton programme est terminé 🏁","Votre programme est terminé 🏁");
+    titre = adr("Ton accompagnement est terminé 🏁","Votre accompagnement est terminé 🏁");
     sub = `Depuis le ${Calc.fmt(finLe)}. ` + adr("Envie de continuer l'aventure ? Parle-en à Ornella 💬","Envie de continuer l'aventure ? Parlez-en à Ornella 💬");
   }
   const wa = jr <= 0 ? waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Mon programme se termine, j'aimerais parler de la suite 💛`) : null;
   return `<div class="card nudge-bilan" style="margin-bottom:16px">
     <div class="nudge-title">${titre}</div>
     <div class="isub nudge-sub">${sub}</div>
-    ${pct!=null ? `<div style="margin-top:12px">${UI.progressBar(pct, `${pct}% du programme écoulé`)}</div>` : ""}
+    ${pct!=null ? `<div style="margin-top:12px">${UI.progressBar(pct, `${pct}% de l'accompagnement écoulé`)}</div>` : ""}
     ${wa ? `<a href="${wa}" target="_blank" rel="noopener" class="btn-accent btn-sm" style="margin-top:12px"><span>💬</span> ${adr("Parler de la suite","Parler de la suite")}</a>` : ""}
   </div>`;
 }
@@ -305,14 +334,14 @@ function maProgressionCard(){
   const rowHtml = (x) => {
     const ev = x.ev;
     if (ev.points.length < 2)
-      return `<div class="cl-line" style="padding:8px 0"><span>${x.m.label}</span><strong>${ev.derniere} ${ev.unite}<small style="display:block;color:var(--text-light);font-weight:400">${adr("point de départ","point de départ")}</small></strong></div>`;
+      return `<div class="cl-line" style="padding:8px 0"><span>${x.m.label}</span><strong>${avecUnite(ev.derniere, ev.unite)}<small style="display:block;color:var(--text-light);font-weight:400">${adr("point de départ","point de départ")}</small></strong></div>`;
     const sign = ev.diff > 0 ? "+" : "";
-    const tone = Calc.mensuTone(x.m.type, ev.diff);
+    const tone = toneCliente(x.m.type, ev.diff);
     const color = tone === "good" ? "var(--ok)" : (tone === "bad" ? "var(--danger)" : "var(--text-mid)");
     const pct = ev.pct != null ? ` (${sign}${ev.pct}%)` : "";
     return `<div class="cl-line" style="padding:8px 0">
       <span>${x.m.label}</span>
-      <strong style="text-align:right">${ev.depart} → ${ev.derniere} ${ev.unite}<small style="display:block;color:${color};font-weight:700">${sign}${ev.diff} ${ev.unite}${pct}</small></strong></div>`;
+      <strong style="text-align:right">${nf(ev.depart)} → ${avecUnite(ev.derniere, ev.unite)}<small style="display:block;color:${color};font-weight:700">${sign}${avecUnite(ev.diff, ev.unite)}${pct.replace(".", ",")}</small></strong></div>`;
   };
   return `<div class="card" style="margin-top:16px">
     <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700;margin-bottom:6px">📊 Ma progression</div>
@@ -436,7 +465,7 @@ function viewAccueil(){
       ${tile(adr("Ton objectif","Votre objectif"), esc(cl.objectif_principal||"—"))}
       ${ac&&ac.seances_prevues ? tile("Séances", s.realisees+" / "+s.prevues, s.restantes+" restantes") : tile("Séances réalisées", s.realisees)}
       ${poidsTile}
-      ${nextSeance ? tile("Prochaine séance", Calc.fmtJour(nextSeance.date), [Calc.fmtHeure(nextSeance.heure), esc(nextSeance.type||"")].filter(Boolean).join(" · ")) : ""}
+      ${nextSeance ? tile("Prochaine séance", Calc.fmtJour(nextSeance.date), [Calc.fmtHeure(nextSeance.heure), esc(seanceNom(nextSeance).replace(/^Séance /,""))].filter(x=>x&&x!=="Séance").join(" · ")) : ""}
       ${b.dernier ? tile("Prochain bilan", Calc.fmt(b.prochain), bilanSub) : ""}
       ${sport&&sport.envoye ? tile("Programme sportif", "Disponible", "envoyé le "+Calc.fmt(sport.date_envoi)) : ""}
       ${ac&&ac.nutrition_active ? tile("Suivi nutrition", "Actif") : ""}
@@ -497,11 +526,11 @@ function viewSeances(){
   if (upcoming.length){
     out += `<h4 class="view-title" style="margin-top:0">📅 Mes prochaines séances</h4><div class="card">` + upcoming.map(x=>{
       const hh = Calc.fmtHeure(x.heure);
-      const wa = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Je souhaiterais modifier ma séance prévue le ${Calc.fmt(x.date)}${hh?` à ${hh}`:""}${x.type?` (${x.type})`:""}.`);
+      const wa = waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Je souhaiterais modifier ma séance prévue le ${Calc.fmt(x.date)}${hh?` à ${hh}`:""}${seanceNom(x)!=="Séance"?` (${seanceNom(x).replace(/^Séance /,"")})`:""}.`);
       return `<div class="item">
       <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}${hh?`<small style="display:block;font-weight:600;color:var(--text-light)">${hh}</small>`:""}</div>
       <div class="ibody">
-        <div class="ititle">${esc(x.type||"Séance")} <span class="tag">à venir</span></div>
+        <div class="ititle">${esc(seanceNom(x))} <span class="tag">à venir</span></div>
         ${seanceBody(x)}
         ${wa?`<a href="${wa}" target="_blank" rel="noopener" class="btn-ghost btn-sm" style="margin-top:8px"><span>💬</span> Demander une modification</a>`:""}
       </div>
@@ -512,7 +541,7 @@ function viewSeances(){
     <div class="item">
       <div class="idate" style="text-transform:capitalize">${Calc.fmtJour(x.date)}</div>
       <div class="ibody">
-        <div class="ititle">${esc(x.type||"Séance")} ${x.statut==="realisee"?`<span class="tag tag-done">✅ Fait</span>`:`<span class="tag">${esc(x.statut)}</span>`}</div>
+        <div class="ititle">${esc(seanceNom(x))} ${x.statut==="realisee"?`<span class="tag tag-done">✅ Faite</span>`:`<span class="tag">${esc(STATUT_NOMS[x.statut]||x.statut)}</span>`}</div>
         ${seanceBody(x)}
       </div>
     </div>`).join("") + `</div>`;
@@ -687,12 +716,12 @@ function viewMensurations(){
   if (!types.length) return addBtn + empty("Aucune mensuration pour l'instant. Ajoute tes mesures avec le bouton ci-dessus 👆");
   const grid = `<div class="mensu-grid">` + types.map(t=>{
     const ev = Calc.mensuEvolution(D.mensurations, t);
-    const dir = Calc.mensuTone(t, ev.diff);
+    const dir = toneCliente(t, ev.diff);
     const sign = ev.diff>0?"+":"";
     return `<div class="mensu-card">
-      <h4>${esc(t.replace(/_/g," "))}</h4>
-      <div class="mensu-delta ${dir}">${sign}${ev.diff} ${esc(ev.unite)} ${ev.pct!=null?`(${sign}${ev.pct}%)`:""}</div>
-      <div class="isub">${ev.depart}${esc(ev.unite)} → ${ev.derniere}${esc(ev.unite)}</div>
+      <h4 style="text-transform:none">${esc(mNom(t))}</h4>
+      <div class="mensu-delta ${dir}">${ev.diff ? `${sign}${esc(avecUnite(ev.diff, ev.unite))} ${ev.pct!=null?`(${sign}${nf(ev.pct)} %)`:""}` : "Stable"}</div>
+      <div class="isub">${esc(avecUnite(ev.depart, ev.unite))} → ${esc(avecUnite(ev.derniere, ev.unite))}</div>
     </div>`;
   }).join("") + `</div>`;
   return addBtn + grid + corrigeMensuBloc();
@@ -712,9 +741,9 @@ function corrigeMensuBloc(){
       ${showDates.map(d=>`<div class="card" style="margin-bottom:8px;padding:8px 12px">
         <div class="idate" style="font-weight:700;text-transform:capitalize;margin-bottom:4px">${Calc.fmtJour(d)}</div>
         ${byDate[d].map(m=>`<div class="cl-line" style="padding:5px 0">
-          <span>${esc(m.type.replace(/_/g," "))}</span>
+          <span>${esc(mNom(m.type))}</span>
           <span style="display:flex;gap:10px;align-items:center;flex:none">
-            <strong>${m.valeur} ${esc(m.unite||"")}</strong>
+            <strong>${esc(avecUnite(m.valeur, m.unite))}</strong>
             <button class="icon-btn" data-edit-mensu="${m.id}" title="Modifier">✏️</button>
             <button class="icon-btn" data-del-mensu="${m.id}" title="Supprimer">🗑</button>
           </span></div>`).join("")}
@@ -723,7 +752,7 @@ function corrigeMensuBloc(){
 }
 async function editMyMensu(id){
   const m = (D.mensurations||[]).find(x=>String(x.id)===String(id)); if(!m) return;
-  const v = await UI.form({ title:"Corriger : "+m.type.replace(/_/g," "), submit:"Enregistrer", fields:[
+  const v = await UI.form({ title:"Corriger : "+mNom(m.type), submit:"Enregistrer", fields:[
     { name:"valeur", label:"Valeur ("+(m.unite||"")+")", type:"number", value:m.valeur, required:true },
   ]});
   if (!v || v.valeur===""||v.valeur==null) return;
@@ -760,8 +789,8 @@ function viewEvolution(){
     const sign = ev.diff > 0 ? "+" : "";
     const pct = ev.pct != null ? ` (${sign}${ev.pct}%)` : "";
     blocks.push(`<div class="card"${mt}><h4 class="view-title" style="margin-top:0">${esc(label)}</h4>
-      <div class="isub" style="margin-bottom:2px">${ev.depart}${esc(ev.unite)} → <strong>${ev.derniere}${esc(ev.unite)}</strong></div>
-      <div class="mensu-delta ${Calc.mensuTone(ev.type,ev.diff)}" style="font-size:1rem;margin-bottom:8px">${sign}${ev.diff} ${esc(ev.unite)}${pct}</div>
+      <div class="isub" style="margin-bottom:2px">${esc(avecUnite(ev.depart, ev.unite))} → <strong>${esc(avecUnite(ev.derniere, ev.unite))}</strong></div>
+      <div class="mensu-delta ${toneCliente(ev.type,ev.diff)}" style="font-size:1rem;margin-bottom:8px">${sign}${esc(avecUnite(ev.diff, ev.unite))}${pct.replace(".", ",")}</div>
       ${UI.lineChart(ev.points,{unite:ev.unite})}</div>`);
   };
   // Poids : série mêlant bilans + mensurations (weightSeries).
@@ -772,7 +801,7 @@ function viewEvolution(){
       diff: Math.round((a-d)*10)/10, pct: d ? Math.round(((a-d)/d)*1000)/10 : null, points:w });
   }
   Calc.mensuTypes(D.mensurations).filter(t=>t!=="poids").forEach(t=>{
-    bloc(t.replace(/_/g," "), Calc.mensuEvolution(D.mensurations, t));
+    bloc(mNom(t), Calc.mensuEvolution(D.mensurations, t));
   });
   return blocks.join("") || empty(adr("Ton évolution s'affichera ici dès tes premières mesures.","Votre évolution s'affichera ici dès vos premières mesures."));
 }
@@ -1117,7 +1146,7 @@ function viewBilans(){
     const mensuBlock = mesures.length ? `
       <div class="mensu-card" style="margin-top:10px">
         <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">📏 Mensurations de ce bilan</div>
-        <div style="margin-top:6px">${mesures.map(m=>`<span class="tag">${esc(m.type.replace(/_/g," "))} : ${m.valeur}${esc(m.unite||"")}</span>`).join(" ")}</div>
+        <div style="margin-top:6px">${mesures.map(m=>`<span class="tag">${esc(mNom(m.type))} : ${esc(avecUnite(m.valeur, m.unite))}</span>`).join(" ")}</div>
       </div>` : "";
     return `
     <div class="card" style="margin-top:14px">
@@ -1247,7 +1276,7 @@ function progItems(list){
     return `<div class="item">
       <div class="idate">${Calc.fmtShort(p.date_envoi||p.date_debut)}</div>
       <div class="ibody">
-        <div class="ititle">${p.envoye?"Envoyé":"À venir"} ${p.version?`<span class="tag">v${esc(p.version)}</span>`:""}</div>
+        <div class="ititle">${p.envoye?"Envoyé":"À venir"} ${p.version?`<span class="tag">${/^\d/.test(String(p.version))?"v":""}${esc(p.version)}</span>`:""}</div>
         <div class="isub">${[p.date_debut&&("du "+Calc.fmt(p.date_debut)), p.date_fin&&("au "+Calc.fmt(p.date_fin))].filter(Boolean).join(" ")||"&nbsp;"}</div>
         ${texte?`<div class="isub">${esc(texte)}</div>`:""}
         ${lien?`<a class="btn-accent btn-sm" href="${esc(lien)}" target="_blank" rel="noopener" style="margin-top:8px;display:inline-flex;align-items:center;gap:6px">📄 ${adr("Voir mon programme","Voir mon programme")}</a>`:""}
