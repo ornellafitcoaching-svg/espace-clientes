@@ -27,8 +27,9 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=f05"></script>
+<script src="js/calc.js?v=q2"></script>
 <script src="js/ui/modal.js?v=e99"></script>
+<script src="js/ui/wizard.js?v=q2"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
 let D = null;          // dossier de la cliente
@@ -911,30 +912,34 @@ function bilanDemarrageCard(){
 // ---- Questionnaire de démarrage (le "premier bilan") : rempli UNE FOIS -----
 async function addMyQuestionnaireInitial(){
   if ((D.questionnaire_initial||[]).length){ UI.toast(adr("Ton questionnaire est déjà rempli ✓","Votre questionnaire est déjà rempli ✓")); return; }
-  const fields = [];
-  (Calc.QI||[]).forEach(function(item, i){
-    if (item.section){ fields.push({ type:"static", name:"_sec"+i, label:"", value:'<div style="margin:16px 0 0;padding-top:12px;border-top:1px solid rgba(0,0,0,.08);font-weight:800;color:var(--accent);font-size:1.05rem">'+item.section+'</div>' }); return; }
-    if (item.type==="select"){
-      const options = [{value:"",label:"— choisir —"}].concat((item.options||[]).map(function(o){ return {value:o,label:o}; }));
-      fields.push({ name:item.id, label:item.q, type:"select", options:options });
-    } else {
-      fields.push({ name:item.id, label:item.q, type:(item.type||"text") });
-    }
-  });
-  const v = await UI.form({ title:"Mon questionnaire de démarrage 📋", submit:"Envoyer à Ornella", fields });
+  // Questionnaire PAR ÉTAPES (UI.wizard) : cases à cocher, brouillon auto, reprise possible.
+  // UN SEUL questionnaire qui s'adapte : + entraînement si elle s'entraîne seule,
+  // + nutrition si elle a la nutrition (et ne l'a pas déjà remplie).
+  const withQE = Calc.needsQE(D.cliente, D.accompagnement, D.programmes);
+  const withQN = hasNutrition() && !(D.questionnaire_nutrition||[]).length;
+  const v = await UI.wizard({ title:"Mon questionnaire de démarrage 📋", items:Calc.qiItems({ qe:withQE, qn:withQN }),
+    submit:"Envoyer à Ornella", draftKey:"qi_"+D.cliente.id });
   if (!v) return;
-  const reponses = {};
-  (Calc.QI||[]).forEach(function(item){
-    if (!item.id) return;
-    const raw = v[item.id];
-    if (raw==null || String(raw).trim()==="") return;
-    reponses[item.id] = (typeof raw==="string" ? raw.trim() : raw);
-  });
+  const clearDraft = v.__clearDraft; delete v.__clearDraft;
+  const reponses = Object.assign({}, v);
   const qdate = Calc.today();
   const row = { cliente_id:D.cliente.id, date:qdate, saisi_par:"cliente", reponses:reponses };
   try{
     const r = await sb.from("questionnaire_initial").insert(row); if (r.error) throw r.error;
     D.questionnaire_initial = (D.questionnaire_initial||[]).concat([row]);
+    // Partie nutrition → AUSSI dans questionnaire_nutrition (fiche nutrition + plan alimentaire).
+    if (withQN){
+      try{
+        const qnIds = {}; (Calc.QN||[]).forEach(function(it){ if (it.id) qnIds[it.id] = 1; });
+        const nrep = {}; Object.keys(reponses).forEach(function(k){ if (qnIds[k]) nrep[k] = reponses[k]; });
+        if (reponses.poids) nrep.poids_actuel = reponses.poids;
+        if (Object.keys(nrep).length){
+          const nrow = { cliente_id:D.cliente.id, date:qdate, saisi_par:"cliente", reponses:nrep };
+          const nr = await sb.from("questionnaire_nutrition").insert(nrow); if (nr.error) throw nr.error;
+          D.questionnaire_nutrition = (D.questionnaire_nutrition||[]).concat([nrow]);
+        }
+      }catch(ne){ console.error("partie nutrition :", ne); }
+    }
     // Les mensurations de départ saisies dans le questionnaire sont AUSSI enregistrées
     // dans la table `mensurations` (datées du jour) → ce sont les TOUTES PREMIÈRES mesures,
     // visibles aussitôt côté cliente ET côté coach, avec leur date. (id du questionnaire → type mensuration.)
@@ -985,6 +990,7 @@ async function addMyQuestionnaireInitial(){
         D.objectifs = (D.objectifs||[]).concat([orow]);
       }catch(oe){ console.error("objectif depuis questionnaire :", oe); }
     }
+    if (clearDraft) clearDraft();
     UI.toast("Questionnaire envoyé à Ornella ✓"); render();
     const msg = `Bonjour Ornella, c'est ${PRENOM} 🙂 J'ai rempli mon questionnaire de démarrage dans mon espace ✅`;
     const wa = waHref(msg);
@@ -1016,12 +1022,10 @@ function questionnaireInitialCard(){
     </div>`;
   }
   const x = list[0]; const rep = x.reponses||{};
-  const rows = (Calc.QI||[]).map(function(item){
-    if (!item.id) return "";
-    const val = rep[item.id];
-    if (val==null || String(val).trim()==="") return "";
-    return `<div style="margin-bottom:8px"><div style="font-size:.72rem;color:var(--text-mid)">${esc(item.q)}</div><div>${esc(String(val))}</div></div>`;
-  }).filter(Boolean).join("");
+  const rows = Calc.qRows("QI", rep).map(function(r){
+    if (r.section) return `<div style="margin:12px 0 4px;font-weight:700;color:var(--accent);font-size:.85rem">${esc(r.section)}</div>`;
+    return `<div style="margin-bottom:8px"><div style="font-size:.72rem;color:var(--text-mid)">${esc(r.q)}</div><div>${esc(r.val)}</div></div>`;
+  }).join("");
   return `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold)">
     <div class="row between" style="margin-bottom:6px"><h4 style="font-size:1.15rem">📋 Questionnaire de démarrage</h4><span class="tag">${Calc.fmt(x.date)}</span></div>
     <div class="isub" style="color:var(--text-mid);margin-bottom:10px">${adr("Merci, tu l'as déjà rempli — Ornella l'a bien reçu.","Merci, vous l'avez déjà rempli — Ornella l'a bien reçu.")}</div>
@@ -1032,29 +1036,15 @@ function questionnaireInitialCard(){
 // ---- Questionnaire ALIMENTAIRE (bilan nutrition) : rempli UNE FOIS -----------
 async function addMyQuestionnaireNutrition(){
   if ((D.questionnaire_nutrition||[]).length){ UI.toast(adr("Ton questionnaire alimentaire est déjà rempli ✓","Votre questionnaire alimentaire est déjà rempli ✓")); return; }
-  const fields = [];
-  (Calc.QN||[]).forEach(function(item, i){
-    if (item.section){ fields.push({ type:"static", name:"_secn"+i, label:"", value:'<div style="margin:16px 0 0;padding-top:12px;border-top:1px solid rgba(0,0,0,.08);font-weight:800;color:var(--accent);font-size:1.05rem">'+item.section+'</div>' }); return; }
-    if (item.type==="select"){
-      const options = [{value:"",label:"— choisir —"}].concat((item.options||[]).map(function(o){ return {value:o,label:o}; }));
-      fields.push({ name:item.id, label:item.q, type:"select", options:options });
-    } else {
-      fields.push({ name:item.id, label:item.q, type:(item.type||"text") });
-    }
-  });
-  const v = await UI.form({ title:"Mon questionnaire alimentaire 🥗", submit:"Envoyer à Ornella", fields });
+  const v = await UI.wizard({ title:"Mon questionnaire alimentaire 🥗", items:Calc.QN, submit:"Envoyer à Ornella", draftKey:"qn_"+D.cliente.id });
   if (!v) return;
-  const reponses = {};
-  (Calc.QN||[]).forEach(function(item){
-    if (!item.id) return;
-    const raw = v[item.id];
-    if (raw==null || String(raw).trim()==="") return;
-    reponses[item.id] = (typeof raw==="string" ? raw.trim() : raw);
-  });
+  const clearDraft = v.__clearDraft; delete v.__clearDraft;
+  const reponses = Object.assign({}, v);
   const row = { cliente_id:D.cliente.id, date:Calc.today(), saisi_par:"cliente", reponses:reponses };
   try{
     const r = await sb.from("questionnaire_nutrition").insert(row); if (r.error) throw r.error;
     D.questionnaire_nutrition = (D.questionnaire_nutrition||[]).concat([row]);
+    if (clearDraft) clearDraft();
     UI.toast("Questionnaire alimentaire envoyé à Ornella ✓"); render();
     const msg = `Bonjour Ornella, c'est ${PRENOM} 🙂 J'ai rempli mon questionnaire alimentaire dans mon espace ✅`;
     const wa = waHref(msg);
@@ -1064,6 +1054,8 @@ async function addMyQuestionnaireNutrition(){
 // Invitation en tête d'accueil tant que le questionnaire alimentaire n'est pas rempli.
 function qnNudge(){
   if ((D.questionnaire_nutrition||[]).length) return "";
+  // Tant que le questionnaire de démarrage n'est pas rempli, la nutrition est DEDANS.
+  if (!(D.questionnaire_initial||[]).length && Calc.estNouvelle(D.cliente)) return "";
   if (!Calc.estNouvelle(D.cliente)) return "";   // anciennes clientes : déjà fait avant l'espace
   // On ne le propose que si une nutrition est prévue (ou déjà active) — inutile pour
   // les présentielles sans suivi alimentaire. hasNutrition() existe déjà côté cliente.
@@ -1079,6 +1071,9 @@ function qnNudge(){
 function questionnaireNutritionCard(){
   const list = (D.questionnaire_nutrition||[]);
   if (!list.length && !Calc.estNouvelle(D.cliente)) return "";
+  // Pas encore de questionnaire de démarrage → la nutrition sera posée dedans (pas de 2e carte).
+  // Sans nutrition prévue → rien à afficher.
+  if (!list.length && (!(D.questionnaire_initial||[]).length || !hasNutrition())) return "";
   if (!list.length){
     return `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold)">
       <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700">🥗 Questionnaire alimentaire</div>
@@ -1087,18 +1082,17 @@ function questionnaireNutritionCard(){
     </div>`;
   }
   const x = list[0]; const rep = x.reponses||{};
-  const rows = (Calc.QN||[]).map(function(item){
-    if (!item.id) return "";
-    const val = rep[item.id];
-    if (val==null || String(val).trim()==="") return "";
-    return `<div style="margin-bottom:8px"><div style="font-size:.72rem;color:var(--text-mid)">${esc(item.q)}</div><div>${esc(String(val))}</div></div>`;
-  }).filter(Boolean).join("");
+  const rows = Calc.qRows("QN", rep).map(function(r){
+    if (r.section) return `<div style="margin:12px 0 4px;font-weight:700;color:var(--accent);font-size:.85rem">${esc(r.section)}</div>`;
+    return `<div style="margin-bottom:8px"><div style="font-size:.72rem;color:var(--text-mid)">${esc(r.q)}</div><div>${esc(r.val)}</div></div>`;
+  }).join("");
   return `<div class="card" style="margin-bottom:14px;border-left:4px solid var(--gold)">
     <div class="row between" style="margin-bottom:6px"><h4 style="font-size:1.15rem">🥗 Questionnaire alimentaire</h4><span class="tag">${Calc.fmt(x.date)}</span></div>
     <div class="isub" style="color:var(--text-mid);margin-bottom:10px">${adr("Merci, tu l'as déjà rempli — Ornella l'a bien reçu.","Merci, vous l'avez déjà rempli — Ornella l'a bien reçu.")}</div>
     ${rows||"&nbsp;"}
   </div>`;
 }
+
 function viewBilans(){
   const list = (D.bilans||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
   const b = Calc.bilanEtat(D);

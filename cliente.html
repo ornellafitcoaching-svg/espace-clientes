@@ -29,7 +29,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=f05"></script>
+<script src="js/calc.js?v=q2"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -481,16 +481,24 @@ function sectionQuestionnaireInitial(){
     body = askBtn + `<p class="empty">Questionnaire de démarrage pas encore rempli.</p>`;
   } else {
     const x = list[0]; const rep = x.reponses||{};
-    const rows = (Calc.QI||[]).map(function(item){
-      if (!item.id) return "";
-      const val = rep[item.id];
-      if (val==null || String(val).trim()==="") return "";
-      return `<div class="isub" style="margin-bottom:7px"><span style="color:var(--text-light)">${esc(item.q)}</span><br><strong>${esc(String(val))}</strong></div>`;
-    }).filter(Boolean).join("");
-    body = askBtn + `<div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div><div class="ibody"><div class="ititle">Réponses de la cliente</div>${rows||'<div class="isub">&nbsp;</div>'}</div></div>`;
+    body = askBtn + `<div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div><div class="ibody"><div class="ititle">Réponses de la cliente</div>${qAnswersHtml("QI", rep)}</div></div>`;
   }
   return block("Questionnaire de démarrage 📋", list.length, body, false);
 }
+
+
+// Réponses d'un questionnaire (V2 + anciennes réponses) + encart « points d'attention ».
+function qAnswersHtml(kind, rep){
+  const al = Calc.qAlertes(rep);
+  const alHtml = al.length ? `<div style="background:#FFF4F1;border:1px solid rgba(192,86,75,.3);border-radius:12px;padding:10px 12px;margin-bottom:10px">`
+    + al.map(a=>`<div class="isub" style="margin-bottom:3px">${a.icon} <strong>${esc(a.label)}</strong> : ${esc(a.val)}</div>`).join("") + `</div>` : "";
+  const rows = Calc.qRows(kind, rep).map(function(r){
+    if (r.section) return `<div class="isub" style="margin:12px 0 4px;font-weight:700;color:var(--accent)">${esc(r.section)}</div>`;
+    return `<div class="isub" style="margin-bottom:7px"><span style="color:var(--text-light)">${esc(r.q)}</span><br><strong>${esc(r.val)}</strong></div>`;
+  }).join("");
+  return alHtml + (rows || '<div class="isub">&nbsp;</div>');
+}
+
 
 function sectionQuestionnaireNutrition(){
   const list = D.questionnaire_nutrition||[];
@@ -510,14 +518,7 @@ function sectionQuestionnaireNutrition(){
     body = askBtn + `<p class="empty">Questionnaire alimentaire pas encore rempli.</p>`;
   } else {
     const x = list[0]; const rep = x.reponses||{};
-    const rows = (Calc.QN||[]).map(function(item){
-      if (item.section) return `<div class="isub" style="margin:12px 0 4px;font-weight:700;color:var(--accent)">${esc(item.section)}</div>`;
-      if (!item.id) return "";
-      const val = rep[item.id];
-      if (val==null || String(val).trim()==="") return "";
-      return `<div class="isub" style="margin-bottom:7px"><span style="color:var(--text-light)">${esc(item.q)}</span><br><strong>${esc(String(val))}</strong></div>`;
-    }).filter(Boolean).join("");
-    body = askBtn + `<div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div><div class="ibody"><div class="ititle">Réponses de la cliente</div>${rows||'<div class="isub">&nbsp;</div>'}</div></div>`;
+    body = askBtn + `<div class="item"><div class="idate">${Calc.fmtShort(x.date)}</div><div class="ibody"><div class="ititle">Réponses de la cliente</div>${qAnswersHtml("QN", rep)}</div></div>`;
   }
   return block("Questionnaire alimentaire 🥗", list.length, body, false);
 }

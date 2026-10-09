@@ -989,7 +989,7 @@ window.Calc = {
   // ---- Questionnaire de démarrage (le "premier bilan") --------------------
   // Reprend le Google Form d'accueil, version ludique : sections + choix (select) + emojis.
   // {section} = titre de section ; sinon {id, q, type?, options?}. Réponses en jsonb {id: valeur}.
-  QI: [
+  QI_V1: [
     { section:"🌿 Ton mode de vie" },
     { id:"entrainement_freq", q:"Combien de fois par semaine veux-tu t’entraîner ? 🗓️", type:"number" },
     { id:"age", q:"Quel âge as-tu ? 🎂", type:"number" },
@@ -1064,7 +1064,7 @@ window.Calc = {
   // Questionnaire ALIMENTAIRE de départ (« bilan nutrition ») — rempli UNE FOIS,
   // séparé du questionnaire de démarrage. Objectif : allergies (à ne surtout pas
   // manquer), habitudes, goûts et contraintes pour un plan nutrition sur-mesure.
-  QN: [
+  QN_V1: [
     { section:"🎯 Ton objectif nutrition" },
     { id:"obj_nutrition", q:"Ton objectif principal côté alimentation ? 🎯", type:"select", options:["Perte de poids","Perdre du gras & me tonifier","Prise de muscle","Rééquilibrage & santé","Plus d’énergie au quotidien","Gérer une contrainte médicale"] },
     { id:"poids_actuel", q:"Ton poids actuel (kg) ⚖️", type:"number" },
@@ -1113,4 +1113,203 @@ window.Calc = {
     { id:"recettes", q:"Côté recettes :", type:"select", options:["Oui, donne-moi des idées recettes","Juste des repères simples"] },
     { id:"contraintes_nutri", q:"Contraintes à connaître ? (travail décalé, déplacements, cantine, famille…) 📌", type:"textarea" },
   ],
+
+  // ==========================================================================
+  // QUESTIONNAIRE V2 (oct. 2026) — UN SEUL questionnaire de démarrage, par étapes,
+  // surtout des cases à cocher, qui S'ADAPTE à la cliente (Calc.qiItems) :
+  //   QI = tronc commun (toutes) + QE si elle s'entraîne seule + QN si nutrition.
+  // Tout est enregistré dans questionnaire_initial ; la partie nutrition est AUSSI
+  // copiée dans questionnaire_nutrition (le plan nutrition s'appuie dessus).
+  // QN reste utilisable seul si la nutrition est prise plus tard.
+  // Ids utilisés ailleurs CONSERVÉS : objectifs, objectifs_pourquoi, taille, poids, tour_*.
+  // Anciennes réponses (V1) toujours lisibles : voir Calc.qRows().
+  // ==========================================================================
+  QI: [
+    { section:"👋 Faisons connaissance", intro:"Quelques questions rapides, surtout à cocher. Tu peux t’arrêter et reprendre plus tard : tout est sauvegardé." },
+    { id:"sexe", q:"Tu es :", hint:"Pour les calculs (besoins caloriques)", type:"choice", req:true, options:["Une femme","Un homme"] },
+    { id:"age", q:"Quel âge as-tu ? 🎂", type:"number", req:true },
+    { id:"rythme_vie", q:"Ton rythme de vie en ce moment ?", type:"choice", options:["Calme 😌","Variable 🔄","Rapide ⚡","Stressant 😰"] },
+    { id:"travail_posture", q:"Au travail, tu es plutôt :", type:"choice", options:["Assise 🪑","Debout 🧍","En mouvement 🚶","Physique (port de charges) 💪","Pas de travail en ce moment"] },
+    { id:"pas_jour", q:"Combien de pas par jour, environ ? 🚶‍♀️", hint:"Regarde ton téléphone ou ta montre si tu peux", type:"choice", options:["Moins de 5 000","5 000 à 8 000","8 000 à 10 000","Plus de 10 000","Je ne sais pas"] },
+    { id:"entrainement_freq", q:"Combien de séances par semaine te paraît réaliste ? 🗓️", type:"choice", options:["1","2","3","4","5 et +"] },
+    { id:"creneaux", q:"Tes créneaux préférés ⏰", hint:"Plusieurs choix possibles", type:"multi", options:["Tôt le matin","Matinée","Midi","Après-midi","Soir","Week-end"] },
+
+    { section:"🩺 Ta santé", intro:"Pour adapter chaque exercice et ne jamais te blesser." },
+    { id:"douleurs_zones", q:"As-tu des douleurs ou des zones fragiles ?", type:"multi", req:true, options:["Aucune","Dos (bas du dos)","Nuque / cervicales","Épaules","Genoux","Hanches","Poignets","Chevilles","Périnée"] },
+    { id:"antecedents", q:"Quelque chose à savoir côté santé ?", type:"multi", other:true, options:["Rien de particulier","Hypertension","Diabète","Asthme","Problème cardiaque","Thyroïde","Hernie discale","Opération récente","Endométriose / SOPK"] },
+    { id:"traitement", q:"Un traitement ou un suivi médical en cours ? (facultatif) 💊", type:"text", ph:"ex. kiné pour le genou" },
+    { id:"grossesses", q:"Grossesses 🤰", type:"choice", options:["Aucune","1","2","3 et +","Enceinte actuellement"] },
+    { id:"postpartum", q:"Après bébé, tu es concernée par :", type:"multi", show:{ id:"grossesses", not:["Aucune"] }, options:["Rien de particulier","Accouchement il y a moins d’1 an","Rééducation du périnée faite","Rééducation pas faite","Diastasis","Petites fuites à l’effort","Césarienne"] },
+    { id:"tabac", q:"Tu fumes ? 🚬", type:"choice", options:["Non","Un peu","Oui, régulièrement","J’ai arrêté"] },
+    { id:"alcool", q:"L’alcool, c’est plutôt : (aucun jugement 🙂)", type:"choice", options:["Jamais","Rarement","Le week-end","Régulièrement"] },
+
+    { section:"😴 Sommeil, énergie & habitudes" },
+    { id:"sommeil_heures", q:"Tu dors combien d’heures par nuit ? 🛏️", type:"choice", options:["Moins de 5 h","5–6 h","6–7 h","7–8 h","Plus de 8 h"] },
+    { id:"sommeil_reparateur", q:"Ton sommeil est réparateur ?", type:"choice", options:["Oui","Moyen","Non"] },
+    { id:"energie_actuelle", q:"Ton niveau d’énergie au quotidien ⚡", type:"scale", lo:"à plat", hi:"au top" },
+    { id:"stress", q:"Ton niveau de stress 😮‍💨", type:"scale", lo:"zen", hi:"débordée" },
+    { id:"grignotage", q:"Tu grignotes entre les repas ?", type:"choice", options:["Non","Parfois","Souvent","Surtout le soir 🌙"] },
+    { id:"envies", q:"Des envies quand tu es fatiguée ?", type:"choice", options:["Non","Sucré 🍫","Salé 🧀","Les deux"] },
+
+    { section:"🎯 Tes objectifs" },
+    { id:"objectifs", q:"Qu’est-ce que tu veux changer ? 🎯", hint:"Coche tout ce qui compte pour toi", type:"multi", req:true, other:true, options:["Perdre du poids","Ventre plus plat","Fessiers galbés","Me tonifier","Prendre du muscle","Retrouver mon corps après bébé","Plus d’énergie","Soulager mon dos / mes douleurs","Reprendre confiance en moi"] },
+    { id:"objectifs_pourquoi", q:"Pourquoi c’est important pour toi aujourd’hui ? 💭", type:"textarea", ph:"En quelques mots, c’est ce qui m’aide le plus à te motiver" },
+    { id:"evenement", q:"Un événement qui te motive ? 📅 (facultatif)", type:"text", ph:"mariage, vacances, anniversaire…" },
+    { id:"motivation", q:"Ta motivation en ce moment 🔥", type:"scale", lo:"bof", hi:"à fond" },
+    { id:"freins", q:"Qu’est-ce qui t’a freinée jusqu’ici ?", type:"multi", options:["Le manque de temps","La motivation qui retombe","Je ne savais pas quoi faire","Les enfants / la famille","La fatigue","Des douleurs","Pas de résultats","Le budget"] },
+    { id:"attentes_coach", q:"Ce que tu attends le plus de moi 💬", type:"multi", options:["Un programme clair","Être motivée et suivie","Corriger ma technique","Des conseils nutrition","Ne pas me blesser","Des résultats visibles"] },
+    { id:"sport_passe", q:"Le sport et toi, jusqu’ici :", type:"choice", options:["Jamais vraiment","Il y a longtemps","De temps en temps","Régulièrement"] },
+    { id:"pref_seances", q:"Tu préfères des séances plutôt :", type:"choice", options:["Douces et progressives 🌱","Dynamiques sans sauts 💫","Intenses et challengeantes 🔥"] },
+
+    { section:"📏 Tes mensurations de départ", intro:"Taille et poids sont indispensables pour calculer tes besoins. Pour les tours : mètre ruban, le matin à jeun si possible. Pas de mètre ? Laisse vide, on les prendra ensemble." },
+    { id:"taille", q:"Taille (cm) 📏", type:"number", req:true },
+    { id:"poids", q:"Poids actuel (kg) ⚖️", type:"number", req:true },
+    { id:"tour_taille", q:"Tour de taille (cm)", hint:"Au plus fin du ventre", type:"number" },
+    { id:"tour_hanches", q:"Tour de hanches (cm)", hint:"Au niveau des os du bassin", type:"number" },
+    { id:"tour_fesses", q:"Tour de fesses (cm)", hint:"Au point le plus bombé", type:"number" },
+    { id:"tour_cuisse", q:"Tour de cuisse (cm)", hint:"10 cm sous le pli de la fesse", type:"number" },
+    { id:"tour_bras", q:"Tour de bras (cm)", hint:"Milieu du bras, détendu", type:"number" },
+    { id:"photos_depart", q:"Tu veux m’envoyer tes photos de départ ? 📸", type:"choice", options:["Oui","Sans mon visage","Plus tard","Non"] },
+  ],
+
+  // Partie ENTRAÎNEMENT — ajoutée au questionnaire si elle s'entraîne SEULE.
+  QE: [
+    { section:"🏠 Où et quand tu t’entraînes", intro:"Pour construire un programme que tu peux vraiment faire, chez toi ou en salle." },
+    { id:"lieu_entrainement", q:"Tu vas t’entraîner :", type:"choice", req:true, options:["À la maison 🏠","En salle 🏋️","Dehors 🌳","Un peu de tout"] },
+    { id:"salle", q:"Quelle salle ? (facultatif)", type:"text", ph:"ex. Basic-Fit Massy", show:{ id:"lieu_entrainement", is:["En salle 🏋️","Un peu de tout"] } },
+    { id:"jours_semaine", q:"Combien de séances seule par semaine ?", type:"choice", req:true, options:["2","3","4","5 et +"] },
+    { id:"duree_seance", q:"Combien de temps par séance ? ⏱️", type:"choice", req:true, options:["20 min","30 min","45 min","1 h et +"] },
+    { id:"moment", q:"Plutôt à quel moment ?", type:"choice", options:["Matin","Midi","Soir","Ça varie"] },
+    { id:"contraintes_maison", q:"Des contraintes à la maison ?", type:"multi", show:{ id:"lieu_entrainement", is:["À la maison 🏠","Un peu de tout"] }, options:["Aucune","Pas de sauts (voisins, bruit)","Peu de place","Les enfants autour","Pas de matériel du tout"] },
+
+    { section:"🏋️ Ton matériel" },
+    { id:"materiel", q:"Ce que tu as à disposition", hint:"Coche tout ce que tu as", type:"multi", req:true, other:true, options:["Rien (poids du corps)","Tapis","Élastiques / bandes","Mini-bands","Haltères","Kettlebell","Barre + disques","Banc","Swiss ball","Corde à sauter","Step / box","Barre de traction","Vélo / tapis de course / rameur"] },
+    { id:"poids_charges", q:"Quels poids pour tes haltères / kettlebell ?", type:"text", ph:"ex. 2 × 4 kg, kettlebell 8 kg", show:{ id:"materiel", is:["Haltères","Kettlebell","Barre + disques"] } },
+    { id:"machines_salle", q:"En salle, tu sais utiliser :", type:"multi", show:{ id:"lieu_entrainement", is:["En salle 🏋️","Un peu de tout"] }, options:["Presse à cuisses","Machine à fessiers / hip thrust","Poulies","Smith machine","Leg curl / leg extension","Rack + barre","Cardio (tapis, vélo, elliptique)","Pas encore les machines"] },
+
+    { section:"📈 Ton niveau" },
+    { id:"niveau", q:"Tu dirais que tu es :", type:"choice", req:true, options:["Débutante (je commence ou je reprends)","Intermédiaire (je m’entraîne un peu)","Confirmée (régulière depuis 1 an et +)"] },
+    { id:"exos_maitrises", q:"Les exercices que tu sais déjà faire ✅", type:"multi", options:["Squat","Fentes","Pont fessier / hip thrust","Soulevé de terre","Pompes (même sur les genoux)","Gainage / planche","Rowing","Développé épaules","Burpees","Aucun pour l’instant"] },
+    { id:"exos_difficiles", q:"Ce qui est difficile ou inconfortable pour toi 😬", type:"multi", other:true, options:["Rien de particulier","Les pompes","Le squat (genoux, équilibre)","Les fentes","Le gainage","Les sauts / burpees","Les abdos (la nuque tire)","Les tractions","Rester longtemps au sol"] },
+    { id:"cardio", q:"Ton cardio :", type:"choice", options:["Je m’essouffle vite","Ça va","J’ai une bonne endurance"] },
+
+    { section:"💛 Ce que tu aimes" },
+    { id:"aime", q:"Ce que tu aimes faire 😍", type:"multi", options:["Le renforcement musculaire","Le cardio / HIIT","Les circuits rapides","Pilates / gainage","Soulever lourd","Les séances courtes et efficaces","Varier souvent"] },
+    { id:"aime_pas", q:"Ce que tu n’aimes pas 🙅‍♀️", type:"multi", options:["Rien, je suis ouverte","Les sauts","Le cardio","Les abdos","Les pompes","Les séances longues","Les exercices au sol"] },
+    { id:"zones_prio", q:"Les zones à travailler en priorité 🎯", type:"multi", options:["Ventre","Fessiers","Cuisses","Bras","Dos / posture","Silhouette globale"] },
+
+    { section:"📲 Ton suivi" },
+    { id:"videos_ok", q:"Tu pourras m’envoyer des vidéos de tes exercices pour que je corrige ta technique ?", type:"choice", options:["Oui 👍","De temps en temps","Pas pour le moment"] },
+    { id:"commentaire", q:"Autre chose à me dire ? (facultatif)", type:"textarea" },
+  ],
+
+  QN: [
+    { section:"🎯 Ton objectif", intro:"Pour un plan nutrition 100 % à ton goût, sans régime frustrant." },
+    { id:"obj_nutrition", q:"Ton objectif côté alimentation 🎯", type:"choice", req:true, options:["Perte de poids","Perdre du gras & me tonifier","Prise de muscle","Rééquilibrage & santé","Plus d’énergie","Gérer une contrainte médicale"] },
+    { id:"poids_actuel", q:"Ton poids actuel (kg) ⚖️", type:"number" },
+    { id:"poids_objectif", q:"Le poids où tu te sentirais bien (kg) ✨", type:"number" },
+
+    { section:"⚠️ Allergies & intolérances", intro:"Très important : je ne mettrai jamais ces aliments dans ton plan." },
+    { id:"allergies", q:"Allergies alimentaires", type:"multi", req:true, other:true, options:["Aucune","Arachide","Fruits à coque","Œuf","Lait","Gluten","Poisson / fruits de mer","Soja","Sésame"] },
+    { id:"intolerances", q:"Intolérances", type:"multi", req:true, other:true, options:["Aucune","Lactose","Gluten","FODMAP / fructose"] },
+    { id:"regime_particulier", q:"Tu manges :", type:"multi", other:true, options:["De tout","Sans porc","Halal","Casher","Végétarien","Végan","Sans viande rouge"] },
+
+    { section:"🍽️ Tes habitudes" },
+    { id:"nb_repas", q:"Combien de repas par jour ?", type:"choice", options:["1","2","3","4 et +","Ça varie"] },
+    { id:"petit_dej_nutri", q:"Le petit-déjeuner 🍳", type:"choice", options:["Tous les jours","Parfois","Jamais"] },
+    { id:"horaires_reguliers", q:"Tes horaires de repas :", type:"choice", options:["Réguliers","Variables","Décalés (travail de nuit…)"] },
+    { id:"grignotage_nutri", q:"Le grignotage :", type:"choice", options:["Non","Parfois","Souvent","Surtout le soir 🌙"] },
+    { id:"cuisine_maison", q:"Tu manges plutôt :", type:"choice", options:["Fait maison","Un peu des deux","Plats préparés / livraison"] },
+    { id:"temps_cuisine", q:"Temps pour cuisiner ⏱️", type:"choice", options:["J’ai le temps","Un peu","Très peu, il me faut du rapide"] },
+    { id:"budget_courses", q:"Budget courses", type:"choice", options:["Serré","Moyen","Confortable"] },
+
+    { section:"😋 Tes goûts" },
+    { id:"proteines_pref", q:"Tes protéines préférées", type:"multi", options:["Poulet / dinde","Bœuf","Poisson","Thon / sardines","Œufs","Fromage blanc / skyr","Tofu","Lentilles / pois chiches"] },
+    { id:"feculents_pref", q:"Tes féculents préférés", type:"multi", options:["Riz","Pâtes","Pommes de terre","Patate douce","Pain","Quinoa / boulgour","Semoule","Légumineuses"] },
+    { id:"legumes_ok", q:"Les légumes et toi 🥦", type:"choice", options:["J’adore","Quelques-uns seulement","Peu","Pas du tout"] },
+    { id:"sucre_sale", q:"Tu es plutôt :", type:"choice", options:["Sucré 🍫","Salé 🧀","Les deux"] },
+    { id:"aliments_detestes", q:"Les aliments que tu ne mangeras JAMAIS 🚫", type:"text", ph:"ex. champignons, brocolis…" },
+    { id:"aliments_aimes", q:"Tes plats ou aliments préférés 😍 (facultatif)", type:"text" },
+
+    { section:"🥤 Boissons" },
+    { id:"eau_jour", q:"L’eau, par jour 💧", type:"choice", options:["Moins de 0,5 L","~1 L","~1,5 L","2 L et +"] },
+    { id:"boissons_sucrees", q:"Sodas / jus sucrés", type:"choice", options:["Jamais","Parfois","Souvent"] },
+    { id:"alcool_nutri", q:"Alcool 🍷", type:"choice", options:["Jamais","Occasionnel","Régulier"] },
+    { id:"fast_food", q:"Fast-food / à emporter", type:"choice", options:["Jamais","~1 fois / semaine","Plusieurs fois / semaine"] },
+
+    { section:"🩺 Digestion & santé" },
+    { id:"digestion", q:"Ta digestion", type:"multi", options:["Bonne","Ballonnements","Constipation","Transit rapide","Reflux / brûlures"] },
+    { id:"pathologies_nutri", q:"À prendre en compte", type:"multi", other:true, options:["Rien","Diabète","Cholestérol","Tension","Thyroïde","SOPK","Anémie / carences"] },
+    { id:"grossesse_allaitement", q:"En ce moment :", type:"choice", options:["Non concernée","Grossesse 🤰","Allaitement 🤱"] },
+    { id:"complements_nutri", q:"Compléments pris en ce moment (facultatif)", type:"text" },
+
+    { section:"📅 Ton plan idéal" },
+    { id:"nb_repas_souhaite", q:"Tu préfères un plan à :", type:"choice", options:["3 repas","3 repas + 1 collation","2 repas","À toi de voir"] },
+    { id:"recettes", q:"Côté recettes :", type:"choice", options:["Donne-moi des idées recettes","Juste des repères simples"] },
+    { id:"contraintes_nutri", q:"Tes contraintes 📌", type:"multi", other:true, options:["Aucune","Repas au travail / cantine","Horaires décalés","Je cuisine pour la famille","Déplacements fréquents","Souvent au restaurant"] },
+  ],
+
+  // Construit LE questionnaire adapté à la cliente (un seul pour elle, une seule fiche pour la coach).
+  //   opts.qe → ajoute la partie entraînement · opts.qn → ajoute la partie nutrition
+  qiItems(opts) {
+    opts = opts || {};
+    let items = this.QI.slice();
+    if (opts.qe) items = items.concat(this.QE);
+    if (opts.qn) items = items.concat(this.QN.filter((it) => it.id !== "poids_actuel"));  // poids déjà demandé
+    return items;
+  },
+  // Qui reçoit la partie ENTRAÎNEMENT ? Toutes celles qui s'entraînent SEULES :
+  // distanciel, hybride, ou présentiel avec un programme en plus des séances
+  // (programme sportif déjà créé, ou formule qui mentionne programme / boost / autonomie).
+  needsQE(cl, ac, programmes) {
+    const t = cl && cl.type;
+    if (t === "distanciel" || t === "hybride") return true;
+    if ((programmes || []).some((p) => p.kind === "sportif")) return true;
+    return /programme|boost|autonom/i.test(String((ac && ac.formule) || ""));
+  },
+  // Lignes à afficher (coach / cliente) : questions actuelles + anciennes réponses V1
+  // encore présentes (jamais de donnée cachée). kind : "QI" | "QE" | "QN".
+  qRows(kind, reponses) {
+    const rep = reponses || {};
+    // Le questionnaire de démarrage peut contenir les parties entraînement + nutrition.
+    const cur = kind === "QI" ? this.QI.concat(this.QE, this.QN) : (this[kind] || []);
+    const legacy = this[kind + "_V1"] || [];
+    const out = []; const seen = {};
+    cur.forEach((it) => {
+      if (it.section) { out.push({ section: it.section }); return; }
+      if (!it.id) return;
+      seen[it.id] = 1;
+      const v = rep[it.id];
+      if (v == null || String(v).trim() === "") return;
+      out.push({ id: it.id, q: it.q, val: String(v) });
+    });
+    const extra = [];
+    legacy.forEach((it) => {
+      if (!it.id || seen[it.id]) return;
+      seen[it.id] = 1;
+      const v = rep[it.id];
+      if (v == null || String(v).trim() === "") return;
+      extra.push({ id: it.id, q: it.q, val: String(v) });
+    });
+    Object.keys(rep).forEach((k) => { if (!seen[k] && rep[k] != null && String(rep[k]).trim() !== "") extra.push({ id: k, q: k.replace(/_/g, " "), val: String(rep[k]) }); });
+    if (extra.length) { out.push({ section: "📎 Autres réponses" }); out.push.apply(out, extra); }
+    // Retire les titres de section sans réponse en dessous.
+    return out.filter((r, i) => !r.section || (out[i + 1] && !out[i + 1].section));
+  },
+  // Points d'attention à mettre en avant côté coach (allergies, douleurs, santé).
+  qAlertes(reponses) {
+    const r = reponses || {}; const out = [];
+    const neg = /^(aucune?|rien|non|rien de particulier|de tout)$/i;
+    const pick = (id, label, icon) => {
+      const v = r[id]; if (v == null || String(v).trim() === "") return;
+      const items = String(v).split(/,\s*/).filter((x) => x && !neg.test(x.trim()));
+      if (items.length) out.push({ icon, label, val: items.join(", ") });
+    };
+    pick("allergies", "Allergies", "⚠️"); pick("allergies_detail", "Allergies", "⚠️");
+    pick("intolerances", "Intolérances", "⚠️");
+    pick("douleurs_zones", "Douleurs / zones fragiles", "🚨"); pick("exos_difficiles", "Difficile pour elle", "😬");
+    pick("antecedents", "Santé", "🩺"); pick("pathologies_nutri", "Santé", "🩺"); pick("postpartum", "Post-partum", "🤱");
+    if (r.grossesses === "Enceinte actuellement" || /Grossesse/.test(r.grossesse_allaitement || "")) out.push({ icon: "🤰", label: "Enceinte", val: "à adapter" });
+    return out;
+  },
 };
