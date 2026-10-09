@@ -150,8 +150,12 @@ window.Calc = {
   // Renvoie { dernier, prochain, joursAvant, source, parElle, statut }
   //   statut = "retard" | "bientot" (≤ 7 j) | "ajour" | null (pas démarrée).
   BILAN_SOURCES: { bilan: "bilan", questionnaire: "questionnaire de démarrage", demarrage: "bilan de démarrage", mensurations: "mensurations" },
+  // Formule SANS suivi (ex. programme 8 semaines seul) : pas de bilan toutes les 4 semaines.
+  sansSuivi(ac) { return /sans\s+suivi/i.test(String((ac && ac.formule) || "")); },
   bilanEtat(c) {
     if (!c) return { dernier: null, prochain: null, joursAvant: null, source: null, parElle: false, statut: null };
+    // Sans suivi → aucun bilan périodique attendu (ni rappel cliente, ni « bilan en retard » coach).
+    if (this.sansSuivi(c.accompagnement)) return { dernier: null, prochain: null, joursAvant: null, source: null, parElle: false, statut: null, sansSuivi: true };
     const lists = {
       bilan: c.bilans || [],
       questionnaire: c.questionnaireInitial || c.questionnaire_initial || [],

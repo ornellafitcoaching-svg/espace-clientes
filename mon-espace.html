@@ -91,6 +91,7 @@ function motOrnella(){
 // Carte « nudge » quand c'est le moment du bilan (ou premier bilan à faire).
 function bilanNudge(){
   const ac = D.accompagnement;
+  if (Calc.sansSuivi(ac)) return "";   // formule sans suivi : pas de bilan toutes les 4 semaines
   const b = Calc.bilanEtat(D);
   const has = (D.bilans||[]).length;
   let titre = "", sub = "";
@@ -1103,7 +1104,8 @@ function questionnaireNutritionCard(){
 function viewBilans(){
   const list = (D.bilans||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
   const b = Calc.bilanEtat(D);
-  const entete = `<div class="card" style="background:var(--panel);color:#fff">
+  // Formule SANS suivi : pas d'encart « un bilan toutes les 4 semaines », juste le questionnaire.
+  const entete = Calc.sansSuivi(D.accompagnement) ? "" : `<div class="card" style="background:var(--panel);color:#fff">
       <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold);font-weight:700">${adr("Ton rythme","Votre rythme")}</div>
       <div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:700">Un bilan toutes les 4 semaines 📋</div>
       <div class="isub" style="color:rgba(255,255,255,.7);margin-top:2px">On refait le point + les mensurations à chaque bilan.${b.prochain?` Prochain : <strong style="color:#fff">${Calc.fmt(b.prochain)}</strong>${b.joursAvant!=null&&b.joursAvant>=0?` (dans ${b.joursAvant} j)`:""}.`:""}</div>

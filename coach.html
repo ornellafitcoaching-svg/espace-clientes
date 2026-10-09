@@ -447,7 +447,7 @@ function renderSansSeance(){
 async function loadAll() {
   const [clientes, accomp, seances, bilans, bilansDem, programmes, mensu, paiements, qinit, qnut] = await window.withTimeout(Promise.all([
     sb.from("clientes").select("*").order("created_at",{ascending:false}),
-    sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois,prix,montant_du"),
+    sb.from("accompagnements").select("cliente_id,seances_prevues,seances_faites_init,date_debut,date_fin,nutrition_active,nb_mois,prix,montant_du,formule"),
     sb.from("seances").select("id,cliente_id,statut,date,type,heure"),
     sb.from("bilans").select("cliente_id,date,saisi_par,created_at"),
     sb.from("bilans_demarrage").select("cliente_id,date,saisi_par,created_at"),
