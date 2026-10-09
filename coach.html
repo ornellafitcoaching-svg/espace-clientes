@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=f01">
+<link rel="stylesheet" href="css/app.css?v=f02">
 </head>
 <body>
 <header class="topbar">
@@ -42,6 +42,7 @@
     <button class="ctab on" data-tab="clientes" role="tab" aria-selected="true">👥 Clientes</button>
     <button class="ctab" data-tab="agenda" role="tab" aria-selected="false">📅 Agenda</button>
     <button class="ctab" data-tab="traiter" role="tab" aria-selected="false">🔔 À traiter<span class="ctab-badge" id="badgeTraiter" hidden></span></button>
+    <button class="ctab" data-tab="entreprises" role="tab" aria-selected="false">🏢 Entreprises</button>
     <button class="ctab" data-tab="comptes" role="tab" aria-selected="false">💰 Finances</button>
   </nav>
 
@@ -75,6 +76,11 @@
     <div id="sansSeance"></div>
   </section>
 
+  <!-- Onglet ENTREPRISES : suivi du démarchage B2B -->
+  <section class="panel" data-panel="entreprises" role="tabpanel" hidden>
+    <div id="prospects"></div>
+  </section>
+
   <!-- Onglet COMPTES -->
   <section class="panel" data-panel="comptes" role="tabpanel" hidden>
     <div id="finances"></div>
@@ -92,6 +98,7 @@
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script src="js/finances.js?v=f12"></script>
+<script src="js/prospects.js?v=p1"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -1043,7 +1050,7 @@ function renderLoadWarn(){
 function renderAll(){
   const safe = (fn, name) => { try { fn(); } catch(e){ console.error("render "+name, e); } };
   safe(renderLoadWarn,"loadWarn"); safe(renderStats,"stats"); safe(renderAlerts,"alerts");
-  safe(renderAgenda,"agenda"); safe(renderComptes,"comptes"); safe(renderFinances,"finances"); safe(renderSources,"sources"); safe(renderProgrammes,"programmes");
+  safe(renderAgenda,"agenda"); safe(renderComptes,"comptes"); safe(renderFinances,"finances"); safe(renderProspects,"prospects"); safe(renderSources,"sources"); safe(renderProgrammes,"programmes");
   safe(renderBilans,"bilans"); safe(renderBilansDemarrage,"bilansDemarrage"); safe(renderSansSeance,"sansSeance");
   safe(renderFilters,"filters"); safe(renderList,"list");
 }

@@ -459,3 +459,21 @@ button{font-family:inherit;cursor:pointer}
 .nav-badge{position:absolute;top:5px;right:8px;width:9px;height:9px;border-radius:50%;
   background:var(--accent);box-shadow:0 0 0 2px var(--white)}
 @media(max-width:640px){ .nav-badge{top:7px;right:calc(50% - 22px)} }
+
+/* ---- Onglet Entreprises (démarchage B2B) ---- */
+.pro-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pro-tile{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font:inherit;color:var(--text-mid)}
+.pro-tile .n{font-size:1.4rem;font-weight:700;color:var(--dark)}
+.pro-tile .l{font-size:.72rem;text-align:center}
+.pro-tile.on{border-color:var(--rose-deep);box-shadow:0 0 0 2px rgba(192,86,75,.15)}
+.pro-todo{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.pro-todo:first-of-type{border-top:0}
+.pro-todo .d{flex:none;width:76px;font-weight:700;font-size:.8rem;color:var(--text-mid)}
+.pro-todo.late .d{color:var(--danger)}
+.pro-list{display:grid;gap:10px}
+.pro-card{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.pro-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.pro-num{font-size:.72rem;color:var(--text-light)}
+.pro-sel{flex:none;max-width:48%;font:inherit;font-size:.8rem;padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:var(--cream)}
+.pro-bot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+@media (min-width:700px){.pro-tiles{grid-template-columns:repeat(6,1fr)}}

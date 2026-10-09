@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=f01">
+<link rel="stylesheet" href="css/app.css?v=f02">
 </head>
 <body>
 <header class="topbar">
@@ -171,12 +171,17 @@ function tempsRestantCard(){
     titre = adr("Ton accompagnement est terminé 🏁","Votre accompagnement est terminé 🏁");
     sub = `Depuis le ${Calc.fmt(finLe)}. ` + adr("Envie de continuer l'aventure ? Parle-en à Ornella 💬","Envie de continuer l'aventure ? Parlez-en à Ornella 💬");
   }
-  const wa = jr <= 0 ? waHref(`Bonjour Ornella, c'est ${PRENOM} 🙂 Mon programme se termine, j'aimerais parler de la suite 💛`) : null;
+  // 2 dernières semaines (et après la fin) : bouton « Je continue » → message WhatsApp prêt à envoyer.
+  const bientot = jr > 0 && jr <= 14;
+  const wa = (jr <= 0 || bientot) ? waHref(bientot
+      ? `Bonjour Ornella, c'est ${PRENOM} 🙂 Mon accompagnement se termine le ${Calc.fmt(finLe)} et j'aimerais continuer ! On en parle ? 💪`
+      : `Bonjour Ornella, c'est ${PRENOM} 🙂 Mon accompagnement est terminé, j'aimerais parler de la suite 💛`) : null;
+  if (bientot) sub += " · " + adr("Envie de continuer ? Un clic suffit 👇","Envie de continuer ? Un clic suffit 👇");
   return `<div class="card nudge-bilan" style="margin-bottom:16px">
     <div class="nudge-title">${titre}</div>
     <div class="isub nudge-sub">${sub}</div>
     ${pct!=null ? `<div style="margin-top:12px">${UI.progressBar(pct, `${pct}% de l'accompagnement écoulé`)}</div>` : ""}
-    ${wa ? `<a href="${wa}" target="_blank" rel="noopener" class="btn-accent btn-sm" style="margin-top:12px"><span>💬</span> ${adr("Parler de la suite","Parler de la suite")}</a>` : ""}
+    ${wa ? `<a href="${wa}" target="_blank" rel="noopener" class="btn-accent btn-sm" style="margin-top:12px"><span>${bientot?"✨":"💬"}</span> ${bientot ? "Je continue" : "Parler de la suite"}</a>` : ""}
   </div>`;
 }
 
