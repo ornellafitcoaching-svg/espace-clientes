@@ -1137,7 +1137,7 @@ window.Calc = {
     { id:"pas_jour", q:"Combien de pas par jour, environ ? 🚶‍♀️", hint:"Regarde ton téléphone ou ta montre si tu peux", type:"choice", options:["Moins de 5 000","5 000 à 8 000","8 000 à 10 000","Plus de 10 000","Je ne sais pas"] },
     { id:"entrainement_freq", q:"Combien de séances par semaine te paraît réaliste ? 🗓️", type:"choice", options:["1","2","3","4","5 et +"] },
     { id:"creneaux", q:"Tes créneaux préférés ⏰", hint:"Plusieurs choix possibles", type:"multi", options:["Tôt le matin","Matinée","Midi","Après-midi","Soir","Week-end"] },
-    { id:"source", q:"Comment m’as-tu connue ? 🔎", type:"choice", req:true, other:true, otherLabel:"Précise si tu veux (nom du groupe, de la page…)", options:["Instagram","TikTok","Facebook (groupe ou page)","Une publicité","Google / mon site","Une amie ou une cliente","Un flyer (dans un colis…)","Un salon / un événement"] },
+    { id:"source", q:"Comment m’as-tu connue ? 🔎", type:"choice", req:true, other:true, otherLabel:"Précise si tu veux (nom du groupe, de la page…)", options:["Instagram","TikTok","Facebook (groupe ou page)","Une publicité","Google / mon site","Une IA (ChatGPT, Gemini…)","Une amie ou une cliente","Un flyer (dans un colis…)","Un salon / un événement"] },
     { id:"parrainage", q:"Qui t’a parlé de moi ? 💛", hint:"Pour la remercier avec mon programme de parrainage", type:"text", ph:"Prénom et nom", show:{ id:"source", is:["Une amie ou une cliente"] } },
 
     { section:"🩺 Ton corps & ta santé", intro:"Uniquement ce qui m’aide à adapter tes séances et à ne jamais te blesser. Tu réponds seulement à ce que tu veux." },
