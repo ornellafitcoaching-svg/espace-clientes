@@ -21,6 +21,23 @@ function proAddDays(iso, n){ const d = new Date(iso + "T12:00:00"); d.setDate(d.
 function proFmt(iso){ if (!iso) return ""; const [y,m,d] = iso.split("-"); return `${d}/${m}`; }
 function proEsc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
+// Mail de premier contact, prêt à envoyer (le flyer PDF se joint à la main dans l'app Mail).
+function proMailto(p){
+  const objet = "Du sport pour vos équipes, directement dans vos locaux";
+  const corps = `Bonjour${p.contact_nom ? " " + p.contact_nom : ""},
+
+Je suis Ornella, éducatrice sportive diplômée d'État dans l'Essonne. J'anime des séances de sport pour les équipes, directement dans les locaux de l'entreprise : renforcement, mobilité, pause active, pour des groupes de 8 personnes maximum, tous niveaux.
+
+À partir de 110 € HT la séance pour tout le groupe. Je vous joins ma plaquette ; tout est aussi détaillé ici : https://www.ornellafitcoaching.com/entreprise.html
+
+Est-ce qu'on peut en parler 15 minutes cette semaine ? L'appel découverte est offert.
+
+Belle journée,
+Ornella
+07 56 83 46 26`;
+  return "mailto:" + encodeURIComponent(p.contact_email || "") + "?subject=" + encodeURIComponent(objet) + "&body=" + encodeURIComponent(corps);
+}
+
 async function renderProspects(){
   const box = document.getElementById("prospects");
   if (!box) return;
@@ -66,19 +83,19 @@ async function renderProspects(){
       ${(p.contact_nom||p.contact_tel||p.contact_email) ? `<div class="isub">👤 ${proEsc([p.contact_nom,p.contact_tel,p.contact_email].filter(Boolean).join(" · "))}</div>` : ""}
       ${p.note ? `<div class="isub" style="color:var(--text-mid)">📝 ${proEsc(p.note)}</div>` : ""}
       <div class="pro-bot">
-        <span class="isub">${p.prochaine_action ? `Prochaine action : <strong>${proFmt(p.prochaine_action)}</strong>` : "Pas de date"}${p.dernier_contact ? ` · dernier contact ${proFmt(p.dernier_contact)}` : ""}</span>
-        <span>${p.site ? `<a class="link" href="${proEsc(p.site)}" target="_blank" rel="noopener">Site</a> · ` : ""}<button class="link" data-pro-edit="${p.id}">✏️ Modifier</button></span>
+        <span class="isub">${p.prochaine_action ? `🔔 Rappel le <strong>${proFmt(p.prochaine_action)}</strong>` : ""}${p.dernier_contact ? `${p.prochaine_action?" · ":""}dernier contact ${proFmt(p.dernier_contact)}` : ""}</span>
+        <span><a class="link" href="${proMailto(p)}">📧 Mail</a> · ${p.site ? `<a class="link" href="${proEsc(p.site)}" target="_blank" rel="noopener">Site</a> · ` : ""}<button class="link" data-pro-edit="${p.id}">✏️ Modifier</button></span>
       </div></div>`;
 
   box.innerHTML = `
     <div class="card" style="margin-bottom:14px">
       <h2 class="view-title" style="margin:0 0 4px">🏢 Démarchage entreprises</h2>
-      <p class="isub" style="margin:0 0 12px">${P.length} entreprises · <strong style="color:var(--ok)">${signees} signée${signees>1?"s":""}</strong>. Change le statut d'une entreprise dès que tu la contactes : la date de relance se met toute seule (7 jours après).</p>
+      <p class="isub" style="margin:0 0 12px">${P.length} entreprises · <strong style="color:var(--ok)">${signees} signée${signees>1?"s":""}</strong>. Change le statut quand tu contactes une entreprise. Si tu veux un rappel, mets toi-même une date avec ✏️ Modifier.</p>
       <div class="pro-tiles">${tuiles}</div>
     </div>
     <div class="card" style="margin-bottom:14px">
-      <h3 style="margin:0 0 8px;font-size:1rem">📅 À faire cette semaine <span class="isub">(${aFaire.length})</span></h3>
-      ${aFaire.length ? aFaire.map(ligneAFaire).join("") : `<p class="isub" style="margin:0">Rien à faire dans les 7 prochains jours 👍</p>`}
+      <h3 style="margin:0 0 8px;font-size:1rem">📅 Mes rappels des 7 prochains jours <span class="isub">(${aFaire.length})</span></h3>
+      ${aFaire.length ? aFaire.map(ligneAFaire).join("") : `<p class="isub" style="margin:0">Aucun rappel. Tu en ajoutes un quand tu veux avec ✏️ Modifier.</p>`}
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
       <button class="jchip ${PRO_FILTRE==="actives"?"jchip-accent":""}" data-pro-filtre="actives">En cours</button>
@@ -102,7 +119,7 @@ async function proEdit(p){
     { name:"ville", label:"Ville", half:true, value:p?p.ville||"":"" },
     { name:"secteur", label:"Secteur", half:true, value:p?p.secteur||"":"" },
     { name:"statut", label:"Où tu en es", type:"select", half:true, value:p?p.statut:"a_contacter", options:PRO_ST.map(s=>({ value:s.k, label:s.ico+" "+s.label })) },
-    { name:"prochaine_action", label:"Prochaine action le", type:"date", half:true, value:p?p.prochaine_action||"":proToday() },
+    { name:"prochaine_action", label:"Me le rappeler le (facultatif)", type:"date", half:true, value:p?p.prochaine_action||"":"" },
     { name:"contact_comment", label:"Comment les contacter", value:p?p.contact_comment||"":"", placeholder:"Ex. accueil, formulaire, LinkedIn RH…" },
     { name:"contact_nom", label:"Nom du contact", half:true, value:p?p.contact_nom||"":"", placeholder:"Ex. Mme Durand (RH)" },
     { name:"contact_tel", label:"Téléphone", half:true, value:p?p.contact_tel||"":"" },
@@ -141,10 +158,9 @@ document.addEventListener("change", async (e) => {
   const id = sel.dataset.proStatut, st = sel.value, today = proToday();
   const p = (PRO_CACHE||[]).find(x => x.id === id); const avant = p ? p.statut : null;
   const patch = { statut: st };
-  // Contactée / relancée → on note la date et on programme la relance à J+7.
-  if (st === "contacte" || st === "relance"){ patch.dernier_contact = today; patch.prochaine_action = proAddDays(today, 7); }
-  if (st === "devis"){ patch.dernier_contact = today; patch.prochaine_action = proAddDays(today, 5); }
-  if (st === "signe" || st === "perdu"){ patch.prochaine_action = null; }
-  try{ await proSave(id, patch); UI.toast(PRO_LABEL[st] + (patch.prochaine_action ? ` · relance le ${proFmt(patch.prochaine_action)}` : "")); renderProspects(); }
+  // On note seulement la date du contact. La date de relance, c'est toi qui la choisis (✏️ Modifier).
+  if (st === "contacte" || st === "relance" || st === "devis" || st === "rdv") patch.dernier_contact = today;
+  if (st === "signe" || st === "perdu") patch.prochaine_action = null;
+  try{ await proSave(id, patch); UI.toast(PRO_LABEL[st] + " ✓"); renderProspects(); }
   catch(err){ console.error(err); if (p) p.statut = avant; sel.value = avant; UI.toast("Pas enregistré, réessaie", "err"); }
 });
