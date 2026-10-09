@@ -1129,17 +1129,19 @@ window.Calc = {
     { id:"sexe", q:"Tu es :", hint:"Pour les calculs (besoins caloriques)", type:"choice", req:true, options:["Une femme","Un homme"] },
     { id:"age", q:"Quel âge as-tu ? 🎂", type:"number", req:true },
     { id:"rythme_vie", q:"Ton rythme de vie en ce moment ?", type:"choice", options:["Calme 😌","Variable 🔄","Rapide ⚡","Stressant 😰"] },
-    { id:"travail_posture", q:"Au travail, tu es plutôt :", type:"choice", options:["Assise 🪑","Debout 🧍","En mouvement 🚶","Physique (port de charges) 💪","Pas de travail en ce moment"] },
+    { id:"travail_posture", q:"Dans ta journée, tu es plutôt :", type:"choice", options:["Assise 🪑","Debout 🧍","En mouvement 🚶","Physique (port de charges) 💪","Ça dépend des jours"] },
     { id:"pas_jour", q:"Combien de pas par jour, environ ? 🚶‍♀️", hint:"Regarde ton téléphone ou ta montre si tu peux", type:"choice", options:["Moins de 5 000","5 000 à 8 000","8 000 à 10 000","Plus de 10 000","Je ne sais pas"] },
     { id:"entrainement_freq", q:"Combien de séances par semaine te paraît réaliste ? 🗓️", type:"choice", options:["1","2","3","4","5 et +"] },
     { id:"creneaux", q:"Tes créneaux préférés ⏰", hint:"Plusieurs choix possibles", type:"multi", options:["Tôt le matin","Matinée","Midi","Après-midi","Soir","Week-end"] },
 
-    { section:"🩺 Ta santé", intro:"Pour adapter chaque exercice et ne jamais te blesser." },
-    { id:"douleurs_zones", q:"As-tu des douleurs ou des zones fragiles ?", type:"multi", req:true, options:["Aucune","Dos (bas du dos)","Nuque / cervicales","Épaules","Genoux","Hanches","Poignets","Chevilles","Périnée"] },
-    { id:"antecedents", q:"Quelque chose à savoir côté santé ?", type:"multi", other:true, options:["Rien de particulier","Hypertension","Diabète","Asthme","Problème cardiaque","Thyroïde","Hernie discale","Opération récente","Endométriose / SOPK"] },
-    { id:"traitement", q:"Un traitement ou un suivi médical en cours ? (facultatif) 💊", type:"text", ph:"ex. kiné pour le genou" },
-    { id:"grossesses", q:"Grossesses 🤰", type:"choice", options:["Aucune","1","2","3 et +","Enceinte actuellement"] },
-    { id:"postpartum", q:"Après bébé, tu es concernée par :", type:"multi", show:{ id:"grossesses", not:["Aucune"] }, options:["Rien de particulier","Accouchement il y a moins d’1 an","Rééducation du périnée faite","Rééducation pas faite","Diastasis","Petites fuites à l’effort","Césarienne"] },
+    { section:"🩺 Ton corps & ta santé", intro:"Uniquement ce qui m’aide à adapter tes séances et à ne jamais te blesser. Tu réponds seulement à ce que tu veux." },
+    { id:"douleurs_zones", q:"As-tu des douleurs ou des zones fragiles ?", type:"multi", req:true, options:["Aucune","Bas du dos","Haut du dos / nuque","Épaules","Genoux","Hanches","Poignets","Chevilles"] },
+    { id:"douleurs_detail", q:"Dis-m’en un peu plus 🩹", hint:"Depuis quand ? Quels mouvements te font mal ? Un diagnostic (hernie, tendinite…) ?", type:"textarea", ph:"ex. bas du dos depuis 2 ans, ça tire quand je me penche en avant", show:{ id:"douleurs_zones", not:["Aucune"] } },
+    { id:"antecedents", q:"Quelque chose qui peut jouer sur l’effort ?", type:"multi", other:true, options:["Rien de particulier","Tension","Asthme","Problème cardiaque","Diabète","Thyroïde","Opération il y a moins d’1 an","Vertiges / malaises"] },
+    { id:"traitement", q:"Un traitement qui peut jouer sur l’effort ? (facultatif) 💊", type:"text", ph:"ex. bêtabloquant, Ventoline…" },
+    { id:"complements", q:"Tu prends des compléments ? (facultatif)", type:"text", ph:"ex. fer, magnésium, protéines, créatine…" },
+    { id:"grossesses", q:"Tu as eu des enfants ? 👶", type:"choice", options:["Non","Oui, 1","Oui, 2","Oui, 3 et +","Je suis enceinte"] },
+    { id:"postpartum", q:"Pour protéger ton ventre et ton périnée, tu es concernée par :", hint:"Seulement si tu es à l’aise d’en parler", type:"multi", show:{ id:"grossesses", is:["Oui, 1","Oui, 2","Oui, 3 et +"] }, options:["Rien de particulier","Bébé de moins d’1 an","Rééducation du périnée faite","Rééducation pas faite","Diastasis (écart des abdos)","Petites fuites à l’effort","Césarienne"] },
     { id:"tabac", q:"Tu fumes ? 🚬", type:"choice", options:["Non","Un peu","Oui, régulièrement","J’ai arrêté"] },
     { id:"alcool", q:"L’alcool, c’est plutôt : (aucun jugement 🙂)", type:"choice", options:["Jamais","Rarement","Le week-end","Régulièrement"] },
 
@@ -1153,12 +1155,15 @@ window.Calc = {
 
     { section:"🎯 Tes objectifs" },
     { id:"objectifs", q:"Qu’est-ce que tu veux changer ? 🎯", hint:"Coche tout ce qui compte pour toi", type:"multi", req:true, other:true, options:["Perdre du poids","Ventre plus plat","Fessiers galbés","Me tonifier","Prendre du muscle","Retrouver mon corps après bébé","Plus d’énergie","Soulager mon dos / mes douleurs","Reprendre confiance en moi"] },
-    { id:"objectifs_pourquoi", q:"Pourquoi c’est important pour toi aujourd’hui ? 💭", type:"textarea", ph:"En quelques mots, c’est ce qui m’aide le plus à te motiver" },
+    { id:"ressenti_corps", q:"Comment tu te sens dans ton corps en ce moment ? 💭", type:"textarea", ph:"Avec tes mots, il n’y a pas de mauvaise réponse" },
+    { id:"objectifs_pourquoi", q:"Pourquoi c’est important pour toi aujourd’hui ?", type:"textarea", ph:"C’est ce qui m’aidera le plus à te motiver les jours difficiles" },
     { id:"evenement", q:"Un événement qui te motive ? 📅 (facultatif)", type:"text", ph:"mariage, vacances, anniversaire…" },
     { id:"motivation", q:"Ta motivation en ce moment 🔥", type:"scale", lo:"bof", hi:"à fond" },
     { id:"freins", q:"Qu’est-ce qui t’a freinée jusqu’ici ?", type:"multi", options:["Le manque de temps","La motivation qui retombe","Je ne savais pas quoi faire","Les enfants / la famille","La fatigue","Des douleurs","Pas de résultats","Le budget"] },
     { id:"attentes_coach", q:"Ce que tu attends le plus de moi 💬", type:"multi", options:["Un programme clair","Être motivée et suivie","Corriger ma technique","Des conseils nutrition","Ne pas me blesser","Des résultats visibles"] },
     { id:"sport_passe", q:"Le sport et toi, jusqu’ici :", type:"choice", options:["Jamais vraiment","Il y a longtemps","De temps en temps","Régulièrement"] },
+    { id:"deja_essaye", q:"Qu’as-tu déjà essayé, et pourquoi ça n’a pas marché ? (facultatif)", type:"textarea", ph:"ex. salle de sport abandonnée au bout de 2 mois, régime trop strict…" },
+    { id:"pourquoi_moi", q:"Qu’est-ce qui t’a donné envie de commencer avec moi ? 💬 (facultatif)", type:"textarea" },
     { id:"pref_seances", q:"Tu préfères des séances plutôt :", type:"choice", options:["Douces et progressives 🌱","Dynamiques sans sauts 💫","Intenses et challengeantes 🔥"] },
 
     { section:"📏 Tes mensurations de départ", intro:"Taille et poids sont indispensables pour calculer tes besoins. Pour les tours : mètre ruban, le matin à jeun si possible. Pas de mètre ? Laisse vide, on les prendra ensemble." },
@@ -1169,6 +1174,9 @@ window.Calc = {
     { id:"tour_fesses", q:"Tour de fesses (cm)", hint:"Au point le plus bombé", type:"number" },
     { id:"tour_cuisse", q:"Tour de cuisse (cm)", hint:"10 cm sous le pli de la fesse", type:"number" },
     { id:"tour_bras", q:"Tour de bras (cm)", hint:"Milieu du bras, détendu", type:"number" },
+    { id:"tour_cou", q:"Tour de cou (cm) ⭐", hint:"Indispensable pour calculer ta masse grasse. Juste sous la pomme d’Adam, mètre bien horizontal.", type:"number" },
+    { id:"tour_poitrine", q:"Tour de poitrine (cm)", hint:"Avec le dos, au plus fort de la poitrine", type:"number" },
+    { id:"tour_dos", q:"Tour sous la poitrine (cm)", hint:"Juste sous la poitrine", type:"number" },
     { id:"photos_depart", q:"Tu veux m’envoyer tes photos de départ ? 📸", type:"choice", options:["Oui","Sans mon visage","Plus tard","Non"] },
   ],
 
@@ -1192,6 +1200,7 @@ window.Calc = {
     { id:"exos_maitrises", q:"Les exercices que tu sais déjà faire ✅", type:"multi", options:["Squat","Fentes","Pont fessier / hip thrust","Soulevé de terre","Pompes (même sur les genoux)","Gainage / planche","Rowing","Développé épaules","Burpees","Aucun pour l’instant"] },
     { id:"exos_difficiles", q:"Ce qui est difficile ou inconfortable pour toi 😬", type:"multi", other:true, options:["Rien de particulier","Les pompes","Le squat (genoux, équilibre)","Les fentes","Le gainage","Les sauts / burpees","Les abdos (la nuque tire)","Les tractions","Rester longtemps au sol"] },
     { id:"cardio", q:"Ton cardio :", type:"choice", options:["Je m’essouffle vite","Ça va","J’ai une bonne endurance"] },
+    { id:"seance_marquante", q:"Une séance ou un sport que tu as adoré… ou détesté ? Pourquoi ? (facultatif)", type:"textarea" },
 
     { section:"💛 Ce que tu aimes" },
     { id:"aime", q:"Ce que tu aimes faire 😍", type:"multi", options:["Le renforcement musculaire","Le cardio / HIIT","Les circuits rapides","Pilates / gainage","Soulever lourd","Les séances courtes et efficaces","Varier souvent"] },
@@ -1207,7 +1216,7 @@ window.Calc = {
     { section:"🎯 Ton objectif", intro:"Pour un plan nutrition 100 % à ton goût, sans régime frustrant." },
     { id:"obj_nutrition", q:"Ton objectif côté alimentation 🎯", type:"choice", req:true, options:["Perte de poids","Perdre du gras & me tonifier","Prise de muscle","Rééquilibrage & santé","Plus d’énergie","Gérer une contrainte médicale"] },
     { id:"poids_actuel", q:"Ton poids actuel (kg) ⚖️", type:"number" },
-    { id:"poids_objectif", q:"Le poids où tu te sentirais bien (kg) ✨", type:"number" },
+    { id:"poids_objectif", q:"Le poids où tu te sentirais bien (kg, facultatif) ✨", type:"number" },
 
     { section:"⚠️ Allergies & intolérances", intro:"Très important : je ne mettrai jamais ces aliments dans ton plan." },
     { id:"allergies", q:"Allergies alimentaires", type:"multi", req:true, other:true, options:["Aucune","Arachide","Fruits à coque","Œuf","Lait","Gluten","Poisson / fruits de mer","Soja","Sésame"] },
@@ -1222,6 +1231,7 @@ window.Calc = {
     { id:"cuisine_maison", q:"Tu manges plutôt :", type:"choice", options:["Fait maison","Un peu des deux","Plats préparés / livraison"] },
     { id:"temps_cuisine", q:"Temps pour cuisiner ⏱️", type:"choice", options:["J’ai le temps","Un peu","Très peu, il me faut du rapide"] },
     { id:"budget_courses", q:"Budget courses", type:"choice", options:["Serré","Moyen","Confortable"] },
+    { id:"journee_repas", q:"Décris-moi une journée type de repas 🍽️", hint:"Ce que tu manges vraiment, pas ce que tu « devrais » manger 😉", type:"textarea", ph:"Matin : café + tartines · Midi : sandwich · 16 h : biscuits · Soir : pâtes…" },
 
     { section:"😋 Tes goûts" },
     { id:"proteines_pref", q:"Tes protéines préférées", type:"multi", options:["Poulet / dinde","Bœuf","Poisson","Thon / sardines","Œufs","Fromage blanc / skyr","Tofu","Lentilles / pois chiches"] },
@@ -1240,8 +1250,7 @@ window.Calc = {
     { section:"🩺 Digestion & santé" },
     { id:"digestion", q:"Ta digestion", type:"multi", options:["Bonne","Ballonnements","Constipation","Transit rapide","Reflux / brûlures"] },
     { id:"pathologies_nutri", q:"À prendre en compte", type:"multi", other:true, options:["Rien","Diabète","Cholestérol","Tension","Thyroïde","SOPK","Anémie / carences"] },
-    { id:"grossesse_allaitement", q:"En ce moment :", type:"choice", options:["Non concernée","Grossesse 🤰","Allaitement 🤱"] },
-    { id:"complements_nutri", q:"Compléments pris en ce moment (facultatif)", type:"text" },
+    { id:"grossesse_allaitement", q:"En ce moment :", hint:"Tes besoins ne sont pas les mêmes", type:"choice", options:["Non concernée","Grossesse 🤰","Allaitement 🤱"] },
 
     { section:"📅 Ton plan idéal" },
     { id:"nb_repas_souhaite", q:"Tu préfères un plan à :", type:"choice", options:["3 repas","3 repas + 1 collation","2 repas","À toi de voir"] },
@@ -1309,7 +1318,8 @@ window.Calc = {
     pick("intolerances", "Intolérances", "⚠️");
     pick("douleurs_zones", "Douleurs / zones fragiles", "🚨"); pick("exos_difficiles", "Difficile pour elle", "😬");
     pick("antecedents", "Santé", "🩺"); pick("pathologies_nutri", "Santé", "🩺"); pick("postpartum", "Post-partum", "🤱");
-    if (r.grossesses === "Enceinte actuellement" || /Grossesse/.test(r.grossesse_allaitement || "")) out.push({ icon: "🤰", label: "Enceinte", val: "à adapter" });
+    pick("douleurs_detail", "Précisions douleurs", "🩹"); pick("traitement", "Traitement", "💊");
+    if (r.grossesses === "Enceinte actuellement" || r.grossesses === "Je suis enceinte" || /Grossesse/.test(r.grossesse_allaitement || "")) out.push({ icon: "🤰", label: "Enceinte", val: "à adapter" });
     return out;
   },
 };

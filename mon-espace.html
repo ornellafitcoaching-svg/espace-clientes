@@ -947,7 +947,7 @@ async function addMyQuestionnaireInitial(){
       poids:{type:"poids",unite:"kg"}, tour_taille:{type:"tour_taille",unite:"cm"},
       tour_hanches:{type:"tour_hanches",unite:"cm"}, tour_fesses:{type:"tour_fessiers",unite:"cm"},
       tour_cuisse:{type:"tour_cuisse",unite:"cm"}, tour_poitrine:{type:"poitrine",unite:"cm"},
-      tour_dos:{type:"tour_dos",unite:"cm"}, tour_bras:{type:"tour_bras",unite:"cm"}
+      tour_dos:{type:"tour_dos",unite:"cm"}, tour_bras:{type:"tour_bras",unite:"cm"}, tour_cou:{type:"tour_cou",unite:"cm"}
     };
     const mrows = [];
     Object.keys(QI_MENSU_MAP).forEach(function(qid){
@@ -958,6 +958,13 @@ async function addMyQuestionnaireInitial(){
       const m = QI_MENSU_MAP[qid];
       mrows.push({ cliente_id:D.cliente.id, date:qdate, type:m.type, valeur:val, unite:m.unite, saisi_par:"cliente" });
     });
+    // Masse grasse (méthode US Navy, femme) calculée dès le 1er questionnaire si taille,
+    // tour de taille, tour de hanches et tour de cou sont remplis — comme pour les bilans.
+    if (mrows.length && reponses.sexe !== "Un homme"){
+      const num = function(k){ const n = Number(String(v[k]||"").replace(",", ".")); return isFinite(n) && n>0 ? n : null; };
+      const mg = Calc.masseGrasseNavy(num("tour_taille"), num("tour_hanches"), num("tour_cou"), num("taille") || D.cliente.taille_cm);
+      if (mg != null) mrows.push({ cliente_id:D.cliente.id, date:qdate, type:"masse_grasse", valeur:mg, unite:"%", saisi_par:"cliente" });
+    }
     if (mrows.length){
       const mr = await insertMensuRows(mrows);
       if (!mr.error) D.mensurations = (D.mensurations||[]).concat(mrows);
