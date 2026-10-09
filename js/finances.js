@@ -128,14 +128,18 @@ async function renderFinances(){
       <strong style="white-space:nowrap">${euro(f.montant)}</strong>
       <button class="btn-ghost" data-fin-edit="${f.id}" title="Modifier" style="padding:2px 7px;font-size:.74rem">✏️</button>
       <button class="btn-ghost" data-fin-del="${f.id}" title="Supprimer" style="padding:2px 7px;font-size:.74rem">🗑</button></div>`;
+  const venteMois = m => r2(F.filter(f => f.kind==="revenu" && /vinted|leboncoin|revente/i.test(f.libelle) && ym(f.mois)===m).reduce((s,f)=>s+Number(f.montant),0));
+  const achatMois = m => r2(deps.filter(f => f.libelle==="Achat revente" && ym(f.mois)===m).reduce((s,f)=>s+Number(f.montant),0));
+  const ligneRevente = m => (venteMois(m)||achatMois(m)) ? `<div class="cl-line" style="padding:6px 0"><span>${cap(libM(m))} · revente : ventes ${euro(venteMois(m))} − achats ${euro(achatMois(m))}</span><strong style="color:${venteMois(m)-achatMois(m)<0?"var(--accent)":"#2f7a46"}">${euro(r2(venteMois(m)-achatMois(m)))}</strong></div>` : "";
   const blocAutres = `<div class="card" style="margin-top:6px;padding:6px 12px">
+      ${ligneRevente(now)}${ligneRevente(addM(now,-1))}
       ${autres.length?autres.map(ligneSimple).join(""):`<p class="isub" style="padding:8px 0">Vinted, LinkedIn… note ici ce qui rentre à côté pour voir ton vrai total du mois.</p>`}
       <div style="margin:10px 0 4px"><button class="btn-ghost" data-fin-add="revenu">＋ Autre revenu</button></div></div>`;
   const blocCharges = `<div class="card" style="margin-top:6px;padding:6px 12px">
       ${charges.length?charges.map(ligneSimple).join("")+`<div class="cl-line" style="padding:8px 0;border-top:2px solid var(--line-soft)"><strong>Total par mois</strong><strong>${euro(totalCharges)}</strong></div><div class="cl-line" style="padding:0 0 8px"><span>dont prélevé sur CIC</span><span>${euro(totalCIC)}</span></div>`:`<p class="isub" style="padding:8px 0">Aucun prélèvement noté. Regarde ton relevé CIC et ajoute chaque prélèvement fixe (loyer, assurance, téléphone, crédit…).</p>`}
       <div style="margin:10px 0 4px"><button class="btn-ghost" data-fin-add="charge">＋ Charge mensuelle</button></div></div>`;
 
-  const catsDep = ["Essence","Courses","Luciana","Autre"];
+  const catsDep = ["Essence","Courses","Luciana","Achat revente","Autre"];
   const depCur = deps.filter(f => ym(f.mois) === now).sort((a,b)=>a.mois<b.mois?1:-1);
   const parCat = catsDep.map(c => ({ c, t: r2(depCur.filter(f => f.libelle === c).reduce((s,f)=>s+Number(f.montant),0)) })).filter(x => x.t);
   const ligneDep = f => `<div class="cl-line" style="padding:7px 0;align-items:center;gap:8px;border-top:1px solid var(--line-soft)">
@@ -144,7 +148,7 @@ async function renderFinances(){
       <button class="btn-ghost" data-fin-edit="${f.id}" title="Modifier" style="padding:2px 7px;font-size:.74rem">✏️</button>
       <button class="btn-ghost" data-fin-del="${f.id}" title="Supprimer" style="padding:2px 7px;font-size:.74rem">🗑</button></div>`;
   const blocDep = `<div class="card" style="margin-top:6px;padding:8px 12px">
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px">${["⛽ Essence","🛒 Courses","👧 Luciana","➕ Autre"].map((t,i)=>`<button class="btn-accent" data-fin-dep="${catsDep[i]}" style="padding:6px 12px;font-size:.82rem">${t}</button>`).join("")}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px">${["⛽ Essence","🛒 Courses","👧 Luciana","🛍 Achat revente","➕ Autre"].map((t,i)=>`<button class="btn-accent" data-fin-dep="${catsDep[i]}" style="padding:6px 12px;font-size:.82rem">${t}</button>`).join("")}</div>
       ${parCat.length?`<div class="isub" style="margin-bottom:4px">${cap(libM(now))} : ${parCat.map(x=>`${x.c} ${euro(x.t)}`).join(" · ")} — <strong>total ${euro(depMois(now))}</strong></div>`:`<p class="isub" style="padding:4px 0">Note chaque plein, chaque course, chaque dépense pour Luciana : en un clic, le montant et c'est tout.</p>`}
       ${depCur.map(ligneDep).join("")}
       ${depMois(addM(now,-1))?`<div class="isub" style="margin-top:6px">${cap(libM(addM(now,-1)))} : ${euro(depMois(addM(now,-1)))} au total</div>`:""}
@@ -185,7 +189,7 @@ async function renderFinances(){
       champs.push({ name:"mois", label:"Mois", type:"month", required:true, half:true, value:moisVal(f&&f.mois) });
       if (!f) champs.push({ name:"repeter", label:"Répéter sur combien de mois ?", type:"number", value:1, hint:"Ex. 3 pour un parcours de 3 mois payé chaque mois" });
     } else if (kind === "revenu"){
-      champs.push({ name:"libelle", label:"Source", type:"select", value:f?f.libelle:"Vinted", options:["Vinted","LinkedIn","Vente programme en ligne (Stripe)","Autre"].map(x=>({value:x,label:x})).concat(f&&!["Vinted","LinkedIn","Vente programme en ligne (Stripe)","Autre"].includes(f.libelle)?[{value:f.libelle,label:f.libelle}]:[]) });
+      champs.push({ name:"libelle", label:"Source", type:"select", value:f?f.libelle:"Vinted", options:["Vinted","Leboncoin","LinkedIn","Vente programme en ligne (Stripe)","Autre"].map(x=>({value:x,label:x})).concat(f&&!["Vinted","Leboncoin","LinkedIn","Vente programme en ligne (Stripe)","Autre"].includes(f.libelle)?[{value:f.libelle,label:f.libelle}]:[]) });
       champs.push({ name:"montant", label:"Montant (€)", type:"text", required:true, half:true, value:f?f.montant:"", placeholder:"ex. 99,50" });
       champs.push({ name:"mois", label:"Mois", type:"month", required:true, half:true, value:moisVal(f&&f.mois) });
       champs.push({ name:"note", label:"Note", value:f?f.note||"":"" });
