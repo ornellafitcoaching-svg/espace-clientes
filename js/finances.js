@@ -148,16 +148,21 @@ async function renderFinances(cache){
     if (!lignes.length) return `<p class="isub">Aucun paiement ce mois-ci.</p>`;
     const th = t => `<th style="text-align:left;padding:6px 4px;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-light)">${t}</th>`;
     return `<table style="width:100%;border-collapse:collapse;font-size:.86rem">
-      <thead><tr>${th("Paiement")}${th("Montant")}${th("URSSAF")}</tr></thead>
+      <thead><tr>${th("Paiement")}${th("Montant")}${th("URSSAF")}${th("Dans ta poche")}</tr></thead>
       <tbody>${lignes.map(l => `<tr style="border-top:1px solid var(--line-soft);${l.recu?"":"background:rgba(201,99,88,.05)"}">
         ${td(`<div>${l.recu?"✅":"⏳"} <strong style="font-weight:600">${l.qui}</strong></div><div class="isub" style="font-size:.76rem">${jour(l.date)}${l.info?" · "+esc(l.info):""}${l.recu?"":" · à recevoir"}</div>
              ${l.prevu?`<div style="display:flex;gap:4px;margin-top:4px"><button class="btn-accent" data-fin-recu="${l.id}" style="padding:2px 8px;font-size:.72rem">Reçu</button><button class="btn-ghost" data-fin-edit="${l.id}" style="padding:1px 5px;font-size:.72rem">✏️</button><button class="btn-ghost" data-fin-del="${l.id}" style="padding:1px 5px;font-size:.72rem">🗑</button></div>`:""}`)}
         ${td(`<strong>${euro(l.montant)}</strong>`, "white-space:nowrap")}
-        ${td(caseU(l.attr, l.id, l.u, l.montant), "text-align:center;width:70px")}</tr>`).join("")}</tbody>
+        ${td(caseU(l.attr, l.id, l.u, l.montant), "text-align:center;width:64px")}
+        ${td(`<strong style="color:${vert}">${euro(r2(l.u ? l.montant*(1-FIN.TAUX_URSSAF) : l.montant))}</strong>`, "text-align:right;white-space:nowrap")}</tr>`).join("")}</tbody>
       <tfoot><tr style="border-top:2px solid var(--line-soft)">
-        ${td("<strong>Total</strong>")}${td(`<strong>${euro(x.totalPro)}</strong>`, "white-space:nowrap")}${td(`<strong>${euro(x.urssaf)}</strong>`, "text-align:center;white-space:nowrap")}</tr></tfoot>
+        ${td("<strong>Total</strong>")}${td(`<strong>${euro(x.totalPro)}</strong>`, "white-space:nowrap")}${td(`<strong>${euro(x.urssaf)}</strong>`, "text-align:center;white-space:nowrap")}${td(`<strong style="color:${vert}">${euro(r2(x.totalPro - x.urssaf))}</strong>`, "text-align:right;white-space:nowrap")}</tr></tfoot>
     </table>
-    <p class="isub" style="margin-top:6px">Case cochée = paiement déclaré → 26 % mis de côté pour l'URSSAF. Décoche si tu ne le déclares pas : tout se recalcule tout de suite.</p>`;
+    <div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--line-soft);font-size:.86rem">
+      💰 <strong>Dans ta poche ce mois-ci</strong> : ${euro(r2(x.totalPro - x.urssaf))} avec tes cases actuelles
+      ${x.urssaf < r2(x.totalPro*FIN.TAUX_URSSAF) - 0.01 ? ` · si tu déclarais tout : ${euro(r2(x.totalPro*(1-FIN.TAUX_URSSAF)))}` : ""}
+      <div class="isub" style="margin-top:2px">Coche ou décoche une case : la colonne « Dans ta poche » et les totaux changent tout de suite.</div>
+    </div>`;
   };
 
   // ---- 1. L'ESSENTIEL DU MOIS -------------------------------------------------
