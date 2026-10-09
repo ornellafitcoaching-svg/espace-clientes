@@ -188,7 +188,7 @@ async function renderFinances(cache){
       <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">Voir les paiements prévus mois par mois</summary>
         ${prochains.map(x => `<div style="margin-top:12px;font-weight:700">${moisSeul(x.m)}</div>${tablePaiements(x)}`).join("")}
       </details>
-      <div style="margin-top:10px"><button class="btn-ghost" data-fin-add="prevu">＋ Ajouter un paiement attendu</button></div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"><button class="btn-accent" data-fin-pack="1">🧮 Étaler un pack sur plusieurs mois</button><button class="btn-ghost" data-fin-add="prevu">＋ Ajouter un paiement attendu</button></div>
     `);
 
   // ---- HISTORIQUE (encaissé coaching, sans déduction) -------------------------
@@ -302,6 +302,32 @@ async function renderFinances(cache){
     } catch(e){ err(e); }
   }
 
+  // 🧮 Étaler un pack : prix total − acompte, réparti en N paiements mensuels (le dernier absorbe les centimes).
+  async function etalerPack(){
+    const v = await UI.form({ title:"🧮 Étaler un pack sur plusieurs mois", submit:"Créer les paiements", fields:[
+      { name:"cliente_id", label:"Cliente", type:"select", options:clientesOpts, value:"" },
+      { name:"libelle", label:"Nom du pack", required:true, placeholder:"Ex. Pack 12 séances" },
+      { name:"total", label:"Prix total du pack (€)", type:"text", required:true, half:true, placeholder:"ex. 650" },
+      { name:"acompte", label:"Acompte déjà payé (€)", type:"text", half:true, value:"0" },
+      { name:"mois", label:"Sur combien de mois ?", type:"number", required:true, half:true, value:3 },
+      { name:"date", label:"Date du 1er paiement", type:"date", required:true, half:true, value:today },
+      { name:"note", label:"Comment elle paie", value:"prélèvement GoCardless", placeholder:"Ex. prélèvement GoCardless, virement…" },
+    ]});
+    if (!v) return;
+    const num = x => Number(String(x||"0").replace(",", "."));
+    const total = num(v.total), acompte = num(v.acompte), n = Math.min(24, Math.max(1, parseInt(v.mois,10) || 1));
+    const reste = r2(total - acompte);
+    if (!(total > 0) || !(reste > 0)) { UI.toast("Vérifie le prix et l'acompte", "error"); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date||"")) { UI.toast("Date invalide", "error"); return; }
+    const base = Math.floor(reste / n * 100) / 100;
+    const montants = Array.from({length:n}, (_,i) => i < n-1 ? base : r2(reste - base*(n-1)));
+    const ok = await UI.confirm(`${esc(v.libelle)} : ${euro(total)}${acompte?` − acompte ${euro(acompte)}`:""} = ${euro(reste)} → ${n} paiement${n>1?"s":""} de ${euro(montants[0])}${montants[n-1]!==montants[0]?` (le dernier ${euro(montants[n-1])})`:""}, chaque mois à partir du ${jour(v.date)} — on crée ?`);
+    if (!ok) return;
+    const rows = montants.map((m, i) => ({ kind:"prevu", cliente_id: v.cliente_id || null, libelle: `${String(v.libelle).trim()} (${i+1}/${n})`, montant: m, mois: addMDate(v.date, i), note: v.note || null }));
+    try { const { error } = await sb.from("finances").insert(rows); if (error) throw error; UI.toast(`${n} paiement${n>1?"s":""} créé${n>1?"s":""} ✅`); refresh(); }
+    catch(e){ err(e); }
+  }
+
   box.onchange = async (e) => {
     const t = e.target; if (!t || t.type !== "checkbox") return;
     const on = t.checked;
@@ -323,6 +349,7 @@ async function renderFinances(cache){
     const d = t.dataset;
     try {
       if (d.finAdd) return formulaire(d.finAdd);
+      if (d.finPack) return etalerPack();
       if (d.finDep) return formulaire("depense", null, d.finDep);
       if (d.finEdit){ const f = byId(d.finEdit); if (f) return formulaire(f.kind, f); return; }
       if (d.finDel){
