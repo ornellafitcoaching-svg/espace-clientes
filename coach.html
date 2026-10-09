@@ -87,7 +87,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=q2"></script>
+<script src="js/calc.js?v=q3"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -987,6 +987,11 @@ document.getElementById("newCliente").onclick = async () => {
       date_debut:v.date_debut, date_fin, nb_mois:v.nb_mois,
       seances_prevues:v.seances_prevues||0, nutrition_active:!!v.nutrition_active,
     });
+    // Accès cliente créé DANS LA FOULÉE : son lien marche tout de suite (plus de « code inconnu »).
+    try {
+      const uid = await Auth.provisionCliente(cliente.access_code, cliente.prenom, cliente.nom);
+      await DB.update("clientes", cliente.id, { profile_id: uid });
+    } catch(pe){ console.error("accès cliente", pe); UI.toast("Fiche créée, mais l'accès n'a pas pu être activé : appuie sur « Activer son accès » dans sa fiche.", "err"); }
     UI.toast("Cliente créée ✓");
     location.href = "cliente.html?id=" + cliente.id;
   } catch(e){ console.error(e); UI.toast(UI.errText(e), "err"); }

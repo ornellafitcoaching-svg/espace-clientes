@@ -29,7 +29,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e99"></script>
-<script src="js/calc.js?v=q2"></script>
+<script src="js/calc.js?v=q3"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
@@ -48,7 +48,25 @@ function makeCode(prenom){
 }
 
 // ============================ CHARGEMENT / RENDU ============================
-async function reload(focusTitle){ D = await DB.dossier(CID); render(focusTitle); }
+async function reload(focusTitle){ D = await DB.dossier(CID); await autoFixDossier(); render(focusTitle); }
+// Corrections automatiques à l'ouverture de la fiche (droits coach) :
+//  • objectif rempli dans le questionnaire de démarrage mais absent de la section Objectifs
+//    (si la cliente n'a pas pu l'y ajouter elle-même) → on l'ajoute, une seule fois.
+async function autoFixDossier(){
+  try{
+    const q = (D.questionnaire_initial||[])[0];
+    const obj = q && q.reponses && String(q.reponses.objectifs||"").trim();
+    if (obj && !(D.objectifs||[]).length){
+      const row = { cliente_id:CID, titre:obj, description:(String(q.reponses.objectifs_pourquoi||"").trim()||null), statut:"en_cours", date_creation:q.date };
+      const r = await window.sb.from("objectifs").insert(row).select();
+      if (!r.error) D.objectifs = r.data || [row];
+    }
+    if (obj && !String(D.cliente.objectif_principal||"").trim()){
+      const r2 = await window.sb.from("clientes").update({ objectif_principal: obj }).eq("id", CID);
+      if (!r2.error) D.cliente.objectif_principal = obj;
+    }
+  }catch(e){ console.error("autoFixDossier", e); }
+}
 
 function render(focusTitle){
   if (!D || !D.cliente){ document.getElementById("main").innerHTML =
@@ -122,6 +140,7 @@ function render(focusTitle){
       ${s.prevues?`<div style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>`:''}
     </div>
 
+    ${(cl.access_code && !cl.profile_id) ? `<div class="card" style="border-left:4px solid var(--danger);margin-bottom:12px"><strong>⚠️ Accès pas encore activé</strong><div class="isub" style="margin-top:4px">Son code ne marche pas tant que tu n'as pas appuyé ici : tout lien envoyé affichera « code inconnu ».</div><button class="btn-accent btn-sm" data-act="create-access" style="margin-top:10px">🔑 Activer son accès maintenant</button></div>` : ""}
     ${sectionAccesCliente()}
     ${sectionCoordonnees()}
     ${sectionAccompagnement(ac, s, suivi)}
