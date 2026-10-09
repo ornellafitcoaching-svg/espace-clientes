@@ -52,6 +52,12 @@ async function renderFinances(){
   // Ce qui part en prélèvement sur le compte CIC (= le virement Revolut → CIC à faire chaque mois)
   const totalCIC = r2(charges.filter(f => f.pro).reduce((s,f)=>s+Number(f.montant||0),0));
 
+  // ---- Dépenses variables (essence, courses, Luciana…) notées au fil de l'eau ----
+  const deps = F.filter(f => f.kind === "depense");
+  const depMois = m => r2(deps.filter(f => ym(f.mois) === m).reduce((s,f)=>s+Number(f.montant||0),0));
+  const moisAvecDep = [...new Set(deps.map(f => ym(f.mois)))].filter(m => m < now).sort().slice(-3);
+  const depEstimee = moisAvecDep.length ? r2(moisAvecDep.reduce((s,m)=>s+depMois(m),0) / moisAvecDep.length) : depMois(now);
+
   // ---- Mois affichés : depuis janvier 2026 (ou 1er paiement) jusqu'à +2 mois -----
   const mois = [];
   for (let m = "2026-01"; m <= addM(now, 2); m = addM(m, 1)) mois.push(m);
@@ -63,8 +69,9 @@ async function renderFinances(){
     const revPerso = r2(F.filter(f => f.kind==="revenu" && !f.pro && ym(f.mois)===m).reduce((s,f)=>s+Number(f.montant),0));
     const coaching = r2(encaisse + attendu);
     const urssaf = r2((coaching + revPro) * FIN.TAUX_URSSAF);
-    const pourToi = r2(coaching + revPro - urssaf + revPerso - totalCharges);
-    return { m, encaisse, attendu, revPro, revPerso, coaching, urssaf, pourToi, futur: m > now, courant: m === now };
+    const depenses = m > now ? depEstimee : depMois(m);
+    const pourToi = r2(coaching + revPro - urssaf + revPerso - totalCharges - depenses);
+    return { m, encaisse, attendu, revPro, revPerso, coaching, urssaf, depenses, pourToi, futur: m > now, courant: m === now };
   };
   const L = mois.map(ligne).filter(l => l.coaching || l.revPro || l.revPerso || l.m >= now);
   const cur = L.find(l => l.courant) || ligne(now);
@@ -90,7 +97,7 @@ async function renderFinances(){
       <div style="flex:1;min-width:0">
         <strong>${cap(libM(l.m))}</strong>${l.futur?` <span class="badge">prévu</span>`:l.courant?` <span class="badge">en cours</span>`:""}
         <div class="isub" style="margin-top:2px;font-size:.8rem">Coaching ${euro(l.coaching)}${l.attendu?` (dont ${euro(l.attendu)} attendu)`:""}${l.revPro+l.revPerso?` · autres ${euro(l.revPro+l.revPerso)}`:""}</div>
-        <div class="isub" style="font-size:.8rem">URSSAF −${euro(l.urssaf)}${totalCharges?` · prélèvements −${euro(totalCharges)}`:""}</div>
+        <div class="isub" style="font-size:.8rem">URSSAF −${euro(l.urssaf)}${totalCharges?` · charges −${euro(totalCharges)}`:""}${l.depenses?` · dépenses −${euro(l.depenses)}${l.futur?" (estimé)":""}`:""}</div>
       </div>
       <div style="text-align:right;white-space:nowrap"><div class="isub">pour toi</div><strong style="font-size:1rem;color:${l.pourToi<0?"var(--accent)":"#2f7a46"}">${euro(l.pourToi)}</strong></div>
     </div>`).join("")}</div>
@@ -128,6 +135,21 @@ async function renderFinances(){
       ${charges.length?charges.map(ligneSimple).join("")+`<div class="cl-line" style="padding:8px 0;border-top:2px solid var(--line-soft)"><strong>Total par mois</strong><strong>${euro(totalCharges)}</strong></div><div class="cl-line" style="padding:0 0 8px"><span>dont prélevé sur CIC</span><span>${euro(totalCIC)}</span></div>`:`<p class="isub" style="padding:8px 0">Aucun prélèvement noté. Regarde ton relevé CIC et ajoute chaque prélèvement fixe (loyer, assurance, téléphone, crédit…).</p>`}
       <div style="margin:10px 0 4px"><button class="btn-ghost" data-fin-add="charge">＋ Charge mensuelle</button></div></div>`;
 
+  const catsDep = ["Essence","Courses","Luciana","Autre"];
+  const depCur = deps.filter(f => ym(f.mois) === now).sort((a,b)=>a.mois<b.mois?1:-1);
+  const parCat = catsDep.map(c => ({ c, t: r2(depCur.filter(f => f.libelle === c).reduce((s,f)=>s+Number(f.montant),0)) })).filter(x => x.t);
+  const ligneDep = f => `<div class="cl-line" style="padding:7px 0;align-items:center;gap:8px;border-top:1px solid var(--line-soft)">
+      <span style="flex:1;min-width:0"><strong>${esc(f.libelle)}</strong><span class="isub"> · ${new Date(f.mois+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}${f.note?" · "+esc(f.note):""}</span></span>
+      <strong style="white-space:nowrap">${euro(f.montant)}</strong>
+      <button class="btn-ghost" data-fin-edit="${f.id}" title="Modifier" style="padding:2px 7px;font-size:.74rem">✏️</button>
+      <button class="btn-ghost" data-fin-del="${f.id}" title="Supprimer" style="padding:2px 7px;font-size:.74rem">🗑</button></div>`;
+  const blocDep = `<div class="card" style="margin-top:6px;padding:8px 12px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px">${["⛽ Essence","🛒 Courses","👧 Luciana","➕ Autre"].map((t,i)=>`<button class="btn-accent" data-fin-dep="${catsDep[i]}" style="padding:6px 12px;font-size:.82rem">${t}</button>`).join("")}</div>
+      ${parCat.length?`<div class="isub" style="margin-bottom:4px">${cap(libM(now))} : ${parCat.map(x=>`${x.c} ${euro(x.t)}`).join(" · ")} — <strong>total ${euro(depMois(now))}</strong></div>`:`<p class="isub" style="padding:4px 0">Note chaque plein, chaque course, chaque dépense pour Luciana : en un clic, le montant et c'est tout.</p>`}
+      ${depCur.map(ligneDep).join("")}
+      ${depMois(addM(now,-1))?`<div class="isub" style="margin-top:6px">${cap(libM(addM(now,-1)))} : ${euro(depMois(addM(now,-1)))} au total</div>`:""}
+    </div>`;
+
   const titre = t => `<div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--accent);margin:16px 2px 2px">${t}</div>`;
   box.innerHTML = `<div class="section-block" style="margin:14px 0">
     <h2 style="font-size:1.05rem;margin:4px 2px 0">💰 Mes finances <span class="isub" style="font-weight:400">· visible uniquement par toi</span></h2>
@@ -135,7 +157,8 @@ async function renderFinances(){
     ${titre("📅 Mois par mois")}${tableau}
     ${titre("⏳ Rentrées prévues")}${blocPrevu}
     ${titre("🛍 Autres revenus (Vinted, LinkedIn…)")}${blocAutres}
-    ${titre("🏦 Mes charges du mois")}${blocCharges}
+    ${titre("⛽ Mes dépenses du mois")}${blocDep}
+    ${titre("🏦 Mes charges fixes")}${blocCharges}
   </div>`;
 
   // ---- Actions -------------------------------------------------------------
@@ -148,9 +171,14 @@ async function renderFinances(){
       .sort((a,b)=>a.label.localeCompare(b.label)));
   const moisVal = d => ym(d || Calc.today());
 
-  async function formulaire(kind, f){
+  async function formulaire(kind, f, cat){
     const champs = [];
-    if (kind === "prevu"){
+    if (kind === "depense"){
+      champs.push({ name:"libelle", label:"Pour quoi ?", type:"select", value:f?f.libelle:(cat||"Essence"), options:catsDep.map(x=>({value:x,label:x})) });
+      champs.push({ name:"montant", label:"Montant (€)", type:"text", required:true, half:true, value:f?f.montant:"", placeholder:"ex. 45,30" });
+      champs.push({ name:"date", label:"Date", type:"date", required:true, half:true, value:f?f.mois:Calc.today() });
+      champs.push({ name:"note", label:"Note (facultatif)", value:f?f.note||"":"" });
+    } else if (kind === "prevu"){
       champs.push({ name:"cliente_id", label:"Cliente", type:"select", options:clientesOpts, value:f?String(f.cliente_id||""):"" });
       champs.push({ name:"libelle", label:"Libellé", required:true, value:f?f.libelle:"", placeholder:"Ex. Linda — nouveau pack" });
       champs.push({ name:"montant", label:"Montant (€)", type:"text", required:true, half:true, value:f?f.montant:"", placeholder:"ex. 99,50" });
@@ -168,13 +196,14 @@ async function renderFinances(){
       champs.push({ name:"note", label:"Note", value:f?f.note||"":"", placeholder:"Ex. le 5 du mois" });
       champs.push({ name:"pro", label:"Prélevé sur mon compte CIC", type:"checkbox", value:f?f.pro:true });
     }
-    const titres = { prevu:"Rentrée prévue", revenu:"Autre revenu", charge:"Charge mensuelle" };
+    const titres = { prevu:"Rentrée prévue", revenu:"Autre revenu", charge:"Charge mensuelle", depense:"Dépense" };
     const v = await UI.form({ title:(f?"Modifier — ":"")+titres[kind], submit:"Enregistrer", fields:champs });
     if (!v) return;
     const montant = Number(String(v.montant).replace(",", "."));
     if (!(montant > 0)) { UI.toast("Montant invalide", "error"); return; }
     const row = { kind, libelle:String(v.libelle||"").trim() || titres[kind], montant: r2(montant) };
-    if (kind !== "charge"){ if (!/^\d{4}-\d{2}$/.test(v.mois||"")) { UI.toast("Mois invalide", "error"); return; } row.mois = v.mois + "-01"; }
+    if (kind === "depense"){ if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date||"")) { UI.toast("Date invalide", "error"); return; } row.mois = v.date; row.note = v.note || null; }
+    else if (kind !== "charge"){ if (!/^\d{4}-\d{2}$/.test(v.mois||"")) { UI.toast("Mois invalide", "error"); return; } row.mois = v.mois + "-01"; }
     else { row.mensuel = true; row.note = v.note || null; row.pro = !!v.pro; }
     if (kind === "prevu") row.cliente_id = v.cliente_id || null;
     if (kind === "revenu"){ row.note = v.note || null; row.pro = !!v.pro; }
@@ -182,7 +211,7 @@ async function renderFinances(){
       if (f){ const { error } = await sb.from("finances").update(row).eq("id", f.id); if (error) throw error; }
       else {
         const n = kind === "prevu" ? Math.min(24, Math.max(1, parseInt(v.repeter,10) || 1)) : 1;
-        const rows = Array.from({length:n}, (_,i) => ({ ...row, mois: row.mois ? addM(v.mois, i) + "-01" : undefined }));
+        const rows = Array.from({length:n}, (_,i) => ({ ...row, mois: kind === "depense" ? row.mois : (row.mois ? addM(v.mois, i) + "-01" : undefined) }));
         const { error } = await sb.from("finances").insert(rows); if (error) throw error;
       }
       UI.toast("Enregistré ✅"); refresh();
@@ -194,6 +223,7 @@ async function renderFinances(){
     const d = t.dataset;
     try {
       if (d.finAdd) return formulaire(d.finAdd);
+      if (d.finDep) return formulaire("depense", null, d.finDep);
       if (d.finEdit){ const f = byId(d.finEdit); if (f) return formulaire(f.kind, f); return; }
       if (d.finDel){
         const f = byId(d.finDel); if (!f) return;
