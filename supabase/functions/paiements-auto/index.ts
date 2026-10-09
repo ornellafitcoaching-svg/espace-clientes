@@ -14,6 +14,7 @@
 // dans l'espace coach. Idempotent : un même paiement n'est jamais ajouté deux fois.
 // Le « montant dû » saisi à la main est diminué d'autant (jamais en dessous de 0).
 // Import de l'historique : POST ?import=AAAA-MM-JJ (&dry=1 pour un aperçu), header x-cron-secret.
+// Prélèvements à venir (lecture seule) : POST ?a_venir=1, header x-cron-secret.
 // ============================================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -123,6 +124,29 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("ok");
   DRY = false;   // jamais d'aperçu par défaut (le webhook enregistre toujours)
   const url = new URL(req.url);
+  // Prélèvements À VENIR (lecture seule) : paiements pas encore encaissés + échéances des abonnements actifs.
+  if (url.searchParams.get("a_venir")) {
+    const CRON = await secret("CRON_SECRET", "cron_secret");
+    if (!CRON || req.headers.get("x-cron-secret") !== CRON) return new Response("Forbidden", { status: 403 });
+    const TOK = await secret("GOCARDLESS_ACCESS_TOKEN", "gocardless_access_token");
+    const noms: Record<string, string> = {};
+    const qui = async (mandat: string) => {
+      if (noms[mandat]) return noms[mandat];
+      const m = (await gc("/mandates/" + mandat, TOK)).mandates;
+      const c = (await gc("/customers/" + m.links.customer, TOK)).customers;
+      return (noms[mandat] = [c.given_name, c.family_name].filter(Boolean).join(" ") || c.email || "?");
+    };
+    const out: unknown[] = [];
+    for (const st of ["pending_submission", "submitted", "pending_customer_approval"]) {
+      const j = await gc("/payments?" + new URLSearchParams({ limit: "200", status: st }), TOK);
+      for (const p of j.payments || []) out.push({ type: "paiement", statut: st, date: p.charge_date, montant: Number(p.amount) / 100, qui: await qui(p.links.mandate), libelle: p.description });
+    }
+    const s = await gc("/subscriptions?" + new URLSearchParams({ limit: "200", status: "active" }), TOK);
+    for (const sub of s.subscriptions || []) {
+      for (const u of sub.upcoming_payments || []) out.push({ type: "abonnement", date: u.charge_date, montant: Number(u.amount) / 100, qui: await qui(sub.links.mandate), libelle: sub.name });
+    }
+    return Response.json(out);
+  }
   if (url.searchParams.get("import")) {
     const CRON = await secret("CRON_SECRET", "cron_secret");
     if (!CRON || req.headers.get("x-cron-secret") !== CRON) return new Response("Forbidden", { status: 403 });
