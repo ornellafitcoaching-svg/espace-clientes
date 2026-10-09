@@ -284,7 +284,8 @@ window.Calc = {
   detteCliente(c) {
     const ac = c && c.accompagnement; if (!ac) return 0;
     const du = ac.montant_du;
-    if (du != null && du !== "" && Number(du) > 0.009) return Math.round(Number(du) * 100) / 100;
+    // « Montant dû » saisi (même 0) = la règle : 0 veut dire « ne doit rien ».
+    if (du != null && du !== "") return Number(du) > 0.009 ? Math.round(Number(du) * 100) / 100 : 0;
     if (ac.prix != null && ac.prix !== "") {
       const enc = (c.paiements || []).reduce((s, p) => s + (Number(p.montant) || 0), 0);
       const r = Math.round((Number(ac.prix) - enc) * 100) / 100;

@@ -164,14 +164,33 @@ async function renderFinances(cache){
   const c = calc(now);
   const vir = F.find(f => f.kind === "virement" && ym(f.mois) === now);
   const okMois = c.reste >= 0;
+  // L'essentiel : ce qui rentre, ce qui sort, ce qui reste — chaque ligne dit ce qu'elle contient.
+  const nomsClientes = [...new Set([...c.recus.map(p => nom(p.cliente_id)), ...c.aRecevoir.map(f => nom(f.cliente_id) || f.libelle)].filter(Boolean))].join(", ");
+  const autresDetail = F.filter(f => f.kind==="revenu" && !f.pro && ym(f.mois)===now).map(f => f.libelle).join(", ");
+  const entre = r2(c.totalPro + c.autres + c.pa.repris);
+  const sort = r2(c.urssaf + totPro + totCIC + c.depenses + c.pa.misDeCote);
+  const lg = (label, detail, val, opt={}) => `<tr style="border-top:${opt.fort?"2px":"1px"} solid var(--line-soft)">${td(`${opt.fort?`<strong>${label}</strong>`:label}${detail?`<div class="isub" style="font-size:.76rem">${detail}</div>`:""}`)}${td(`<strong style="white-space:nowrap;${opt.color?`color:${opt.color};`:""}${opt.fort?"font-size:1.1rem;":"font-weight:500;"}">${val}</strong>`, "text-align:right")}</tr>`;
   const blocEssentiel = carte(`
       <table style="width:100%;border-collapse:collapse;font-size:.92rem">
-        <tr>${td("🏦 <strong>Virer de Revolut vers CIC</strong><div class='isub'>pour payer tes prélèvements perso</div>")}${td(`<strong style="font-size:1.15rem">${euro(totCIC)}</strong><div style="margin-top:4px">${vir && vir.fait ? `✅ fait <button class="btn-ghost" data-fin-virundo="${vir.id}" style="padding:1px 6px;font-size:.7rem">annuler</button>` : `<button class="btn-accent" data-fin-virok="1" style="padding:3px 9px;font-size:.76rem">C'est fait</button>`}</div>`, "text-align:right;white-space:nowrap")}</tr>
-        <tr style="border-top:1px solid var(--line-soft)">${td(`💶 <strong>Il te faut en coaching</strong><div class='isub'>pour tout payer ce mois-ci${c.autres?` (France Travail et autres rentrées déjà comptés : ${euro(c.autres)})`:""}</div>`)}${td(`<strong style="font-size:1.15rem">${euro(c.besoin)}</strong>`, "text-align:right;white-space:nowrap")}</tr>
-        <tr style="border-top:1px solid var(--line-soft)">${td("📥 <strong>Tes clientes te paient</strong><div class='isub'>reçu + à recevoir ce mois</div>")}${td(`<strong style="font-size:1.15rem;color:${okMois?vert:rouge}">${euro(c.totalPro)}</strong>`, "text-align:right;white-space:nowrap")}</tr>
-        <tr style="border-top:2px solid var(--line-soft)">${td(okMois ? `<strong style="color:${vert}">✅ Ça passe ce mois-ci</strong>` : `<strong style="color:${rouge}">❌ Il manque</strong>`)}${td(`<strong style="font-size:1.15rem;color:${okMois?vert:rouge}">${okMois ? "+"+euro(c.reste) : euro(c.manque)}</strong>`, "text-align:right;white-space:nowrap")}</tr>
+        <tr><td colspan="2" style="padding:2px 4px 4px;font-weight:700;color:${vert}">📥 Ce qui rentre en ${moisSeul(now).toLowerCase()}</td></tr>
+        ${lg("Tes clientes", `${euro(c.recu)} déjà reçus + ${euro(c.attendu)} à recevoir${nomsClientes?" · "+esc(nomsClientes):""}`, "+"+euro(c.totalPro))}
+        ${c.autres ? lg("Autres rentrées", esc(autresDetail), "+"+euro(c.autres)) : ""}
+        ${c.pa.repris ? lg("Ta part des packs payés d'avance", "", "+"+euro(c.pa.repris)) : ""}
+        ${lg("Total qui rentre", "", euro(entre), { fort:true })}
+        <tr><td colspan="2" style="padding:14px 4px 4px;font-weight:700;color:${rouge}">📤 Ce qui sort</td></tr>
+        ${lg("URSSAF à mettre de côté", "26 % des paiements de tes clientes", "−"+euro(c.urssaf))}
+        ${lg("Abonnements pro", chPro.map(f=>esc(f.libelle.replace(/\s*\(.*\)/,""))).join(", "), "−"+euro(totPro))}
+        ${lg("Tes prélèvements perso (CIC)", "loyer, crédits, assurances, voiture… = le virement à faire", "−"+euro(totCIC))}
+        ${lg("Tes dépenses", c.depenses > depMois(now) ? "essence, courses, Luciana (moyenne de tes mois)" : "essence, courses, Luciana (ce que tu as noté)", "−"+euro(c.depenses))}
+        ${c.pa.misDeCote ? lg("Pack reçu, mis de côté pour les mois suivants", "", "−"+euro(c.pa.misDeCote)) : ""}
+        ${lg("Total qui sort", "", euro(sort), { fort:true })}
+        ${lg(okMois ? "✅ Il te reste" : "❌ Il te manque", okMois ? "ce mois-ci, une fois tout payé" : "pour tout payer ce mois-ci", okMois ? euro(c.reste) : euro(-c.reste), { fort:true, color: okMois ? vert : rouge })}
       </table>
-      ${okMois ? "" : `<div style="margin-top:8px"><strong>🛒 À vendre (une de ces options) :</strong><ul style="margin:4px 0 0 18px;padding:0">${c.aVendre.map(t => `<li>${t}</li>`).join("")}</ul></div>`}
+      ${okMois ? "" : `<div style="margin-top:8px"><strong>🛒 Pour combler, vends une de ces options :</strong><ul style="margin:4px 0 0 18px;padding:0">${c.aVendre.map(t => `<li>${t}</li>`).join("")}</ul></div>`}
+      <div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(201,99,88,.07);display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div>🏦 <strong>Virement à faire : Revolut → CIC</strong><div class="isub">pour payer tes prélèvements perso</div></div>
+        <div style="text-align:right"><strong style="font-size:1.1rem">${euro(totCIC)}</strong><div style="margin-top:4px">${vir && vir.fait ? `✅ fait <button class="btn-ghost" data-fin-virundo="${vir.id}" style="padding:1px 6px;font-size:.7rem">annuler</button>` : `<button class="btn-accent" data-fin-virok="1" style="padding:3px 9px;font-size:.76rem">C'est fait</button>`}</div></div>
+      </div>
     `, okMois ? vert : rouge);
 
   // Le mois en un tableau : d'où vient l'argent, où il va.
@@ -200,12 +219,12 @@ async function renderFinances(cache){
   const th = `style="text-align:left;padding:6px 4px;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-light)"`;
   const blocProchains = carte(`
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.86rem">
-        <thead><tr><th ${th}>Mois</th><th ${th}>Déjà prévu</th><th ${th}>Il faut</th><th ${th}>Il manque</th></tr></thead>
+        <thead><tr><th ${th}>Mois</th><th ${th}>Clientes (prévu)</th><th ${th}>Autres rentrées</th><th ${th}>Reste ou manque</th></tr></thead>
         <tbody>${prochains.map(x => `<tr style="border-top:1px solid var(--line-soft)">
           <td style="padding:7px 4px"><strong>${moisSeul(x.m)}</strong></td>
           <td style="padding:7px 4px">${euro(x.totalPro)}</td>
-          <td style="padding:7px 4px">${euro(x.besoin)}</td>
-          <td style="padding:7px 4px;font-weight:700;color:${x.manque?rouge:vert}">${x.manque?euro(x.manque):"✅ 0 €"}</td></tr>`).join("")}</tbody>
+          <td style="padding:7px 4px">${x.autres?euro(x.autres):"—"}</td>
+          <td style="padding:7px 4px;font-weight:700;color:${x.reste<0?rouge:vert}">${x.reste<0?"❌ manque "+euro(-x.reste):"✅ reste "+euro(x.reste)}</td></tr>`).join("")}</tbody>
       </table></div>
       ${prochains.filter(x => x.manque).map(x => `<div style="margin-top:8px;font-size:.86rem"><strong>${moisSeul(x.m)} :</strong> vendre ${x.aVendre.join(" <em>ou</em> ")}</div>`).join("")}
       <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:600">Voir les paiements prévus mois par mois</summary>
@@ -270,7 +289,6 @@ async function renderFinances(cache){
   box.innerHTML = `<div class="section-block" style="margin:14px 0">
     <h2 style="font-size:1.1rem;margin:4px 2px 0">💰 Mes finances <span class="isub" style="font-weight:400">· visible uniquement par toi</span></h2>
     ${titre(`🎯 ${moisSeul(now)} — l'essentiel`)}${blocEssentiel}
-    ${titre(`📋 ${moisSeul(now)} — ton mois en un tableau`)}${blocMois}
     ${titre(`💶 ${moisSeul(now)} — les paiements de tes clientes`)}${blocPaiementsMois}
     ${titre("🔮 Les 3 prochains mois")}${blocProchains}
     ${titre("📦 Packs payés d'avance")}${blocPacks}
