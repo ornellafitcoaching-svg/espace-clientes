@@ -18,4 +18,8 @@ window.APP_CONFIG = {
   // Numéro WhatsApp d'Ornella au format international SANS le "+" ni espaces.
   // Ex. pour +33 6 12 34 56 78 → "33612345678". Laisser vide masque le bouton.
   WHATSAPP_NUMBER: "33756834626",
+
+  // Lien « laisser un avis » de la fiche Google d'Ornella (Google Business Profile →
+  // « Demander des avis » → copier le lien). Vide = l'encart avis est masqué.
+  GOOGLE_REVIEW_URL: "",
 };

@@ -437,6 +437,26 @@ function programmeDispoCard(){
   return `<a class="prog-shortcut" href="${esc(st.link)}" target="_blank" rel="noopener">📋 ${adr("Mon programme","Mon programme")}</a>`;
 }
 
+// Encart « avis Google » : lien direct vers la fiche Google d'Ornella.
+// Masqué si aucun lien configuré, ou si la cliente a cliqué « C'est fait ».
+function avisGoogleCard(){
+  const url = (window.APP_CONFIG && window.APP_CONFIG.GOOGLE_REVIEW_URL) || "";
+  if (!url) return "";
+  const code = D && D.cliente && (D.cliente.access_code || D.cliente.id);
+  try { if (localStorage.getItem("ofc_avis_ok_"+code)) return ""; } catch(_){}
+  return `<div class="card" style="margin-top:16px;border:2px solid var(--rose-deep, #C0574A)">
+    <div class="k" style="font-size:.68rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gold-text);font-weight:700;margin-bottom:6px">⭐ Un petit service</div>
+    <div style="font-weight:700;font-size:1.05rem;margin-bottom:6px">${adr("Ton avis compte énormément pour moi 💛","Votre avis compte énormément pour moi 💛")}</div>
+    <p class="isub" style="margin:0 0 12px">${adr(
+      "Je suis une coach indépendante : chaque avis Google aide d'autres femmes à me trouver et à oser se lancer. Si tu es contente de ton accompagnement, ça me ferait vraiment plaisir que tu laisses quelques mots. Ça prend 1 minute. Merci du fond du cœur de me soutenir !",
+      "Je suis une coach indépendante : chaque avis Google aide d'autres femmes à me trouver et à oser se lancer. Si vous êtes contente de votre accompagnement, ça me ferait vraiment plaisir que vous laissiez quelques mots. Ça prend 1 minute. Merci du fond du cœur de me soutenir !")}</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+      <a href="${url}" target="_blank" rel="noopener" class="btn-accent btn-sm"><span>⭐</span> ${adr("Laisser mon avis Google","Laisser mon avis Google")}</a>
+      <button class="link" data-avis-ok>${adr("C'est fait, merci ✓","C'est fait ✓")}</button>
+    </div>
+  </div>`;
+}
+
 function viewAccueil(){
   const cl = D.cliente, ac = D.accompagnement;
   const s = Calc.seancesStats(ac, D.seances);
@@ -477,6 +497,7 @@ function viewAccueil(){
     </div>
     ${maProgressionCard()}
     ${ac&&ac.seances_prevues ? `<div class="card" style="margin-top:16px">${UI.progressBar(s.pct, s.realisees+" / "+s.prevues+" séances réalisées")}</div>` : ""}
+    ${avisGoogleCard()}
     <div class="card" style="margin-top:16px">
       <p class="isub" style="color:var(--text-mid)">${adr("Utilise le menu ci-dessus pour parcourir tes séances, mensurations, bilans, photos et programmes.","Utilisez le menu ci-dessus pour parcourir vos séances, mensurations, bilans, photos et programmes.")} 💪</p>
       <p class="isub" style="color:var(--text-mid);margin-top:8px">💡 ${adr("Saisis tes mensurations et tes bilans <strong>directement ici, dans l'app</strong> — c'est plus simple pour tout garder au même endroit. Le WhatsApp, garde-le surtout pour organiser tes séances avec Ornella.","Saisissez vos mensurations et vos bilans <strong>directement ici, dans l'app</strong> — c'est plus simple pour tout garder au même endroit. Le WhatsApp, gardez-le surtout pour organiser vos séances avec Ornella.")}</p>
@@ -1378,6 +1399,7 @@ document.getElementById("main").addEventListener("click", (e)=>{
   if (nok){ try{ localStorage.setItem("ofc_nextok_"+code, nok.dataset.nextOk); }catch(_){} render(); return; }
   if (e.target.closest("[data-notif-ok]")){ SEANCE_NOTIF = []; try{ localStorage.setItem("ofc_notif_"+code, "[]"); }catch(_){}
     if (!e.target.closest("[data-view]")){ render(); return; } }
+  if (e.target.closest("[data-avis-ok]")){ try{ localStorage.setItem("ofc_avis_ok_"+code, "1"); }catch(_){} render(); return; }
   if (e.target.closest("#guideMesureBtn")){ showGuideMesure(); return; }
   if (e.target.closest("#addMensuBtn")){ addMyMensu(); return; }
   if (e.target.closest("#addBilanBtn")){ addMyBilan(); return; }
