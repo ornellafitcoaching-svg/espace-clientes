@@ -133,13 +133,17 @@ Deno.serve(async (req) => {
   mensQui.forEach((id) => recus.push(ligne(`📏 ${esc(CL[id]?.prenom)} a envoyé ses mensurations`)));
   const payes = (pays || []).filter(depuisHier).map((p) => ligne(`💶 ${esc(CL[p.cliente_id]?.prenom)} : ${euro(Number(p.montant))}${p.mode ? " (" + esc(p.mode) + ")" : ""}`));
   const rattacher = (taches || []).filter((t) => /rattacher/i.test(t.titre)).map((t) => ligne(esc(t.titre)));
+  // Tâches / encaissements prévus aujourd'hui (ou oubliés les jours d'avant).
+  const aFaire = (taches || []).filter((t) => !/rattacher/i.test(t.titre) && t.echeance && t.echeance <= today)
+    .sort((a, b) => (a.echeance < b.echeance ? -1 : 1))
+    .map((t) => ligne(`${esc(t.titre)}${t.echeance < today ? ` <span style="color:#C0564B">(depuis le ${jourLong(t.echeance)})</span>` : ""}`));
   const dettes: string[] = [];
   const fins: string[] = [];
   for (const c of clientes || []) {
     if (c.statut === "termine") continue;
     const a = AC[c.id]; if (!a) continue;
-    const paye = (pays || []).filter((p) => p.cliente_id === c.id).reduce((s, p) => s + Number(p.montant || 0), 0);
-    const du = a.montant_du != null && a.montant_du !== "" ? Number(a.montant_du) : (a.prix != null ? Number(a.prix) - paye : 0);
+    // Seulement ce qu'Ornella a saisi comme « montant dû » (vrais retards), jamais le reste d'un contrat.
+    const du = a.montant_du != null && a.montant_du !== "" ? Number(a.montant_du) : 0;
     if (du > 0.009) dettes.push(ligne(`${esc(c.prenom)} : ${euro(du)}`));
     if (a.date_fin && a.date_fin >= today && a.date_fin <= parisDay(14)) {
       const wa = waLink(c.telephone, `Coucou ${c.prenom} 😊 ${tu(c, "Ton", "Votre")} accompagnement se termine le ${jourLong(a.date_fin)}. On en parle pour la suite ? J'ai plein d'idées pour continuer ${tu(c, "tes", "vos")} progrès 💪`);
@@ -152,6 +156,7 @@ Deno.serve(async (req) => {
   ];
   const corps = `<p>Bonjour Ornella ☀️ Voici ta journée du <strong>${jourLong(today)}</strong>.</p>`
     + (sJour.length ? bloc(`📅 Tes séances aujourd'hui (${sJour.length})`, sJour) : `<p>📅 Aucune séance aujourd'hui.</p>`)
+    + bloc("📌 À faire / à encaisser aujourd'hui", aFaire)
     + bloc("🆕 Reçu depuis hier", recus)
     + bloc("💶 Paiements reçus depuis hier", payes)
     + bloc("⚠️ Paiements à rattacher", rattacher)
