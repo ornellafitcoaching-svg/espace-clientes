@@ -29,7 +29,7 @@ a{color:#C0574A}
 <script type="application/json" id="ofc-data">{{DATA}}</script>
 <script>
 (function(){
-  var SLUG="{{SLUG}}", MERCI={{MERCI}}==1, FN="{{FN}}", KEY="ofc_acces_"+SLUG;
+  var SLUG="{{SLUG}}", MERCI={{MERCI}}==1, CLIENTE={{MERCI}}==2, FN="{{FN}}", KEY="ofc_acces_"+SLUG;
   var D=JSON.parse(document.getElementById("ofc-data").textContent);
   var b64=function(s){return Uint8Array.from(atob(s),function(c){return c.charCodeAt(0)})};
   var $=function(i){return document.getElementById(i)};
@@ -38,7 +38,7 @@ a{color:#C0574A}
       .then(function(k){return crypto.subtle.deriveKey({name:"PBKDF2",salt:b64(D.s),iterations:D.n,hash:"SHA-256"},k,{name:"AES-GCM",length:256},false,["decrypt"])})
       .then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:b64(D.i)},k,b64(D.c))})
       .then(function(buf){
-        try{localStorage.setItem(KEY,String(code).trim().toUpperCase())}catch(e){}
+        try{localStorage.setItem(KEY,String(code).trim().toUpperCase());if(CLIENTE)localStorage.setItem("ofc_code_cliente",String(code).trim().toUpperCase())}catch(e){}
         var html=new TextDecoder().decode(buf);
         document.open();document.write(html);document.close();
         return true;
@@ -47,16 +47,16 @@ a{color:#C0574A}
   function formulaire(texte){
     $("msg").textContent=texte; $("f").hidden=false;
     $("f").onsubmit=function(e){e.preventDefault();$("err").textContent="";
-      ouvrir($("code").value).catch(function(){$("err").textContent="Ce code ne fonctionne pas. Vérifie-le dans ton e-mail."});};
+      ouvrir($("code").value).catch(function(){$("err").textContent=CLIENTE?"Ce code ne fonctionne pas. Vérifie-le, ou écris-moi.":"Ce code ne fonctionne pas. Vérifie-le dans ton e-mail."});};
   }
   var q=new URLSearchParams(location.search), essais=[];
-  try{var m=localStorage.getItem(KEY); if(m) essais.push(m);}catch(e){}
+  try{var m=localStorage.getItem(KEY); if(m) essais.push(m); var mc=CLIENTE&&localStorage.getItem("ofc_code_cliente"); if(mc&&mc!==m) essais.push(mc);}catch(e){}
   if(q.get("code")) essais.unshift(q.get("code"));
   function suite(i){
     if(i<essais.length) return ouvrir(essais[i]).catch(function(){suite(i+1)});
     var sid=q.get("session_id");
     if(sid){ $("msg").textContent="On vérifie ton paiement…"; return verifier(sid,0); }
-    formulaire(MERCI?"Pour afficher cette page, utilise le lien reçu après ton paiement, ou entre ton code d'accès.":"Entre le code d'accès reçu par e-mail après ton achat.");
+    formulaire(CLIENTE?"Entre ton code personnel : c'est le même que pour ton espace Ornella Fit Coaching. Ton téléphone s'en souviendra ensuite.":MERCI?"Pour afficher cette page, utilise le lien reçu après ton paiement, ou entre ton code d'accès.":"Entre le code d'accès reçu par e-mail après ton achat.");
   }
   function verifier(sid,n){
     fetch(FN,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:sid,page:SLUG})})

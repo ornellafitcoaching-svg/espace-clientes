@@ -3,7 +3,7 @@
 La page publiée ne contient plus que le texte chiffré : sans le code, son contenu est illisible.
 Déverrouillage : ?code=XXXX, code saisi, code mémorisé sur l'appareil, ou preuve d'achat Stripe
 (?session_id=cs_…) vérifiée par la fonction acces-achat.
-Usage :  proteger.py chiffrer <page.html> <CODE> <slug> <titre> [--merci]
+Usage :  proteger.py chiffrer <page.html> <CODE> <slug> <titre> [--merci|--cliente]
          proteger.py dechiffrer <page.html> <CODE>   (affiche le HTML d'origine)
 """
 import sys, os, json, base64, re, html
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     if action == "dechiffrer":
         print(dechiffrer(open(sys.argv[2], encoding="utf-8").read(), sys.argv[3])); sys.exit()
     path, code, slug, titre = sys.argv[2:6]
-    merci = "--merci" in sys.argv
+    merci = "2" if "--cliente" in sys.argv else ("1" if "--merci" in sys.argv else "0")
     src = open(path, encoding="utf-8").read()
     if "ofc-data" in src: sys.exit("déjà protégée : " + path)
     # La page déchiffrée n'affiche plus son ancien écran « code d'accès » (déjà validé ici).
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     src = src.replace("<body class=\"content-locked\">", "<body>").replace("<body class=\"ag-locked\">", "<body>")
     data = chiffrer(src, code)
     out = (WRAP.replace("{{TITRE}}", html.escape(titre)).replace("{{SLUG}}", slug)
-              .replace("{{MERCI}}", "1" if merci else "0").replace("{{FN}}", FN)
+              .replace("{{MERCI}}", merci).replace("{{FN}}", FN)
               .replace("{{DATA}}", json.dumps(data)))
     open(path, "w", encoding="utf-8").write(out)
     print("protégée :", path)
