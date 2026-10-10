@@ -19,6 +19,7 @@ js/…              → config, supabase, auth, données, calculs, interface
 sql/schema.sql               → base + sécurité (à coller en 1er)
 sql/migration_01_*.sql       → paiements, mensurations complètes, santé (2e)
 sql/migration_02_*.sql       → vues sûres cliente (santé/prix jamais lisibles) (3e)
+sql/migration_21_*.sql       → photos : email groupé à la cliente + badge « Nouveau » (cron notif-photos)
 CNAME             → sous-domaine espace.ornellafitcoaching.com
 ```
 

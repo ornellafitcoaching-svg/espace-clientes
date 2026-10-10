@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=f02">
+<link rel="stylesheet" href="css/app.css?v=f03">
 </head>
 <body>
 <header class="topbar">
@@ -34,7 +34,7 @@
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
 let D = null;          // dossier de la cliente
-let VIEW = "accueil";  // vue courante
+let VIEW = new URLSearchParams(location.search).get("v") || "accueil";  // vue courante (?v=photos depuis l'email)
 let PRENOM = "";       // prénom de la cliente (pour les messages WhatsApp)
 let PREV_VISIT = null; // date de la dernière visite (localStorage) → encart « Nouveautés »
 const esc = s => (s==null?"":String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
@@ -1186,6 +1186,17 @@ function viewBilans(){
   }).join("");
 }
 
+// Badge « Nouveau » : photos partagées par Ornella que la cliente n'a pas encore ouvertes
+// (colonne photos.vue_cliente_at, remplie par la fonction marquer_photos_vues()).
+// Le tag reste affiché sur les photos concernées pendant toute la visite de l'onglet.
+const PHOTOS_NEW = new Set();
+function photosNonVues(){ return (D.photos||[]).filter(p=>p.vue_cliente_at===null); }
+async function marquerPhotosVues(){
+  const nv = photosNonVues(); if (!nv.length) return;
+  nv.forEach(p=>{ PHOTOS_NEW.add(p.id); p.vue_cliente_at = new Date().toISOString(); });
+  render();   // affiche les tags « Nouveau » + retire le badge de l'onglet
+  try { const { error } = await sb.rpc("marquer_photos_vues"); if (error) throw error; } catch(e){ console.error(e); }
+}
 function viewPhotos(){
   const list = (D.photos||[]).slice().sort((a,b)=>a.date<b.date?1:-1); // plus récente en 1er
   if (!list.length) return empty(adr("Aucune photo partagée pour l'instant.","Aucune photo partagée pour l'instant."));
@@ -1211,7 +1222,7 @@ function viewPhotos(){
   const titre = compare ? adr("Toutes mes photos","Toutes mes photos") : adr("Mes photos de départ","Mes photos de départ");
   return compare + (list.length>=2?`<h4 class="view-title" style="margin-top:0">${titre}</h4>`:"") + `<div class="mensu-grid" id="photoGrid">` + list.map(p=>`
     <div class="mensu-card photo-card">
-      <div class="cl-line" style="margin-bottom:8px"><strong>${Calc.fmt(p.date)}</strong></div>
+      <div class="cl-line" style="margin-bottom:8px"><strong>${Calc.fmt(p.date)}</strong>${PHOTOS_NEW.has(p.id)?` <span class="photo-new">Nouveau</span>`:""}</div>
       <div class="photo-thumb" data-path="${esc(p.storage_path)}" style="min-height:140px;display:flex;align-items:center;justify-content:center;color:var(--text-light);font-size:.8rem;background:var(--cream);border-radius:12px">chargement…</div>
       ${p.legende?`<div class="isub" style="margin-top:6px">${esc(p.legende)}</div>`:""}
     </div>`).join("") + `</div>`;
@@ -1331,15 +1342,17 @@ function render(){
     (n.k!=="programmes"  || hasProgrammes()));
   if (!menu.some(n=>n.k===VIEW)) VIEW = "accueil";
   const showBadge = progHasUnseen();
+  const nPhotosNew = photosNonVues().length;
   const nav = `<nav class="cl-nav">` + menu.map(n=>{
-    const badge = (n.k==="programmes" && showBadge) ? `<span class="nav-badge"></span>` : "";
+    const badge = (n.k==="programmes" && showBadge) ? `<span class="nav-badge"></span>`
+      : (n.k==="photos" && nPhotosNew && VIEW!=="photos") ? `<span class="nav-new">Nouveau</span>` : "";
     return `<button class="navbtn ${n.k===VIEW?"on":""}" data-view="${n.k}"><span class="i">${n.i}</span>${n.label}${badge}</button>`;
   }).join("") + `</nav>`;
   let bar = ""; try { bar = notifBar(); } catch(e){ console.error(e); }
   // Bandeau fin « prochaine séance » en haut des AUTRES pages (l'accueil a la version pleine).
   const banner = VIEW!=="accueil" ? prochaineSeanceBanner(true) : "";
   document.getElementById("main").innerHTML = bar + nav + banner + `<div id="viewBox">${VIEWS[VIEW]()}</div>`;
-  if (VIEW==="photos") loadPhotoThumbs();
+  if (VIEW==="photos"){ loadPhotoThumbs(); marquerPhotosVues(); }
   try { loadProgLinks(); } catch(e){ console.error(e); }
 }
 
