@@ -1,7 +1,10 @@
 // ============================================================================
 // modal.js — modale de formulaire générique (pour toutes les actions rapides).
 // UI.form({ title, fields:[...], submit:'Enregistrer' }) → Promise(values|null)
-//   field = { name, label, type, value, options, required, placeholder, half, hint }
+//   field = { name, label, type, value, options, required, placeholder, half, hint, warn }
+//   warn(value, allValues) → html|"" : message ROUGE live sous le champ (ex. écart improbable).
+//   opts.warnConfirm : si des messages rouges sont affichés au moment d'enregistrer, on
+//   affiche ce texte en haut et il faut recliquer pour enregistrer quand même.
 //   types : text | textarea | number | date | select | checkbox | hidden | static
 // ============================================================================
 window.UI = window.UI || {};
@@ -49,7 +52,8 @@ UI.form = function (opts) {
                     placeholder="${f.placeholder || ""}" ${f.required ? "required" : ""}>`;
       }
       const hint = f.hint ? `<span class="field-hint">${f.hint}</span>` : "";
-      wrap.innerHTML = `<span class="field-label">${f.label || ""}${f.required ? " *" : ""}</span>${control}${hint}`;
+      const warn = f.warn ? `<span class="field-warn" data-warn-for="${f.name}" hidden></span>` : "";
+      wrap.innerHTML = `<span class="field-label">${f.label || ""}${f.required ? " *" : ""}</span>${control}${warn}${hint}`;
       form.appendChild(wrap);
     });
 
@@ -66,6 +70,32 @@ UI.form = function (opts) {
         }, 300);
       }
     });
+
+    // Messages rouges live (vraisemblance des mesures, etc.)
+    let warnBanner = null, warnAcked = false;
+    function refreshWarns() {
+      const all = collect();
+      let n = 0;
+      fields.forEach((f) => {
+        if (!f.warn) return;
+        const box = form.querySelector(`[data-warn-for="${f.name}"]`);
+        if (!box) return;
+        let html = "";
+        try { html = f.warn(all[f.name], all) || ""; } catch (_) {}
+        box.innerHTML = html; box.hidden = !html;
+        const el = form.querySelector(`[name="${f.name}"]`);
+        if (el) el.classList.toggle("warn", !!html);
+        if (html) n++;
+      });
+      if (!n && warnBanner) { warnBanner.remove(); warnBanner = null; warnAcked = false;
+        overlay.querySelector('[data-act="ok"]').textContent = opts.submit || "Enregistrer"; }
+      return n;
+    }
+    if (fields.some((f) => f.warn)) {
+      form.addEventListener("input", refreshWarns);
+      form.addEventListener("change", refreshWarns);
+      refreshWarns();
+    }
 
     function close(result) {
       overlay.classList.remove("open");
@@ -92,6 +122,18 @@ UI.form = function (opts) {
           const el = form.querySelector(`[name="${f.name}"]`);
           if (el && !el.value) { el.focus(); el.classList.add("invalid"); return; }
         }
+      }
+      if (opts.warnConfirm && fields.some((f) => f.warn) && refreshWarns() && !warnAcked) {
+        warnAcked = true;
+        if (!warnBanner) {
+          warnBanner = document.createElement("div");
+          warnBanner.className = "field-warn field-warn-banner";
+          warnBanner.innerHTML = opts.warnConfirm;
+          form.prepend(warnBanner);
+        }
+        overlay.querySelector('[data-act="ok"]').textContent = "Enregistrer quand même";
+        try { warnBanner.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (_) {}
+        return;
       }
       close(collect());
     }

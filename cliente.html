@@ -30,8 +30,9 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e101"></script>
-<script src="js/calc.js?v=q5"></script>
-<script src="js/ui/modal.js?v=e99"></script>
+<script src="js/calc.js?v=q6"></script>
+<script src="js/mesures.js?v=m1"></script>
+<script src="js/ui/modal.js?v=m1"></script>
 <script src="js/ui/progress.js?v=e99"></script>
 <script>
 const CID = new URLSearchParams(location.search).get("id");
@@ -673,14 +674,17 @@ function sectionQuestionnaireNutrition(){
 
 function sectionMensurations(){
   const types = Calc.mensuTypes(D.mensurations);
+  const FLAGS = Mesures.flagsHistorique(D.mensurations);
   const body = types.length ? `<div class="mensu-grid">` + types.map(t=>{
     const ev = Calc.mensuEvolution(D.mensurations, t);
     const dir = Calc.mensuTone(t, ev.diff);
+    const fl = ev.points.map(pt=>FLAGS.get(Mesures.cle(pt))).filter(Boolean);
     const sign = ev.diff>0?"+":"";
     return `<div class="mensu-card">
       <h4>${esc(t.replace(/_/g," "))}</h4>
       <div class="mensu-delta ${dir}">${sign}${ev.diff} ${esc(ev.unite)} ${ev.pct!=null?`(${sign}${ev.pct}%)`:""}</div>
       <div class="isub">${ev.depart}${esc(ev.unite)} → ${ev.derniere}${esc(ev.unite)}</div>
+      ${fl.length ? `<div class="mensu-flag">⚠️ ${fl.length} relevé${fl.length>1?"s":""} improbable${fl.length>1?"s":""} (${esc(fl[fl.length-1].court)}) — résultat à prendre avec des pincettes</div>` : ""}
       ${UI.lineChart(ev.points, {unite:ev.unite})}
     </div>`;
   }).join("") + `</div>` : `<p class="empty">Aucune mensuration.</p>`;
@@ -695,7 +699,7 @@ function sectionMensurations(){
         <button class="link" data-act="edit-mensu-date" data-date="${d}">✏️ Modifier la date</button></div>
       ${byDate[d].map(m=>`<div class="cl-line" style="padding:3px 0">
           <span>${esc(m.type.replace(/_/g," "))}</span>
-          <span style="display:flex;align-items:center;gap:8px"><strong>${m.valeur}${esc(m.unite||"")}</strong>
+          <span style="display:flex;align-items:center;gap:8px"><strong class="${FLAGS.has(Mesures.cle(m))?"val-flag":""}" title="${FLAGS.has(Mesures.cle(m))?esc(FLAGS.get(Mesures.cle(m)).long):""}">${FLAGS.has(Mesures.cle(m))?"⚠️ ":""}${m.valeur}${esc(m.unite||"")}</strong>
             ${selBox("mensuration",m.id)}
             <button class="icon-btn" data-act="del" data-entity="mensuration" data-id="${m.id}">🗑</button>
           </span></div>`).join("")}
@@ -1025,8 +1029,7 @@ const MENSU_PRESETS = [
   { name:"tour_cou",      label:"Tour de cou (cm) ⭐",      unite:"cm" },
   { name:"masse_grasse",  label:"Masse grasse (% — auto)", unite:"%"  },
   { name:"poitrine",      label:"Poitrine (cm)",           unite:"cm" },
-  { name:"sous_poitrine", label:"Sous-poitrine (cm)",      unite:"cm" },
-  { name:"tour_dos",      label:"Tour de dos (cm)",        unite:"cm" },
+  { name:"tour_dos",      label:"Tour de dos — sous la poitrine (cm)", unite:"cm" },
   { name:"tour_taille",   label:"Tour de taille (cm)",     unite:"cm" },
   { name:"tour_hanches",  label:"Tour de hanches (cm)",    unite:"cm" },
   { name:"tour_fessiers", label:"Tour de fessiers (cm)",   unite:"cm" },
@@ -1035,19 +1038,14 @@ const MENSU_PRESETS = [
   { name:"tour_mollet",   label:"Tour de mollet (cm)",     unite:"cm" },
 ];
 // Où placer le mètre (rappel affiché sous chaque champ, mêmes repères que côté cliente).
-const MENSU_HINTS = {
-  poids:         "Le matin, à jeun, après les toilettes. Toujours la même balance.",
-  tour_cou:      "⭐ Indispensable pour calculer la masse grasse. Juste sous la pomme d'Adam, mètre horizontal.",
-  poitrine:      "Sur la partie la plus forte (niveau des mamelons).",
-  sous_poitrine: "Juste sous la poitrine, ligne du soutien-gorge.",
-  tour_dos:      "Le tour du buste au niveau du dos : sous les aisselles, à l'endroit le plus large du dos, bras le long du corps.",
-  tour_taille:   "Partie la plus fine du ventre (souvent au-dessus du nombril), ventre non rentré.",
-  tour_hanches:  "À l'endroit LE PLUS LARGE des hanches / fessiers.",
-  tour_fessiers: "Partie la plus rebondie des fesses, pieds joints.",
-  tour_cuisse:   "Haut de la cuisse, partie la plus large. Toujours la même jambe.",
-  tour_bras:     "Milieu du bras, relâché. Toujours le même bras.",
-  tour_mollet:   "Partie la plus large du mollet. Toujours le même mollet.",
-};
+// Où placer le mètre : MÊMES repères que le questionnaire de départ (source unique js/mesures.js).
+const MENSU_HINTS = Mesures.HINTS;
+// Champ de saisie avec repère + message rouge si écart improbable vs relevé précédent.
+function mensuField(p){
+  return { name:p.name, label:p.label, type:"number", half:true, hint:MENSU_HINTS[p.name]||"",
+    warn:(val, all)=>Mesures.warnHtml(p.name, val, { mensurations:D.mensurations, date:(all&&all.date)||Calc.today(), poids:all&&all.poids }) };
+}
+const MENSU_WARN_CONFIRM_COACH = `<strong>⚠️ Mesure(s) improbable(s) en rouge.</strong> Vérifie l'endroit du mètre, ou reclique pour enregistrer quand même.`;
 // Saisie de la TAILLE (hauteur) — formulaire à UN SEUL champ, aucune confusion avec le tour
 // de taille. Enregistrée sur la fiche (clientes.taille_cm) puis recalcule les masses grasses.
 async function editTaille(){
@@ -1095,8 +1093,8 @@ async function addMensuSession(){
   // La TAILLE (hauteur) n'est PAS ici : c'est une donnée de profil, saisie via le bouton
   // dédié « 📏 Taille (hauteur) » de la section Mensurations (pas de confusion avec le tour de taille).
   const fields = [{ name:"date", label:"Date", type:"date", value:Calc.today() }]
-    .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true, hint:MENSU_HINTS[p.name]||"" })));
-  const v = await UI.form({ title:"Mensurations", submit:"Enregistrer", fields });
+    .concat(MENSU_PRESETS.map(mensuField));
+  const v = await UI.form({ title:"Mensurations", submit:"Enregistrer", fields, warnConfirm:MENSU_WARN_CONFIRM_COACH });
   if (!v) return;
   const rows = MENSU_PRESETS
     .filter(p => v[p.name] != null && v[p.name] !== "")
@@ -1104,7 +1102,7 @@ async function addMensuSession(){
   // Masse grasse calculée automatiquement (méthode US Navy) si non saisie à la main
   // et si tour de taille + hanches + cou + taille (hauteur) sont disponibles.
   if ((v.masse_grasse==null || v.masse_grasse==="") && D && D.cliente){
-    const mg = Calc.masseGrasseNavy(v.tour_taille, v.tour_hanches, v.tour_cou, D.cliente.taille_cm);
+    const mg = Calc.masseGrasseNavy(v.tour_taille, Mesures.hancheNavy(v.tour_fessiers, v.tour_hanches), v.tour_cou, D.cliente.taille_cm);
     if (mg != null) rows.push({ cliente_id:CID, date:v.date, type:"masse_grasse", valeur:mg, unite:"%" });
   }
   if (!rows.length){ UI.toast("Aucune mesure saisie"); return; }
@@ -1123,8 +1121,8 @@ async function addMensuSession(){
 async function addBilanCoach(rec){
   const x = rec || {};
   const fields = bilanFields(x)
-    .concat(MENSU_PRESETS.map(p=>({ name:p.name, label:p.label, type:"number", half:true })));
-  const v = await UI.form({ title:(rec?"Modifier ":"")+"Bilan", submit:"Enregistrer", fields });
+    .concat(MENSU_PRESETS.map(mensuField));
+  const v = await UI.form({ title:(rec?"Modifier ":"")+"Bilan", submit:"Enregistrer", fields, warnConfirm:MENSU_WARN_CONFIRM_COACH });
   if (!v) return;
   const BILAN_KEYS = ["date","semaine","poids","ressenti","evolution","objectifs_atteints",
     "difficultes","points_positifs","nouveaux_objectifs","commentaire_coach"];
@@ -1136,7 +1134,7 @@ async function addBilanCoach(rec){
   if (v.masse_grasse!=null && v.masse_grasse!=="")
     rows.push({ cliente_id:CID, date:v.date, type:"masse_grasse", valeur:Number(v.masse_grasse), unite:"%" });
   else {
-    const mg = Calc.masseGrasseNavy(v.tour_taille, v.tour_hanches, v.tour_cou, D.cliente && D.cliente.taille_cm);
+    const mg = Calc.masseGrasseNavy(v.tour_taille, Mesures.hancheNavy(v.tour_fessiers, v.tour_hanches), v.tour_cou, D.cliente && D.cliente.taille_cm);
     if (mg!=null) rows.push({ cliente_id:CID, date:v.date, type:"masse_grasse", valeur:mg, unite:"%" });
   }
   try{
@@ -1157,7 +1155,7 @@ async function recalcMasseGrasse(date){
   if (!data) return null;
   const get = t => { const r = data.find(x=>x.type===t); return r?r.valeur:null; };
   if (data.some(x=>x.type==="masse_grasse")) return null; // déjà un IMG ce jour-là → on ne l'écrase pas
-  const mg = Calc.masseGrasseNavy(get("tour_taille"), get("tour_hanches"), get("tour_cou"), D.cliente.taille_cm);
+  const mg = Calc.masseGrasseNavy(get("tour_taille"), Mesures.hancheNavy(get("tour_fessiers"), get("tour_hanches")), get("tour_cou"), D.cliente.taille_cm);
   if (mg == null) return null; // pas assez de mesures (souvent le cou qui manque)
   await window.sb.from("mensurations").insert({ cliente_id:CID, date, type:"masse_grasse", valeur:mg, unite:"%" });
   return mg;
