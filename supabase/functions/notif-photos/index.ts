@@ -68,6 +68,10 @@ Deno.serve(async (req) => {
   const { data: clientes } = await supa.from("clientes")
     .select("id,prenom,email_perso,tutoiement,access_code,profile_id").in("id", ids);
   const CL: Record<string, any> = {}; (clientes || []).forEach((c) => (CL[c.id] = c));
+  // Clientes qui ont DÉJÀ des photos partagées avant cette série → sinon ce sont ses photos de départ.
+  const { data: anciennes } = await supa.from("photos").select("cliente_id")
+    .eq("visibilite", "cliente").not("notif_envoyee_at", "is", null).in("cliente_id", ids);
+  const dejaPhotos = new Set((anciennes || []).map((p) => p.cliente_id));
 
   const limite = Date.now() - ATTENTE_MIN * 60e3;
   const out: any[] = [];
@@ -86,14 +90,20 @@ Deno.serve(async (req) => {
       const quand = lesDates(dates);
       const n = lot.length;
       const lien = `${ESPACE}/espace.html?${c.access_code ? "code=" + encodeURIComponent(c.access_code) + "&" : ""}v=photos`;
+      const depart = !dejaPhotos.has(id);   // 1re série : pas de comparaison possible
       const corps = `<p>${tu("Coucou", "Bonjour")} ${esc(c.prenom)} !</p>`
-        + `<p>${tu("Tes", "Vos")} photos de suivi ${quand} sont dispo dans ${tu("ton", "votre")} espace 📸</p>`
-        + `<p>${n > 1 ? `${n} photos ${tu("t'attendent", "vous attendent")}` : `Une photo ${tu("t'attend", "vous attend")}`} : ${tu("prends", "prenez")} un moment pour comparer avec ${tu("tes", "vos")} débuts, ${tu("tu vas voir", "vous allez voir")} le chemin parcouru 💪</p>`
+        + (depart
+          ? `<p>${tu("Tes", "Vos")} photos de départ ${quand} sont dans ${tu("ton", "votre")} espace 📸</p>`
+            + `<p>C'est ${tu("ton", "votre")} point de départ : dans quelques semaines, on refera les mêmes et ${tu("tu pourras", "vous pourrez")} voir ${tu("ta", "votre")} transformation côte à côte 💪</p>`
+          : `<p>${tu("Tes", "Vos")} photos de suivi ${quand} sont dispo dans ${tu("ton", "votre")} espace 📸</p>`
+            + `<p>${n > 1 ? `${n} photos ${tu("t'attendent", "vous attendent")}` : `Une photo ${tu("t'attend", "vous attend")}`} : ${tu("prends", "prenez")} un moment pour comparer avec ${tu("tes", "vos")} débuts, ${tu("tu vas voir", "vous allez voir")} le chemin parcouru 💪</p>`)
         + `<p style="text-align:center;margin:22px 0"><a href="${lien}" style="background:#C96358;color:#fff;padding:12px 22px;border-radius:30px;text-decoration:none;font-weight:700">Voir mes photos</a></p>`
         + `<p>${tu("Tes", "Vos")} photos restent 100 % privées : il n'y a que ${tu("toi", "vous")} et moi qui y avons accès 💛</p>`
         + `<p>À très vite !<br>Ornella</p>`;
-      const sujet = `${c.prenom}, ${tu("tes", "vos")} photos de suivi ${quand} sont dispo 📸`;
-      statut = dry ? "dry" : await send(c.email_perso, c.prenom, sujet, emailHtml(`${tu("Tes", "Vos")} nouvelles photos 📸`, corps));
+      const sujet = depart
+        ? `${c.prenom}, ${tu("tes", "vos")} photos de départ sont dans ${tu("ton", "votre")} espace 📸`
+        : `${c.prenom}, ${tu("tes", "vos")} photos de suivi ${quand} sont dispo 📸`;
+      statut = dry ? "dry" : await send(c.email_perso, c.prenom, sujet, emailHtml(depart ? `${tu("Tes", "Vos")} photos de départ 📸` : `${tu("Tes", "Vos")} nouvelles photos 📸`, corps));
       out.push({ cliente: c.prenom, photos: n, statut, ...(dry ? { sujet, html: corps } : {}) });
       if (statut !== "ok") continue;   // échec Brevo → on retentera au prochain passage
     }
