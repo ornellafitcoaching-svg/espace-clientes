@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=f02">
+<link rel="stylesheet" href="css/app.css?v=f03">
 </head>
 <body>
 <div class="login-wrap">
@@ -55,7 +55,10 @@ if (new URLSearchParams(location.search).get("err") === "role")
     return;
   }
   const p = await window.Auth.profile();
-  if (p && p.role === "cliente") return location.replace("mon-espace.html");
+  if (p && p.role === "cliente") {
+    const v = new URLSearchParams(location.search).get("v");
+    return location.replace("mon-espace.html" + (v && /^[a-z]+$/.test(v) ? "?v=" + v : ""));
+  }
   if (p && p.role === "coach") return location.replace("coach.html");
 })();
 
@@ -76,7 +79,9 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
     btn.disabled = false; btn.textContent = "Accéder à mon suivi";
     return;
   }
-  location.replace("mon-espace.html");
+  // ?v=photos (lien d'un email) → ouvre directement le bon onglet.
+  const v = new URLSearchParams(location.search).get("v");
+  location.replace("mon-espace.html" + (v && /^[a-z]+$/.test(v) ? "?v=" + v : ""));
 });
 </script>
 </body>

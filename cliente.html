@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=f02">
+<link rel="stylesheet" href="css/app.css?v=f03">
 </head>
 <body>
 <header class="topbar">
@@ -784,32 +784,126 @@ async function loadPhotoThumbs(){
     } else { el.textContent = "indisponible"; }
   });
 }
+// Compression côté navigateur : max 1600 px (côté le plus long), JPEG ~80 %, objectif ~300 Ko.
+// Si l'image n'est pas lisible par le navigateur (ex. HEIC sur Chrome), on renvoie null → envoi de l'original.
+const PHOTO_MAX_PX = 1600, PHOTO_CIBLE_OCTETS = 300 * 1024;
+async function decodeImage(file){
+  if (window.createImageBitmap){
+    try { return await createImageBitmap(file, { imageOrientation:"from-image" }); } catch(_){}
+  }
+  return await new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("image illisible")); };
+    img.src = url;
+  });
+}
+async function compressPhoto(file){
+  let img; try { img = await decodeImage(file); } catch(_) { return null; }
+  const w0 = img.width || img.naturalWidth, h0 = img.height || img.naturalHeight;
+  if (!w0 || !h0) return null;
+  const r = Math.min(1, PHOTO_MAX_PX / Math.max(w0, h0));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(w0 * r); cv.height = Math.round(h0 * r);
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);   // PNG transparent → fond blanc
+  ctx.drawImage(img, 0, 0, cv.width, cv.height);
+  if (img.close) img.close();
+  const toBlob = q => new Promise(res => cv.toBlob(res, "image/jpeg", q));
+  let blob = null;
+  for (const q of [0.8, 0.7, 0.6]){                 // on baisse la qualité seulement si besoin
+    blob = await toBlob(q);
+    if (!blob || blob.size <= PHOTO_CIBLE_OCTETS) break;
+  }
+  if (!blob) return null;
+  return blob.size < file.size ? blob : null;       // déjà plus léger que ça ? on garde l'original
+}
+const fmtKo = n => n >= 1048576 ? (n/1048576).toFixed(1).replace(".",",")+" Mo" : Math.round(n/1024)+" Ko";
+
+// Fenêtre de progression : une ligne + une barre par photo.
+function photoProgress(files){
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay";
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head"><h3>Envoi de ${files.length} photo${files.length>1?"s":""}</h3></div>
+      <div style="padding:6px 22px 12px;overflow-y:auto;max-height:60vh">${files.map((f,i)=>`
+        <div class="up-row" data-i="${i}" style="margin:10px 0">
+          <div style="display:flex;justify-content:space-between;gap:10px;font-size:.82rem">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
+            <span class="up-st" style="white-space:nowrap;color:var(--text-light)">en attente</span></div>
+          <div style="height:7px;background:var(--line-soft);border-radius:6px;overflow:hidden;margin-top:4px">
+            <div class="up-bar" style="height:100%;width:0;background:var(--accent);transition:width .25s"></div></div>
+        </div>`).join("")}</div>
+      <div class="modal-foot"><div class="up-sum" style="margin-right:auto;font-size:.82rem;align-self:center"></div>
+        <button type="button" class="btn-accent" data-close disabled>Patiente…</button></div>
+    </div>`;
+  document.body.appendChild(ov);
+  requestAnimationFrame(() => ov.classList.add("open"));
+  const row = i => ov.querySelector(`.up-row[data-i="${i}"]`);
+  return {
+    set(i, pct, txt, kind){
+      const r = row(i); if (!r) return;
+      const bar = r.querySelector(".up-bar"), st = r.querySelector(".up-st");
+      bar.style.width = pct + "%";
+      if (kind === "ok") bar.style.background = "var(--ok)";
+      if (kind === "err") { bar.style.background = "var(--danger)"; bar.style.width = "100%"; }
+      st.textContent = txt;
+      st.style.color = kind === "err" ? "var(--danger)" : kind === "ok" ? "var(--ok)" : "var(--text-light)";
+      if (kind === "err") st.style.fontWeight = "700";
+    },
+    done(summary, hasErr){
+      const b = ov.querySelector("[data-close]");
+      const sum = ov.querySelector(".up-sum");
+      sum.innerHTML = summary; sum.style.color = hasErr ? "var(--danger)" : "var(--ok)"; sum.style.fontWeight = "700";
+      b.disabled = false; b.textContent = "Fermer";
+      return new Promise(res => b.onclick = () => { ov.remove(); res(); });
+    },
+  };
+}
+
 async function addPhoto(){
-  const meta = await UI.form({ title:"Ajouter des photos", submit:"Choisir les fichiers", fields:[
+  const meta = await UI.form({ title:"Ajouter des photos", submit:"Choisir les photos", fields:[
     { name:"date", label:"Date", type:"date", half:true, value:Calc.today() },
     { name:"visibilite", label:"Visibilité", type:"select", half:true, value:"prive", options:[
       {value:"prive",label:"🔒 Privé (coach)"},{value:"cliente",label:"👁 Visible cliente"}]},
     { name:"legende", label:"Légende (facultatif, commune aux photos choisies)" },
+    { name:"_info", type:"static", label:"", value:"Tu peux en sélectionner plusieurs d'un coup. Elles sont allégées automatiquement avant l'envoi." },
   ]});
   if (!meta) return;
   const input = document.getElementById("photoInput");
   input.value = "";
   input.onchange = async () => {
     const files = [...input.files]; if (!files.length) return;
-    try{
-      UI.toast(`Envoi de ${files.length} photo${files.length>1?"s":""}…`);
-      let ok = 0;
-      for (const file of files){
-        const ext = (file.name.split(".").pop()||"jpg").toLowerCase();
+    const pg = photoProgress(files);
+    let ok = 0; const echecs = [];
+    for (let i = 0; i < files.length; i++){
+      const file = files[i];
+      try{
+        pg.set(i, 15, "compression…");
+        const blob = await compressPhoto(file);
+        const body = blob || file;
+        const ext = blob ? "jpg" : ((file.name.split(".").pop()||"jpg").toLowerCase());
         const path = `${CID}/${meta.visibilite}/${uuid()}.${ext}`;
-        const up = await sb.storage.from("photos").upload(path, file, { upsert:false });
+        pg.set(i, 50, `envoi… (${fmtKo(body.size)})`);
+        const up = await sb.storage.from("photos").upload(path, body, { upsert:false, contentType: blob ? "image/jpeg" : (file.type||undefined) });
         if (up.error) throw up.error;
-        await DB.insert("photos", { cliente_id:CID, date:meta.date, storage_path:path, visibilite:meta.visibilite, legende:meta.legende });
+        pg.set(i, 85, "enregistrement…");
+        try {
+          await DB.insert("photos", { cliente_id:CID, date:meta.date, storage_path:path, visibilite:meta.visibilite, legende:meta.legende });
+        } catch(e) { try { await sb.storage.from("photos").remove([path]); } catch(_){}; throw e; }   // pas de fichier orphelin
         ok++;
-        if (files.length > 1) UI.toast(`Envoi… ${ok}/${files.length}`);
+        pg.set(i, 100, blob ? `✓ ${fmtKo(file.size)} → ${fmtKo(blob.size)}` : `✓ ${fmtKo(file.size)}`, "ok");
+      }catch(e){
+        console.error(e);
+        echecs.push(file.name);
+        pg.set(i, 100, "✗ " + UI.errText(e), "err");
       }
-      UI.toast(`${ok} photo${ok>1?"s":""} ajoutée${ok>1?"s":""} ✓`); reload("Photos de progression");
-    }catch(e){ console.error(e); UI.toast(UI.errText(e),"err"); }
+    }
+    const summary = echecs.length
+      ? `${ok}/${files.length} envoyée${ok>1?"s":""} · ${echecs.length} échec${echecs.length>1?"s":""} — relance-${echecs.length>1?"les":"la"} via « Photo »`
+      : `${ok} photo${ok>1?"s":""} ajoutée${ok>1?"s":""} ✓` + (meta.visibilite==="cliente" ? " — la cliente sera prévenue par email" : "");
+    if (ok) reload("Photos de progression");
+    await pg.done(summary, echecs.length > 0);
   };
   input.click();
 }
@@ -1643,7 +1737,20 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   }
   if (act==="toggle-photo"){
     const nv = el.dataset.vis==="cliente"?"prive":"cliente";
-    await DB.update("photos", id, { visibilite:nv }); UI.toast("Visibilité mise à jour"); return reload();
+    // Le dossier du fichier suit la visibilité (<cliente>/<visibilite>/…) : c'est lui que le
+    // stockage contrôle. Sans déplacement, une photo « rendue visible » resterait illisible pour la cliente.
+    const rec = (D.photos||[]).find(p=>p.id===id), path = rec && rec.storage_path;
+    try{
+      const parts = String(path||"").split("/");
+      if (parts.length >= 3 && parts[1] !== nv){
+        const np = [parts[0], nv, ...parts.slice(2)].join("/");
+        const mv = await sb.storage.from("photos").move(path, np);
+        if (mv.error) throw mv.error;
+        await DB.update("photos", id, { visibilite:nv, storage_path:np });
+      } else await DB.update("photos", id, { visibilite:nv });
+      UI.toast(nv==="cliente" ? "Visible par la cliente ✓ (elle sera prévenue par email)" : "Photo repassée en privé");
+    }catch(e2){ console.error(e2); UI.toast(UI.errText(e2),"err"); }
+    return reload();
   }
   if (act==="del"){
     const entity = el.dataset.entity;
