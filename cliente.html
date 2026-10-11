@@ -30,7 +30,7 @@
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e101"></script>
-<script src="js/calc.js?v=q6"></script>
+<script src="js/calc.js?v=q7"></script>
 <script src="js/mesures.js?v=m1"></script>
 <script src="js/ui/modal.js?v=m1"></script>
 <script src="js/ui/progress.js?v=e99"></script>
@@ -715,8 +715,9 @@ function sectionMensurations(){
   const actions = `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
       ${tailleCtl}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-accent btn-sm" data-act="retour-mensu">📲 Retour sur son dernier relevé</button>
         <button class="btn-ghost btn-sm" data-act="ask-mesure">📲 Demander une mesure</button>
-        <button class="btn-ghost btn-sm" data-act="recap-mensu">📲 Envoyer le récap</button>
+        <button class="btn-ghost btn-sm" data-act="recap-mensu">📲 Récap depuis le départ</button>
       </div>
     </div>`;
   return block("Mensurations & évolution", (D.mensurations||[]).length, actions+body+listing, false);
@@ -1619,6 +1620,16 @@ document.getElementById("main").addEventListener("click", async (e)=>{
     const cl = D.cliente;
     if (!Calc.normalizeFrPhone(cl.telephone)){ UI.toast("Ajoute d'abord son numéro (bouton « Modifier »)","err"); return; }
     const wa = Calc.waHref(cl.telephone, Calc.demandeReleveCompletMsg(cl));
+    if (wa) window.open(wa, "_blank");
+    return;
+  }
+  // Retour sur le DERNIER relevé : ce qui a bougé / stable / remonté / à reprendre (WhatsApp).
+  if (act==="retour-mensu"){
+    const cl = D.cliente;
+    if (!Calc.normalizeFrPhone(cl.telephone)){ UI.toast("Ajoute d'abord son numéro (bouton « Modifier »)","err"); return; }
+    const msg = Calc.retourMensurationsMsg(cl, D.mensurations);
+    if (!msg){ UI.toast("Aucune mensuration à commenter","err"); return; }
+    const wa = Calc.waHref(cl.telephone, msg);
     if (wa) window.open(wa, "_blank");
     return;
   }
