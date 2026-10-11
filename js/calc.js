@@ -643,6 +643,134 @@ window.Calc = {
       + "\n\nBravo pour votre progression, on continue comme ça 💪💛";
   },
 
+  // ---- Retour sur le DERNIER relevé (WhatsApp) ------------------------------
+  // Compare le dernier relevé au relevé PRÉCÉDENT, mesure par mesure, et range en :
+  //   ✅ ce qui a bougé dans le bon sens · ➖ stable · ↗️ remonté (dit avec bienveillance)
+  //   · 🔎 valeurs douteuses (écart improbable → on demande de reprendre la mesure).
+  // + le cumul depuis le départ sur ce qui progresse. Ton naturel, tu/vous.
+  // cf. demande Ornella 11/10/2026 : « ce qui a bougé, ce qui a pas bougé et tout ».
+  MESURE_ORDRE: ["poids","masse_grasse","tour_taille","sous_poitrine","tour_dos","tour_hanches","tour_fessiers",
+    "tour_cuisse","tour_bras","tour_mollet","poitrine","tour_cou"],
+  MESURE_NOMS_COURTS: {
+    poids:"Poids", masse_grasse:"Masse grasse", tour_cou:"Tour de cou", poitrine:"Poitrine",
+    sous_poitrine:"Sous la poitrine", tour_dos:"Tour de dos", tour_taille:"Tour de taille",
+    tour_hanches:"Hanches", tour_fessiers:"Fessiers", tour_cuisse:"Cuisse", tour_bras:"Bras", tour_mollet:"Mollet",
+  },
+  // En dessous de ce seuil, on considère que la mesure n'a pas bougé (marge du mètre / balance).
+  MESURE_SEUIL_STABLE: { poids:0.3, masse_grasse:0.5 },
+
+  // Analyse le dernier relevé. Renvoie null s'il n'y a aucune mesure.
+  retourMensurations(mensurations) {
+    const all = (mensurations || []).filter(m => m && m.date && m.valeur != null && m.valeur !== "" && isFinite(Number(m.valeur)));
+    if (!all.length) return null;
+    const dateDernier = all.reduce((d, m) => (m.date > d ? m.date : d), "");
+    const r1 = (x) => Math.round(x * 10) / 10;
+    const unit = (t, m) => (m && m.unite) || (t === "poids" ? "kg" : t === "masse_grasse" ? "%" : "cm");
+    const out = { date: dateDernier, datePrec: null, dateDepart: null, mieux: [], stable: [], moins: [], neutre: [], doutes: [], seules: [], depuis: [] };
+    const types = [...new Set(all.filter(m => m.date === dateDernier).map(m => m.type))]
+      .filter(t => t !== "tour_dos_aisselles")
+      .sort((a, b) => { const o = this.MESURE_ORDRE, ia = o.indexOf(a), ib = o.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    const poidsJour = all.find(m => m.type === "poids" && m.date === dateDernier);
+    types.forEach(t => {
+      const pts = all.filter(m => m.type === t).sort((a, b) => (a.date < b.date ? -1 : 1));
+      const cur = [...pts].reverse().find(m => m.date === dateDernier);
+      const prev = [...pts].reverse().find(m => m.date < dateDernier);
+      const dep = pts[0];
+      const u = unit(t, cur);
+      const v = Number(cur.valeur);
+      const item = { type: t, nom: this.MESURE_NOMS_COURTS[t] || t.replace(/_/g, " "), unite: u, valeur: v };
+      if (!prev) { out.seules.push(item); return; }
+      // Écart improbable (mètre mal placé / faute de frappe) → on ne commente pas, on demande de reprendre.
+      if (window.Mesures && t !== "masse_grasse") {
+        const w = window.Mesures.verifier(t, v, { mensurations: all, date: dateDernier, poids: poidsJour && poidsJour.valeur, excludeId: cur.id });
+        if (w) { out.doutes.push(item); return; }
+      }
+      if (!out.datePrec || prev.date > out.datePrec) out.datePrec = prev.date;
+      item.avant = Number(prev.valeur);
+      item.diff = r1(v - item.avant);
+      const seuil = this.MESURE_SEUIL_STABLE[t] != null ? this.MESURE_SEUIL_STABLE[t] : 0.5;
+      const tone = this.mensuTone(t, item.diff);
+      if (Math.abs(item.diff) < seuil) out.stable.push(item);
+      else if (tone === "good") out.mieux.push(item);
+      else if (tone === "bad") out.moins.push(item);
+      else out.neutre.push(item);
+      // Cumul depuis le départ : seulement si le départ est AVANT le relevé précédent
+      // (sinon c'est la même info) et que le total va dans le bon sens.
+      if (dep && dep.date < prev.date) {
+        const tot = r1(v - Number(dep.valeur));
+        if (Math.abs(tot) >= seuil && this.mensuTone(t, tot) === "good") {
+          out.depuis.push(Object.assign({}, item, { total: tot }));
+          if (!out.dateDepart || dep.date < out.dateDepart) out.dateDepart = dep.date;
+        }
+      }
+    });
+    return out;
+  },
+
+  retourMensurationsMsg(cl, mensurations) {
+    const R = this.retourMensurations(mensurations);
+    if (!R) return "";
+    const tu = !!cl.tutoiement;
+    const nb = (x) => String(x).replace(".", ",");
+    const signe = (d) => (d > 0 ? "+" : "−") + nb(Math.abs(d));
+    const ligneDiff = (i, emo) => "• " + i.nom + " : " + nb(i.avant) + " → " + nb(i.valeur) + " " + i.unite
+      + " (" + signe(i.diff) + " " + i.unite + ")" + (emo || "");
+    const blocs = [];
+    if (R.mieux.length) {
+      blocs.push("✅ Ce qui a bougé dans le bon sens :\n" + R.mieux.map(i => ligneDiff(i, Math.abs(i.diff) >= (i.type === "poids" ? 1 : 1.5) ? " 🔥" : " 👏")).join("\n"));
+    }
+    if (R.neutre.length) blocs.push("↔️ Ça a bougé aussi :\n" + R.neutre.map(i => ligneDiff(i)).join("\n"));
+    if (R.stable.length) {
+      blocs.push("➖ Stable (pas bougé) :\n" + R.stable.map(i => "• " + i.nom + " : " + nb(i.valeur) + " " + i.unite).join("\n"));
+    }
+    if (R.moins.length) {
+      blocs.push("↗️ Un peu remonté :\n" + R.moins.map(i => ligneDiff(i)).join("\n")
+        + "\nPas d'inquiétude, ça peut être de l'eau, le cycle ou la fatigue. On regarde la tendance sur plusieurs relevés, pas sur un seul 😉");
+    }
+    if (R.seules.length && (R.mieux.length || R.stable.length || R.moins.length || R.neutre.length)) {
+      blocs.push("🆕 " + (tu ? "Nouvelle(s) mesure(s), ta base de départ :" : "Nouvelle(s) mesure(s), votre base de départ :") + "\n"
+        + R.seules.map(i => "• " + i.nom + " : " + nb(i.valeur) + " " + i.unite).join("\n"));
+    }
+    if (R.depuis.length) {
+      blocs.push("📈 Depuis le début" + (R.dateDepart ? " (" + this.fmtShort(R.dateDepart) + ")" : "") + " :\n"
+        + R.depuis.map(i => "• " + i.nom + " : " + signe(i.total) + " " + i.unite).join("\n"));
+    }
+    if (R.doutes.length) {
+      const noms = R.doutes.map(i => i.nom.toLowerCase()).join(", ");
+      const la = R.doutes.length > 1 ? "les" : "la";
+      blocs.push("🔎 " + (tu
+        ? "Petit doute sur : " + noms + " (l'écart est trop gros d'un coup, le mètre a dû glisser). Tu peux " + la + " reprendre au même endroit dès que tu peux ? 🙏"
+        : "Petit doute sur : " + noms + " (l'écart est trop gros d'un coup, le mètre a dû glisser). Pouvez-vous " + la + " reprendre au même endroit dès que possible ? 🙏"));
+    }
+    const quand = this.fmtShort(R.date);
+    // Premier relevé (rien à comparer) → on pose la base.
+    if (!R.mieux.length && !R.stable.length && !R.moins.length && !R.neutre.length) {
+      const base = R.seules.map(i => "• " + i.nom + " : " + nb(i.valeur) + " " + i.unite).join("\n");
+      return tu
+        ? "Coucou " + cl.prenom + " 🌸 J'ai bien reçu tes mensurations du " + quand + " 📏\n\n" + base
+          + (R.doutes.length ? "\n\n" + blocs[blocs.length - 1] : "")
+          + "\n\nC'est ta base de départ, on comparera au prochain relevé 💪💛"
+        : "Bonjour " + cl.prenom + " 😊 J'ai bien reçu vos mensurations du " + quand + " 📏\n\n" + base
+          + (R.doutes.length ? "\n\n" + blocs[blocs.length - 1] : "")
+          + "\n\nC'est votre base de départ, on comparera au prochain relevé 💪💛";
+    }
+    const intro = tu
+      ? "Coucou " + cl.prenom + " 🌸 J'ai regardé tes mensurations du " + quand
+        + (R.datePrec ? " (par rapport au " + this.fmtShort(R.datePrec) + ")" : "") + " 📏"
+      : "Bonjour " + cl.prenom + " 😊 J'ai regardé vos mensurations du " + quand
+        + (R.datePrec ? " (par rapport au " + this.fmtShort(R.datePrec) + ")" : "") + " 📏";
+    let fin;
+    if (R.mieux.length && !R.moins.length) {
+      fin = tu ? "Super boulot, ça paie ! On garde le cap 💪💛" : "Super travail, ça paie ! On garde le cap 💪💛";
+    } else if (R.mieux.length) {
+      fin = "Globalement ça avance, bravo 👏 On continue comme ça 💪💛";
+    } else {
+      fin = "Ça bouge peu sur cette période, c'est normal par moments. On ajuste ensemble pour relancer 💪💛";
+    }
+    fin += tu ? "\n\nEt toi, comment tu te sens en ce moment ?" : "\n\nEt vous, comment vous sentez-vous en ce moment ?";
+    return intro + "\n\n" + blocs.join("\n\n") + "\n\n" + fin;
+  },
+
   // Message « demander un relevé COMPLET de mensurations » (toutes les mesures), tu/vous.
   demandeReleveCompletMsg(cl) {
     const lien = this.espaceLink(cl.access_code);
