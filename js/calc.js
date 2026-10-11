@@ -671,6 +671,20 @@ window.Calc = {
       .filter(t => t !== "tour_dos_aisselles")
       .sort((a, b) => { const o = this.MESURE_ORDRE, ia = o.indexOf(a), ib = o.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
     const poidsJour = all.find(m => m.type === "poids" && m.date === dateDernier);
+    // En PERTE (poids ou masse grasse en baisse vs relevé précédent) : des cm en moins sur les
+    // tours sont une victoire, même sur cuisse/fessiers/bras (sinon « remonté » serait faux).
+    const baisse = (t) => {
+      const pts = all.filter(m => m.type === t).sort((a, b) => (a.date < b.date ? 1 : -1));
+      const cur = pts.find(m => m.date === dateDernier), prev = pts.find(m => m.date < dateDernier);
+      return cur && prev && Number(cur.valeur) < Number(prev.valeur);
+    };
+    const enPerte = baisse("poids") || baisse("masse_grasse");
+    const toneRetour = (t, d) => {
+      const tone = this.mensuTone(t, d);
+      if (enPerte && d < 0 && t !== "tour_cou") return "good";
+      if (tone === "bad" && d < 0) return "neutral"; // un tour « muscle » qui baisse : on ne dit jamais « remonté »
+      return tone;
+    };
     types.forEach(t => {
       const pts = all.filter(m => m.type === t).sort((a, b) => (a.date < b.date ? -1 : 1));
       const cur = [...pts].reverse().find(m => m.date === dateDernier);
@@ -689,7 +703,7 @@ window.Calc = {
       item.avant = Number(prev.valeur);
       item.diff = r1(v - item.avant);
       const seuil = this.MESURE_SEUIL_STABLE[t] != null ? this.MESURE_SEUIL_STABLE[t] : 0.5;
-      const tone = this.mensuTone(t, item.diff);
+      const tone = toneRetour(t, item.diff);
       if (Math.abs(item.diff) < seuil) out.stable.push(item);
       else if (tone === "good") out.mieux.push(item);
       else if (tone === "bad") out.moins.push(item);
@@ -698,7 +712,8 @@ window.Calc = {
       // (sinon c'est la même info) et que le total va dans le bon sens.
       if (dep && dep.date < prev.date) {
         const tot = r1(v - Number(dep.valeur));
-        if (Math.abs(tot) >= seuil && this.mensuTone(t, tot) === "good") {
+        // (et seulement si le cumul fait MIEUX que le dernier écart, sinon ça démotive pour rien)
+        if (Math.abs(tot) >= seuil && toneRetour(t, tot) === "good" && Math.abs(tot) > Math.abs(item.diff)) {
           out.depuis.push(Object.assign({}, item, { total: tot }));
           if (!out.dateDepart || dep.date < out.dateDepart) out.dateDepart = dep.date;
         }
