@@ -21,5 +21,5 @@ window.APP_CONFIG = {
 
   // Lien « laisser un avis » de la fiche Google d'Ornella (Google Business Profile →
   // « Demander des avis » → copier le lien). Vide = l'encart avis est masqué.
-  GOOGLE_REVIEW_URL: "",
+  GOOGLE_REVIEW_URL: "https://share.google/NcyAyWaS3WMZgQ4B6",
 };

@@ -90,11 +90,11 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e99"></script>
+<script src="js/config.js?v=e100"></script>
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e100"></script>
-<script src="js/calc.js?v=q8"></script>
+<script src="js/calc.js?v=q9"></script>
 <script src="js/mesures.js?v=m1"></script>
 <script src="js/ui/modal.js?v=e99"></script>
 <script src="js/ui/progress.js?v=e99"></script>
@@ -788,11 +788,16 @@ function renderAlerts() {
       const quand = a.date ? Calc.fmt(a.date) : "";
       const msg = a.c ? Calc.retourMensurationsMsg(cl, a.c.mensurations) : "";
       const wa = msg ? Calc.waHref(cl.telephone, msg) : null;
+      // Bons résultats (que du positif) → proposer aussi la demande d'avis Google, c'est LE moment.
+      const R = a.c ? Calc.retourMensurations(a.c.mensurations) : null;
+      const avisMsg = (R && R.mieux.length && !R.moins.length) ? Calc.demandeAvisMsg(cl, "resultats") : "";
+      const avisWa = avisMsg ? Calc.waHref(cl.telephone, avisMsg) : null;
       return `<div class="alert alert-action" style="border-left:4px solid var(--ok);cursor:default">
          <a href="cliente.html?id=${cl.id}" style="display:flex;gap:9px;align-items:center;flex:1;min-width:0;color:inherit;text-decoration:none">
          <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span>${quand?` · <span style="color:var(--text-light)">le ${quand}</span>`:""}</span></a>
          ${wa ? `<a class="alert-cta" href="${wa}" target="_blank" rel="noopener" title="Message WhatsApp pré-rempli : ce qui a bougé, ce qui est stable…">Lui faire un retour 📲</a>`
-              : `<a class="alert-cta go" href="cliente.html?id=${cl.id}">Voir 📏</a>`}</div>`;
+              : `<a class="alert-cta go" href="cliente.html?id=${cl.id}">Voir 📏</a>`}
+         ${avisWa ? `<a class="alert-cta" href="${avisWa}" target="_blank" rel="noopener" style="background:#f4b400" title="Bons résultats : c'est le moment de demander un avis Google">⭐ Avis</a>` : ""}</div>`;
     }
     return `<a class="alert" href="cliente.html?id=${cl.id}">
        <span>${a.icon}</span><span><strong>${a.label}</strong> · <span class="who">${esc(cl.prenom)}</span></span>
