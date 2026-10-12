@@ -26,11 +26,11 @@
 <input type="file" id="devisInput" accept="application/pdf,image/*" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=e99"></script>
+<script src="js/config.js?v=e100"></script>
 <script src="js/supabaseClient.js?v=e99"></script>
 <script src="js/auth.js?v=e99"></script>
 <script src="js/db.js?v=e101"></script>
-<script src="js/calc.js?v=q8"></script>
+<script src="js/calc.js?v=q9"></script>
 <script src="js/mesures.js?v=m1"></script>
 <script src="js/ui/modal.js?v=m1"></script>
 <script src="js/ui/progress.js?v=e99"></script>
@@ -113,6 +113,7 @@ function render(focusTitle){
       <button class="qbtn" data-act="add-seances-lot"><span class="i">🗓️</span> Plusieurs séances</button>
       <button class="qbtn" data-act="agenda-cliente"><span class="i">📅</span> Agenda Apple</button>
       <button class="qbtn" data-act="recap-seances"><span class="i">📲</span> Récap séances</button>
+      <button class="qbtn" data-act="ask-avis"><span class="i">⭐</span> Demander un avis</button>
       <button class="qbtn" data-act="add-bilan"><span class="i">📋</span> Bilan</button>
       <button class="qbtn" data-act="add-mensu"><span class="i">📏</span> Mensurations</button>
       <button class="qbtn" data-act="add-photo"><span class="i">📸</span> Photo</button>
@@ -1629,6 +1630,19 @@ document.getElementById("main").addEventListener("click", async (e)=>{
     if (!Calc.normalizeFrPhone(cl.telephone)){ UI.toast("Ajoute d'abord son numéro (bouton « Modifier »)","err"); return; }
     const msg = Calc.retourMensurationsMsg(cl, D.mensurations);
     if (!msg){ UI.toast("Aucune mensuration à commenter","err"); return; }
+    const wa = Calc.waHref(cl.telephone, msg);
+    if (wa) window.open(wa, "_blank");
+    return;
+  }
+  // Demander un avis Google (WhatsApp pré-rempli avec le lien). Si de bons résultats sont
+  // récents (dernier relevé favorable), le message rebondit dessus.
+  if (act==="ask-avis"){
+    const cl = D.cliente;
+    if (!Calc.normalizeFrPhone(cl.telephone)){ UI.toast("Ajoute d'abord son numéro (bouton « Modifier »)","err"); return; }
+    const R = Calc.retourMensurations(D.mensurations);
+    const bons = R && R.mieux.length && !R.moins.length && Calc.daysFromToday(R.date) >= -21;
+    const msg = Calc.demandeAvisMsg(cl, bons ? "resultats" : "");
+    if (!msg){ UI.toast("Lien d'avis Google non configuré (js/config.js)","err"); return; }
     const wa = Calc.waHref(cl.telephone, msg);
     if (wa) window.open(wa, "_blank");
     return;

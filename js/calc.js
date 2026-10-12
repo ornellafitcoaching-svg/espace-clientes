@@ -786,6 +786,31 @@ window.Calc = {
     return intro + "\n\n" + blocs.join("\n\n") + "\n\n" + fin;
   },
 
+  // Message « demander un avis Google », naturel, tu/vous. Lien = APP_CONFIG.GOOGLE_REVIEW_URL.
+  // contexte = "resultats" quand on rebondit sur de bons résultats (mensurations), sinon général.
+  demandeAvisMsg(cl, contexte) {
+    const url = (window.APP_CONFIG && window.APP_CONFIG.GOOGLE_REVIEW_URL) || "";
+    if (!url) return "";
+    const tu = !!cl.tutoiement;
+    const accroche = contexte === "resultats"
+      ? (tu ? "Franchement je suis trop fière de tes résultats 🔥 " : "Franchement je suis très fière de vos résultats 🔥 ")
+      : (tu ? "J'espère que tu vas bien ! " : "J'espère que vous allez bien ! ");
+    if (tu) {
+      return "Coucou " + cl.prenom + " 🌸 " + accroche
+        + "J'ai un petit service à te demander 🙏\n\n"
+        + "Si tu es contente de notre travail ensemble, est-ce que tu pourrais me laisser un avis Google ? "
+        + "Ça prend 1 minute et ça m'aide énormément : c'est grâce à ça que d'autres femmes me trouvent et osent se lancer 💛\n\n"
+        + "👉 " + url + "\n(clique sur « Avis » puis « Donner un avis »)\n\n"
+        + "Tu peux dire ce que tu veux : ce qui a changé pour toi, comment se passent nos séances, ce que tu ressens… Merci du fond du cœur 🥰";
+    }
+    return "Bonjour " + cl.prenom + " 😊 " + accroche
+      + "J'ai un petit service à vous demander 🙏\n\n"
+      + "Si vous êtes contente de notre travail ensemble, pourriez-vous me laisser un avis Google ? "
+      + "Ça prend 1 minute et ça m'aide énormément : c'est grâce à ça que d'autres femmes me trouvent et osent se lancer 💛\n\n"
+      + "👉 " + url + "\n(cliquez sur « Avis » puis « Donner un avis »)\n\n"
+      + "Vous pouvez dire ce que vous voulez : ce qui a changé pour vous, comment se passent nos séances, ce que vous ressentez… Merci du fond du cœur 🥰";
+  },
+
   // Message « demander un relevé COMPLET de mensurations » (toutes les mesures), tu/vous.
   demandeReleveCompletMsg(cl) {
     const lien = this.espaceLink(cl.access_code);
