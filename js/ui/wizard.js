@@ -51,6 +51,13 @@ textarea.wz-in{min-height:76px;resize:vertical}
 .wz-foot{flex:none;display:flex;gap:10px;padding:12px 20px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--line-soft);background:var(--cream)}
 .wz-foot .btn-ghost{flex:none}
 .wz-foot .btn-accent{flex:1;justify-content:center}
+.wz-bm{display:flex;justify-content:center;gap:14px;margin-top:10px;padding:12px 6px 6px;background:var(--cream);border-radius:14px}
+.wz-bm svg{width:100%;max-width:140px;height:auto}
+.wz-bm>div{flex:1 1 0;display:flex;flex-direction:column;align-items:center}
+.wz-bm-b{fill:#F3EAE3;stroke:#D9C7B8;stroke-width:1}
+.wz-bz{fill:#F3EAE3;stroke:#D9C7B8;stroke-width:1;cursor:pointer;transition:fill .2s;-webkit-tap-highlight-color:transparent}
+.wz-bz.on{fill:var(--accent);stroke:#A94E44}
+.wz-bm-l{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-light);text-align:center;margin-top:2px}
 .wz-saved{font-size:.7rem;color:var(--ok);text-align:center;padding-top:6px;min-height:1em}
 `;
   function injectCss() {
@@ -85,6 +92,32 @@ textarea.wz-in{min-height:76px;resize:vertical}
     return true;
   }
   function isEmpty(v) { return v == null || (Array.isArray(v) ? v.length === 0 : String(v).trim() === ""); }
+
+  // Silhouette cliquable (question multi avec bodymap:{zone: option}) : chaque zone
+  // touchée coche/décoche l'option correspondante (mêmes valeurs que les cases).
+  function bodyMap(q, arr) {
+    const m = q.bodymap || {};
+    const all = !!(m.tout && arr.includes(m.tout));
+    const z = (k, tag, attrs) => m[k]
+      ? `<${tag} class="wz-bz ${all || arr.includes(m[k]) ? "on" : ""}" data-q="${esc(q.id)}" data-v="${esc(m[k])}" data-t="multi" role="button" aria-label="${esc(m[k])}" ${attrs}/>`
+      : "";
+    const base = (tag, attrs) => `<${tag} class="wz-bm-b" ${attrs}/>`;
+    const MIR = 'transform="translate(120 0) scale(-1 1)"';
+    const ARM = 'd="M37 49 Q27 52 25 68 L20 126 Q21 134 28 132 L33 92 L40 64 Z"';
+    const LEG = 'd="M38 140 L59 142 L57 196 L55 246 Q50 254 45 247 L42 196 Z"';
+    const THI = 'd="M38 140 L59 142 L58 190 L43 190 Z"';
+    const TOR = 'd="M38 46 Q60 40 82 46 L86 70 Q80 98 76 110 Q86 128 84 142 L36 142 Q34 128 44 110 Q40 98 34 70 Z"';
+    const common = base("ellipse", 'cx="60" cy="22" rx="13" ry="15"') + base("rect", 'x="54" y="34" width="12" height="12" rx="3"') +
+      base("path", TOR) + base("path", LEG) + base("path", LEG + " " + MIR) +
+      z("bras", "path", ARM) + z("bras", "path", ARM + " " + MIR);
+    const face = common + z("ventre", "ellipse", 'cx="60" cy="101" rx="14" ry="17"') +
+      z("cuisses", "path", THI) + z("cuisses", "path", THI + " " + MIR);
+    const dos = common + z("dos", "path", 'd="M41 50 Q60 45 79 50 L82 70 Q74 96 60 100 Q46 96 38 70 Z"') +
+      z("fessiers", "ellipse", 'cx="49" cy="126" rx="11.5" ry="13"') + z("fessiers", "ellipse", 'cx="71" cy="126" rx="11.5" ry="13"') +
+      z("cuisses", "path", THI + ' transform="translate(0 4)"') + z("cuisses", "path", THI + ' transform="translate(120 4) scale(-1 1)"');
+    return `<div class="wz-bm"><div><svg viewBox="0 0 120 262" aria-label="Silhouette de face">${face}</svg><div class="wz-bm-l">Face</div></div>` +
+      `<div><svg viewBox="0 0 120 262" aria-label="Silhouette de dos">${dos}</svg><div class="wz-bm-l">Dos</div></div></div>`;
+  }
 
   window.UI.wizard = function (opts) {
     injectCss();
@@ -129,6 +162,7 @@ textarea.wz-in{min-height:76px;resize:vertical}
               const on = type === "multi" ? arr.includes(o) : v === o;
               return `<button type="button" class="wz-o ${type === "multi" ? "multi" : ""} ${on ? "on" : ""}" data-q="${esc(q.id)}" data-v="${esc(o)}" data-t="${type}">${esc(o)}</button>`;
             }).join("") + `</div>`;
+            if (type === "multi" && q.bodymap) ctl = bodyMap(q, arr) + ctl;
             if (q.other) ctl += `<input class="wz-in" data-q="${esc(q.id)}__autre" placeholder="${esc(q.otherLabel || "Autre / je précise…")}" value="${esc(st[q.id + "__autre"] || "")}">`;
           } else if (type === "scale") {
             const min = q.min || 1, max = q.max || 10;
@@ -147,7 +181,7 @@ textarea.wz-in{min-height:76px;resize:vertical}
       }
 
       body.addEventListener("click", (e) => {
-        const b = e.target.closest(".wz-o"); if (!b) return;
+        const b = e.target.closest(".wz-o, .wz-bz"); if (!b) return;
         const id = b.dataset.q, val = b.dataset.v, t = b.dataset.t;
         if (t === "multi") {
           const arr = Array.isArray(st[id]) ? st[id].slice() : [];

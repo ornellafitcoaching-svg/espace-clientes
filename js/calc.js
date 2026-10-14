@@ -1330,6 +1330,9 @@ window.Calc = {
 
     { section:"🎯 Tes objectifs" },
     { id:"objectifs", q:"Qu’est-ce que tu veux changer ? 🎯", hint:"Coche tout ce qui compte pour toi", type:"multi", req:true, other:true, options:["Perdre du poids","Ventre plus plat","Fessiers galbés","Me tonifier","Prendre du muscle","Retrouver mon corps après bébé","Plus d’énergie","Soulager mon dos / mes douleurs","Reprendre confiance en moi"] },
+    // Silhouette cliquable (wizard : bodymap) — mêmes valeurs qu'avant, stockées en texte « A, B ».
+    // Déplacée de la partie entraînement vers le tronc commun : toutes les clientes la voient.
+    { id:"zones_prio", q:"Les zones à travailler en priorité 🎯", hint:"Touche la silhouette ou coche en dessous", type:"multi", bodymap:{ ventre:"Ventre", fessiers:"Fessiers", cuisses:"Cuisses", bras:"Bras", dos:"Dos / posture", tout:"Silhouette globale" }, options:["Ventre","Fessiers","Cuisses","Bras","Dos / posture","Silhouette globale"] },
     { id:"ressenti_corps", q:"Comment tu te sens dans ton corps en ce moment ? 💭", type:"textarea", ph:"Avec tes mots, il n’y a pas de mauvaise réponse" },
     { id:"objectifs_pourquoi", q:"Pourquoi c’est important pour toi aujourd’hui ?", type:"textarea", ph:"C’est ce qui m’aidera le plus à te motiver les jours difficiles" },
     { id:"evenement", q:"Un événement qui te motive ? 📅 (facultatif)", type:"text", ph:"mariage, vacances, anniversaire…" },
@@ -1380,7 +1383,6 @@ window.Calc = {
     { section:"💛 Ce que tu aimes & ton suivi" },
     { id:"aime", q:"Ce que tu aimes faire 😍", type:"multi", options:["Le renforcement musculaire","Le cardio / HIIT","Les circuits rapides","Pilates / gainage","Soulever lourd","Les séances courtes et efficaces","Varier souvent"] },
     { id:"aime_pas", q:"Ce que tu n’aimes pas 🙅‍♀️", type:"multi", options:["Rien, je suis ouverte","Les sauts","Le cardio","Les abdos","Les pompes","Les séances longues","Les exercices au sol"] },
-    { id:"zones_prio", q:"Les zones à travailler en priorité 🎯", type:"multi", options:["Ventre","Fessiers","Cuisses","Bras","Dos / posture","Silhouette globale"] },
 
     { id:"videos_ok", q:"Tu pourras m’envoyer des vidéos de tes exercices pour que je corrige ta technique ?", type:"choice", options:["Oui 👍","De temps en temps","Pas pour le moment"] },
     { id:"commentaire", q:"Autre chose à me dire ? (facultatif)", type:"textarea" },
