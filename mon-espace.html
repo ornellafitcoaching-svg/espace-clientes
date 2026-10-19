@@ -1204,9 +1204,11 @@ function viewPhotos(){
   let compare = "";
   // « Avant / Maintenant » uniquement si la photo la plus récente date d'au moins 14 jours
   // après la 1re (sinon ce sont juste les photos de départ : pas de faux « Maintenant »).
-  const avant0 = list[list.length-1], apres0 = list[0];
+  // (un montage « Avant / après » d'Ornella n'entre pas dans ce comparatif : il est déjà complet)
+  const vraies = list.filter(p=>!/^Avant \/ après/.test(p.legende||""));
+  const avant0 = vraies[vraies.length-1], apres0 = vraies[0];
   const ecart = (avant0 && apres0) ? Math.round((new Date(apres0.date+"T12:00:00") - new Date(avant0.date+"T12:00:00"))/864e5) : 0;
-  if (list.length >= 2 && ecart >= 14){
+  if (vraies.length >= 2 && ecart >= 14){
     const apres = apres0, avant = avant0;
     const vignette = (p, titre) => `<div>
         <div class="isub" style="text-align:center;font-weight:700;margin-bottom:4px;font-size:.74rem;white-space:nowrap">${titre} · ${Calc.fmtShort(p.date)}</div>

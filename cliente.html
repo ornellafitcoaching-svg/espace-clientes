@@ -735,7 +735,9 @@ function sectionPhotos(){
       <div style="margin-top:6px">${selBox("photo",p.id,p.storage_path)} <button class="link" data-act="toggle-photo" data-id="${p.id}" data-vis="${p.visibilite}">${p.visibilite==="cliente"?"Rendre privé":"Rendre visible"}</button>
       &nbsp;·&nbsp;<button class="link" data-act="del" data-entity="photo" data-id="${p.id}" data-path="${esc(p.storage_path)}">Supprimer</button></div>
     </div>`).join("") + `</div>` : `<p class="empty">Aucune photo.</p>`);
-  return block("Photos de progression", list.length, body, false);
+  const nbDates = new Set(list.filter(p=>!estMontage(p)).map(p=>p.date)).size;
+  const avantApres = nbDates >= 2 ? `<p style="margin:0 0 10px"><button class="btn" data-act="avant-apres">🪄 Créer un avant / après</button></p>` : "";
+  return block("Photos de progression", list.length, avantApres + body, false);
 }
 
 function sectionObjectifs(){
@@ -819,6 +821,77 @@ async function compressPhoto(file){
   }
   if (!blob) return null;
   return blob.size < file.size ? blob : null;       // déjà plus léger que ça ? on garde l'original
+}
+function estMontage(p){ return /^Avant \/ après/.test(p.legende||""); }
+// Avant / après : toutes les photos d'une date en haut (AVANT), celles d'une autre date en
+// bas (MAINTENANT), dans l'ordre d'envoi. Montage fait dans le navigateur, puis rangé dans
+// les photos de la cliente + téléchargé (pour l'envoyer / le poster avec son accord).
+async function avantApres(){
+  const vraies = (D.photos||[]).filter(p=>!estMontage(p));   // jamais un montage dans un montage
+  const dates = [...new Set(vraies.map(p=>p.date))].sort();
+  if (dates.length < 2) return UI.toast("Il faut des photos à 2 dates différentes", "err");
+  const opts = dates.map(d=>({ value:d, label:`${Calc.fmt(d)} (${vraies.filter(p=>p.date===d).length} photo${vraies.filter(p=>p.date===d).length>1?"s":""})` }));
+  const meta = await UI.form({ title:"Créer un avant / après", submit:"Créer le montage", fields:[
+    { name:"avant", label:"Avant", type:"select", half:true, value:dates[0], options:opts },
+    { name:"apres", label:"Maintenant", type:"select", half:true, value:dates[dates.length-1], options:opts },
+    { name:"visibilite", label:"Ranger le montage", type:"select", value:"cliente", options:[
+      {value:"cliente",label:"👁 Visible cliente"},{value:"prive",label:"🔒 Privé (coach)"}]},
+    { name:"_info", type:"static", label:"", value:"Astuce : envoie les photos de chaque bilan dans le même ordre (face, profil, dos…) pour que les poses s'alignent." },
+  ]});
+  if (!meta) return;
+  if (meta.avant === meta.apres) return UI.toast("Choisis deux dates différentes", "err");
+  UI.toast("Montage en cours…");
+  try{
+    const duJour = d => vraies.filter(p=>p.date===d).sort((a,b)=>(a.created_at||"")<(b.created_at||"")?-1:1);
+    const charger = async p => {
+      const { data, error } = await sb.storage.from("photos").download(p.storage_path);
+      if (error) throw error;
+      return await decodeImage(data);
+    };
+    const rangA = await Promise.all(duJour(meta.avant).map(charger));
+    const rangB = await Promise.all(duJour(meta.apres).map(charger));
+    const n = Math.max(rangA.length, rangB.length);
+    const CW = 600, CH = 800, G = 14, PAD = 28, BAND = 70, FOOT = 60;
+    const cv = document.createElement("canvas");
+    cv.width = PAD*2 + n*CW + (n-1)*G;
+    cv.height = PAD*2 + 2*(BAND + G + CH) + G + FOOT;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#FAF6F1"; ctx.fillRect(0, 0, cv.width, cv.height);
+    // Recadrage centré en 3:4 (« cover »), pour des cases toutes identiques.
+    const cover = (img, x, y) => {
+      const w = img.width || img.naturalWidth, h = img.height || img.naturalHeight, r = CW/CH;
+      let sw = w, sh = h, sx = 0, sy = 0;
+      if (w/h > r){ sw = h*r; sx = (w-sw)/2; } else { sh = w/r; sy = (h-sh)/2; }
+      ctx.drawImage(img, sx, sy, sw, sh, x, y, CW, CH);
+    };
+    const rangee = (imgs, y, titre, fond) => {
+      ctx.fillStyle = fond; ctx.fillRect(PAD, y, cv.width - PAD*2, BAND);
+      ctx.fillStyle = "#fff"; ctx.font = "700 34px Montserrat, Arial, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(titre, cv.width/2, y + BAND/2);
+      imgs.forEach((img, k) => cover(img, PAD + k*(CW+G), y + BAND + G));
+    };
+    rangee(rangA, PAD, `AVANT · ${Calc.fmt(meta.avant)}`.toUpperCase(), "#8A7F78");
+    rangee(rangB, PAD + BAND + G + CH + G, `MAINTENANT · ${Calc.fmt(meta.apres)}`.toUpperCase(), "#2C1F1A");
+    ctx.fillStyle = "#C9957A"; ctx.font = "700 26px Montserrat, Arial, sans-serif";
+    ctx.fillText("ORNELLA FIT COACHING", cv.width/2, cv.height - PAD - FOOT/2 + 6);
+    [...rangA, ...rangB].forEach(img => img.close && img.close());
+    const blob = await new Promise(res => cv.toBlob(res, "image/jpeg", 0.85));
+    if (!blob) throw new Error("montage impossible");
+    const nom = `avant-apres-${(D.cliente.prenom||"cliente").toLowerCase()}-${meta.apres}.jpg`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nom; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    const path = `${CID}/${meta.visibilite}/${uuid()}.jpg`;
+    const up = await sb.storage.from("photos").upload(path, blob, { upsert:false, contentType:"image/jpeg" });
+    if (up.error) throw up.error;
+    try {
+      await DB.insert("photos", { cliente_id:CID, date:meta.apres, storage_path:path, visibilite:meta.visibilite,
+        legende:`Avant / après · ${Calc.fmt(meta.avant)} → ${Calc.fmt(meta.apres)}` });
+    } catch(e) { try { await sb.storage.from("photos").remove([path]); } catch(_){}; throw e; }
+    UI.toast("Avant / après créé ✓ (téléchargé + ajouté aux photos)");
+    reload("Photos de progression");
+  }catch(e){ console.error(e); UI.toast(UI.errText(e), "err"); }
 }
 const fmtKo = n => n >= 1048576 ? (n/1048576).toFixed(1).replace(".",",")+" Mo" : Math.round(n/1024)+" Ko";
 
@@ -1597,6 +1670,7 @@ document.getElementById("main").addEventListener("click", async (e)=>{
   if (act==="file-devis") return pickDevisFile(findRec("devis", id));
   if (act==="devis-paiements") return devisPaiements(findRec("devis", id));
   if (act==="add-photo") return addPhoto();
+  if (act==="avant-apres") return avantApres();
   if (act==="prog-sportif") return progEnvoye("sportif");
   if (act==="prog-nutrition") return progEnvoye("nutrition");
   if (act==="recap-seances"){
