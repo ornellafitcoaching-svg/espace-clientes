@@ -44,6 +44,7 @@
     <button class="ctab" data-tab="traiter" role="tab" aria-selected="false">🔔 À traiter<span class="ctab-badge" id="badgeTraiter" hidden></span></button>
     <button class="ctab" data-tab="entreprises" role="tab" aria-selected="false">🏢 Entreprises</button>
     <button class="ctab" data-tab="comptes" role="tab" aria-selected="false">💰 Finances</button>
+    <button class="ctab" data-tab="revente" role="tab" aria-selected="false">🛍️ Achat-revente</button>
   </nav>
 
   <!-- Onglet CLIENTES (par défaut) : recherche + filtres + cartes -->
@@ -87,6 +88,11 @@
     <div id="comptes"></div>
     <div id="sources"></div>
   </section>
+
+  <!-- Onglet ACHAT-REVENTE -->
+  <section class="panel" data-panel="revente" role="tabpanel" hidden>
+    <div id="revente"></div>
+  </section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -100,6 +106,7 @@
 <script src="js/ui/progress.js?v=e99"></script>
 <script src="js/finances.js?v=f12"></script>
 <script src="js/prospects.js?v=p2"></script>
+<script src="js/revente.js?v=e01"></script>
 <script>
 let STATE = { clientes: [], byId: {}, filter: null, q: "", sort: "", agendaView: "list" };
 
@@ -1061,7 +1068,7 @@ function renderLoadWarn(){
 function renderAll(){
   const safe = (fn, name) => { try { fn(); } catch(e){ console.error("render "+name, e); } };
   safe(renderLoadWarn,"loadWarn"); safe(renderStats,"stats"); safe(renderAlerts,"alerts");
-  safe(renderAgenda,"agenda"); safe(renderComptes,"comptes"); safe(renderFinances,"finances"); safe(renderProspects,"prospects"); safe(renderSources,"sources"); safe(renderProgrammes,"programmes");
+  safe(renderAgenda,"agenda"); safe(renderComptes,"comptes"); safe(renderFinances,"finances"); safe(renderProspects,"prospects"); safe(renderSources,"sources"); safe(renderRevente,"revente"); safe(renderProgrammes,"programmes");
   safe(renderBilans,"bilans"); safe(renderBilansDemarrage,"bilansDemarrage"); safe(renderSansSeance,"sansSeance");
   safe(renderFilters,"filters"); safe(renderList,"list");
 }
