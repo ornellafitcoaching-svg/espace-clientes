@@ -561,6 +561,8 @@ function sectionBilans(){
       <div class="ibody">
         <div class="ititle">Bilan ${x.semaine!=null?"semaine "+x.semaine:""} ${x.poids?`<span class="tag">${x.poids} kg</span>`:""}</div>
         <div class="isub">${[x.ressenti&&("Ressenti : "+esc(x.ressenti)),x.evolution&&esc(x.evolution)].filter(Boolean).join(" · ")||"&nbsp;"}</div>
+        ${x.reponses&&x.reponses.pourquoi_evolue?`<div class="isub">💛 ${esc(x.reponses.pourquoi_evolue)}</div>`:""}
+        ${x.reponses&&(x.reponses.sommeil||x.reponses.stress!=null||x.reponses.energie!=null||x.reponses.motivation!=null)?`<div class="isub">🌙 ${[x.reponses.sommeil&&("sommeil "+esc(x.reponses.sommeil)),x.reponses.stress!=null&&("stress "+esc(x.reponses.stress)+"/10"),x.reponses.energie!=null&&("énergie "+esc(x.reponses.energie)+"/5"),x.reponses.motivation!=null&&("motivation "+esc(x.reponses.motivation)+"/5")].filter(Boolean).join(" · ")}</div>`:""}
         ${x.difficultes?`<div class="isub">⚠️ ${esc(x.difficultes)}</div>`:""}
         ${x.points_positifs?`<div class="isub">✅ ${esc(x.points_positifs)}</div>`:""}
         ${x.commentaire_coach?`<div class="isub">💬 ${esc(x.commentaire_coach)}</div>`:""}

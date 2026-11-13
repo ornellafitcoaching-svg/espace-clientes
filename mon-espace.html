@@ -839,9 +839,15 @@ async function addMyBilan(){
   const fields = [
     { name:"date", label:"Date du bilan", type:"date", value:Calc.today() },
     { name:"ressenti", label:"Comment tu te sens ? 🙂" },
-    { name:"evolution", label:"Ton évolution", type:"textarea" },
+    { name:"evolution", label:"Ce qui a changé depuis le dernier bilan, à part la balance 🌱", type:"textarea", hint:"Énergie, vêtements, humeur, confiance… avec tes mots" },
+    { name:"pourquoi_evolue", label:"Ton pourquoi est-il toujours le même ? 💛", type:"textarea", hint:"Qu'est-ce que tu ressens maintenant que tu ne ressentais pas au début ?" },
+    { name:"sommeil", label:"Ton sommeil ces 4 dernières semaines 🌙", type:"select", value:"", options:[
+      {value:"",label:"—"},{value:"bon",label:"Bon, réparateur"},{value:"moyen",label:"Moyen"},{value:"mauvais",label:"Mauvais / court"}]},
+    { name:"stress", label:"Ton niveau de stress (1 = zen → 10 = débordée) 😮‍💨", type:"number" },
+    { name:"energie", label:"Ton énergie au quotidien (1 → 5) ⚡", type:"number" },
+    { name:"motivation", label:"Ta motivation (1 → 5) 🔥", type:"number" },
     { name:"points_positifs", label:"Tes points positifs 💪", type:"textarea" },
-    { name:"difficultes", label:"Tes difficultés ⚠️", type:"textarea" },
+    { name:"difficultes", label:"Tes difficultés ⚠️", type:"textarea", hint:"Ce qui t'a freinée, y compris la fatigue, le stress, le manque de temps" },
     { name:"nouveaux_objectifs", label:"Tes nouveaux objectifs 🎯", type:"textarea" },
     MENSU_NOTE_FIELD,
   ].concat(mensuFieldsWithHints());
@@ -856,6 +862,10 @@ async function addMyBilan(){
     ressenti:v.ressenti||null, evolution:v.evolution||null, points_positifs:v.points_positifs||null,
     difficultes:v.difficultes||null, nouveaux_objectifs:v.nouveaux_objectifs||null,
     poids:(v.poids!=null && v.poids!=="")?Number(v.poids):null };
+  // Points « en profondeur » (migration_22 : colonne bilans.reponses) — seulement ceux renseignés.
+  const rep = {};
+  ["pourquoi_evolue","sommeil","stress","energie","motivation"].forEach(k=>{ if (v[k]!=null && v[k]!=="") rep[k]=v[k]; });
+  if (Object.keys(rep).length) bilan.reponses = rep;
   try{
     const r1 = await sb.from("bilans").insert(bilan); if (r1.error) throw r1.error;
     if (mrows.length){ const r2 = await insertMensuRows(mrows); if (r2.error) throw r2.error; }
@@ -865,6 +875,11 @@ async function addMyBilan(){
     const parts = [];
     if (v.ressenti) parts.push(`Ressenti : ${v.ressenti}`);
     if (v.evolution) parts.push(`Évolution : ${v.evolution}`);
+    if (v.pourquoi_evolue) parts.push(`Mon pourquoi : ${v.pourquoi_evolue}`);
+    if (v.sommeil) parts.push(`Sommeil : ${v.sommeil}`);
+    if (v.stress!=null && v.stress!=="") parts.push(`Stress : ${v.stress}/10`);
+    if (v.energie!=null && v.energie!=="") parts.push(`Énergie : ${v.energie}/5`);
+    if (v.motivation!=null && v.motivation!=="") parts.push(`Motivation : ${v.motivation}/5`);
     if (v.points_positifs) parts.push(`Points positifs : ${v.points_positifs}`);
     if (v.difficultes) parts.push(`Difficultés : ${v.difficultes}`);
     if (v.nouveaux_objectifs) parts.push(`Nouveaux objectifs : ${v.nouveaux_objectifs}`);
@@ -1176,6 +1191,8 @@ function viewBilans(){
       </div>
       ${line("Ressenti", x.ressenti)}
       ${line("Évolution", x.evolution)}
+      ${x.reponses&&x.reponses.pourquoi_evolue?line("💛 Mon pourquoi", x.reponses.pourquoi_evolue):""}
+      ${x.reponses&&(x.reponses.sommeil||x.reponses.stress!=null||x.reponses.energie!=null||x.reponses.motivation!=null)?line("🌙 Sommeil · stress · énergie", [x.reponses.sommeil&&("sommeil "+x.reponses.sommeil), x.reponses.stress!=null&&("stress "+x.reponses.stress+"/10"), x.reponses.energie!=null&&("énergie "+x.reponses.energie+"/5"), x.reponses.motivation!=null&&("motivation "+x.reponses.motivation+"/5")].filter(Boolean).join(" · ")):""}
       ${line("✅ Objectifs atteints", x.objectifs_atteints)}
       ${line("💪 Points positifs", x.points_positifs)}
       ${line("⚠️ Difficultés", x.difficultes)}
